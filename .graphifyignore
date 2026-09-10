@@ -1,0 +1,46 @@
+# .graphifyignore — index ONLY real application/source code.
+# (node_modules, build, dist, target, .dart_tool, .venv, .git are auto-skipped already.)
+
+# ---- Tests (we do NOT graph test code) ----
+test/
+tests/
+integration_test/
+test_driver/
+__tests__/
+e2e/
+cypress/
+*_test.dart
+*.test.js
+*.test.jsx
+*.test.ts
+*.test.tsx
+*.spec.js
+*.spec.jsx
+*.spec.ts
+*.spec.tsx
+*_test.py
+conftest.py
+coverage/
+
+# ---- Vendored native deps (CocoaPods, symlinked plugins) ----
+Pods/
+ios/Pods/
+macos/Pods/
+.symlinks/
+
+# ---- Generated Dart (build_runner / freezed / json_serializable / retrofit / protobuf) ----
+*.g.dart
+*.freezed.dart
+*.gr.dart
+*.config.dart
+*.mocks.dart
+*.pb.dart
+*.pbenum.dart
+*.pbjson.dart
+*.pbserver.dart
+
+# ---- Generated / minified JS-TS (backends) ----
+*.min.js
+*.bundle.js
+generated/
+prisma/generated/
