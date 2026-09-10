@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/scene/glass_scene.dart';
@@ -80,4 +82,108 @@ void main() {
     final tight = scene.bounds(padding: 0);
     expect(padded.width, closeTo(tight.width + 1, 1e-9));
   });
+
+  test(
+    'uniformTranslationSince refuses a translation when the shape count '
+    'differs, even though every shape in common agrees on the delta',
+    () {
+      final before = GlassScene()
+        ..register('a', _geometry())
+        ..register('b', _geometry(origin: const Offset(50, 0)));
+      final after = GlassScene()
+        ..register('a', _geometry(origin: const Offset(10, 5)))
+        ..register('b', _geometry(origin: const Offset(60, 5)))
+        ..register('c', _geometry(origin: const Offset(70, 5)));
+
+      expect(after.uniformTranslationSince(before), isNull);
+    },
+  );
+
+  test(
+    'uniformTranslationSince refuses a translation when a shape key from '
+    'one scene has no counterpart in the other',
+    () {
+      final before = GlassScene()
+        ..register('a', _geometry())
+        ..register('b', _geometry(origin: const Offset(50, 0)));
+      final after = GlassScene()
+        ..register('a', _geometry(origin: const Offset(10, 5)))
+        ..register('c', _geometry(origin: const Offset(60, 5)));
+
+      expect(after.uniformTranslationSince(before), isNull);
+    },
+  );
+
+  test(
+    'uniformTranslationSince refuses a translation when a shape also '
+    'changed, so a shifted matte is never reused over pixels that no '
+    'longer match',
+    () {
+      final before = GlassScene()
+        ..register('a', _geometry())
+        ..register('b', _geometry(origin: const Offset(50, 0)));
+      final after = GlassScene()
+        ..register('a', _geometry(origin: const Offset(10, 5)))
+        ..register(
+          'b',
+          _geometry(origin: const Offset(60, 5), radius: 16),
+        );
+
+      expect(after.uniformTranslationSince(before), isNull);
+    },
+  );
+
+  test(
+    'unregistering a key that was never registered leaves the revision '
+    'unchanged',
+    () {
+      final scene = GlassScene()..register('a', _geometry());
+      final after = scene.revision;
+      scene.unregister('does-not-exist');
+      expect(scene.revision, after);
+    },
+  );
+
+  test(
+    "bounds encloses a rotated shape's corners, wider than its unrotated "
+    'footprint',
+    () {
+      const size = Size(40, 100);
+      const shape = GlassRoundedRectangle(
+        radius: BorderRadius.all(Radius.circular(8)),
+      );
+      final straightScene = GlassScene()
+        ..register(
+          'a',
+          ShapeGeometry.resolve(
+            shape: shape,
+            size: size,
+            toLayer: Matrix4.identity(),
+            devicePixelRatio: 1,
+          ),
+        );
+      final rotatedScene = GlassScene()
+        ..register(
+          'a',
+          ShapeGeometry.resolve(
+            shape: shape,
+            size: size,
+            toLayer: Matrix4.rotationZ(math.pi / 4),
+            devicePixelRatio: 1,
+          ),
+        );
+
+      final straightBounds = straightScene.bounds(padding: 0);
+      final rotatedBounds = rotatedScene.bounds(padding: 0);
+
+      // A 40x100 rectangle rotated 45 degrees has an axis-aligned bounding
+      // box that is a square of side (20 + 50) * sqrt(2) — wider than the
+      // unrotated shape's 40-pixel width.
+      // The basis is stored as Float32List, so allow for float32 rounding.
+      const expectedSide = (20 + 50) * math.sqrt2;
+      expect(rotatedBounds.width, closeTo(expectedSide, 1e-3));
+      expect(rotatedBounds.height, closeTo(expectedSide, 1e-3));
+      expect(rotatedBounds.width, greaterThan(straightBounds.width));
+    },
+  );
 }
