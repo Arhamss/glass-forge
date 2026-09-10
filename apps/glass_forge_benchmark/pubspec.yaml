@@ -25,10 +25,6 @@ dependencies:
   # What we are measuring.
   glass_forge:
     path: ../../packages/glass_forge
-  glass_forge_gpu:
-    path: ../../packages/glass_forge_gpu
-  glass_forge_platform:
-    path: ../../packages/glass_forge_platform
 
   # State + routing for the harness UI itself.
   bloc: ^9.2.1

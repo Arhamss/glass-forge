@@ -14,8 +14,18 @@ dependencies:
     sdk: flutter
 
   # Spring physics. Depended on, never vendored — it is stable and maintained.
-  # See docs/reference/motor_teardown.md for what it does and does not give us.
+  # See docs/reference/motor_teardown.md for what it gives us and the six gaps
+  # we fill ourselves.
   motor: ^1.1.0
+
+  plugin_platform_interface: ^2.1.8
+
+  # NOTE: flutter_gpu, flutter_gpu_shaders and the native-assets build hook
+  # land with the Flutter GPU geometry producer, not before. Declaring them
+  # now would run a shader-compiling build hook in every consumer's build for
+  # a code path that does not exist yet. When they do land, the hook must fail
+  # soft: if the bundle cannot be built, the package still works through the
+  # runtime-effect producer rather than breaking the consumer's build.
 
 dev_dependencies:
   flutter_test:
@@ -24,6 +34,24 @@ dev_dependencies:
   very_good_analysis: ^10.3.0
 
 flutter:
+  # One package, everything inside.
+  #
+  # The native side exists because Flutter does not surface Reduce
+  # Transparency at all — the iOS accessibility bitmask never reads
+  # isReduceTransparencyEnabled, and Android has no public equivalent. Every
+  # other Flutter glass package approximates it with MediaQuery.highContrast
+  # and ships a documented hole. Splitting this out would mean anyone who did
+  # not read the README silently got that same hole, so it lives here.
+  plugin:
+    platforms:
+      android:
+        package: com.codeable.glass_forge
+        pluginClass: GlassForgePlugin
+      ios:
+        pluginClass: GlassForgePlugin
+      macos:
+        pluginClass: GlassForgePlugin
+
   shaders:
     - shaders/geometry.frag
     - shaders/final_render.frag

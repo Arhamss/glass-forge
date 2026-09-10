@@ -17,10 +17,6 @@ dependencies:
   # What this workbench exists to exercise.
   glass_forge:
     path: ../../packages/glass_forge
-  glass_forge_gpu:
-    path: ../../packages/glass_forge_gpu
-  glass_forge_platform:
-    path: ../../packages/glass_forge_platform
 
   # State Management
   bloc: ^9.2.1

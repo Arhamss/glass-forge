@@ -7,10 +7,15 @@ environment:
 
 # Dart pub workspaces (native since 3.6) — one shared lockfile, one
 # .dart_tool/package_config.json, no cross-package version skew.
+#
+# glass_forge itself is deliberately ONE package. A consumer runs a single
+# `pub add` and gets everything: rendering, tiering, motion, and the native
+# accessibility signals. Splitting the native side out would have meant anyone
+# who skipped that package silently received a fake Reduce Transparency — the
+# exact defect every competing package documents. Not worth the packaging
+# tidiness.
 workspace:
   - packages/glass_forge
-  - packages/glass_forge_gpu
-  - packages/glass_forge_platform
   - apps/glass_forge_workbench
   - apps/glass_forge_benchmark
 

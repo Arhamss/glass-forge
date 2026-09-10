@@ -12,17 +12,15 @@ everywhere else, and the frame timings published so the claim is checkable.
 
 ## Layout
 
-A pub workspace — one lockfile, one resolution, no cross-package version skew.
+One package. `flutter pub add glass_forge` and everything works — rendering,
+tiering, motion, and the native accessibility signals. There is no companion
+package to remember, and no configuration required to get correct behaviour.
 
-| Package | What it is | Costs you |
-|---|---|---|
-| [`packages/glass_forge`](packages/glass_forge) | The core. Shapes, SDF, runtime-effect geometry producer, composition, tier engine, motion, tokens. | Nothing beyond Flutter and `motor`. Works on every platform. |
-| [`packages/glass_forge_gpu`](packages/glass_forge_gpu) | Flutter GPU geometry producer. Faster where available. | A beta SDK dependency and a native-assets build hook. Opt-in. |
-| [`packages/glass_forge_platform`](packages/glass_forge_platform) | Native signals: Reduce Transparency, thermal status, low-power mode. | Native build steps. Opt-in; the core degrades without it. |
-| [`apps/glass_forge_workbench`](apps/glass_forge_workbench) | Visual workbench — test surfaces, tier forcing, material knobs. | — |
-| [`apps/glass_forge_benchmark`](apps/glass_forge_benchmark) | Device benchmark harness. Deliberately minimal so it measures the renderer, not itself. | — |
-
-Add a package, get the faster path. Leave it out and you do not pay for it.
+| Path | What it is |
+|---|---|
+| [`packages/glass_forge`](packages/glass_forge) | The package. Shapes, SDF, both geometry producers, composition, tier engine, motion, tokens, native signals. |
+| [`apps/glass_forge_workbench`](apps/glass_forge_workbench) | Visual workbench — test surfaces, tier forcing, material knobs. |
+| [`apps/glass_forge_benchmark`](apps/glass_forge_benchmark) | Device benchmark harness. Deliberately minimal, so it measures the renderer rather than itself. |
 
 ## Why
 

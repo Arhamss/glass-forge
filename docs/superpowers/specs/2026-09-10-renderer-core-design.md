@@ -131,8 +131,9 @@ packages/glass_forge/lib/src/
     matte_generation.dart         immutable texture + bounds + revision
     matte_codec.dart              encode/decode contract
     runtime_geometry_producer.dart    Paint.shader + toImageSync
+    gpu_geometry_producer.dart        Flutter GPU, behind a capability check
     null_geometry_producer.dart       cheap tiers: no matte
-    producer_registry.dart        where glass_forge_gpu registers itself
+    producer_registry.dart        availability probing + tier-driven selection
   composition/
     glass_composition.dart        the single BackdropFilterLayer
     filter_snapshot.dart          uniform snapshot for native filter reuse
@@ -190,10 +191,12 @@ submitted and replaced.
 `!bounds.isFinite || width <= 0 || height <= 0` — the missing guard is upstream
 issues #149 and #131, both crash reports.
 
-`GpuGeometryProducer` (in `glass_forge_gpu`) renders a full-screen quad into a
-`devicePrivate` texture and exposes it via `Texture.asImage()`. It registers
-itself in `producer_registry.dart` from its own library initialiser, so core
-has no compile-time knowledge of it.
+`GpuGeometryProducer` renders a full-screen quad into a `devicePrivate`
+texture and exposes it via `Texture.asImage()`. It ships in the same package
+but is guarded: `capabilities.available` is false when Flutter GPU cannot
+initialise, when the shader bundle did not build, or when the backend is Skia.
+The registry then falls through to the runtime producer. A consumer never has
+to know either exists.
 
 ---
 

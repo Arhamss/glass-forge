@@ -46,6 +46,7 @@ Two further findings reshape the design:
 | Platforms | **Full matrix** — iOS, Android, web, macOS, Windows, Linux | Forces analytic normals (derivatives are rejected on web) and a real fallback path (`ImageFilter.shader` is Impeller-only). |
 | Flutter floor | **3.47** | No GLES Y-flip conditionals. `BackdropGroup`, `ImageFilter.shader`, `ImageFilterConfig.blur` all assumable. |
 | Geometry producer | **Both** — Flutter GPU and runtime-effect, behind one interface, selected by tier | §5.2 |
+| Packaging | **One package.** Everything ships in `glass_forge`. | §6 |
 | Customisation | **Layered**: tokens -> presets -> settings -> raw shader | Sub-project 4 |
 | Motion | **All four**: spring properties, gesture/press, morph/merge, ambient | Sub-project 3 |
 | Apple parity | **Faithful**, then superset | `apple_liquid_glass_spec.md` is the contract |
@@ -155,9 +156,10 @@ abstract interface class GeometryProducer {
 }
 ```
 
-`glass_forge_gpu` registers a `GpuGeometryProducer` with the core registry at
-startup. If the package is absent, the registry only ever sees the runtime
-producer, and nothing about the core changes.
+Both producers ship in the package. `GpuGeometryProducer` reports
+`available: false` when Flutter GPU cannot initialise — an older Flutter, a
+Skia backend, a shader bundle that did not build — and the registry falls
+through to the runtime producer.
 
 Selection is a **tier output**, not a compile-time constant — so a device that
 thermally throttles can fall back from the GPU producer to the runtime producer
@@ -288,28 +290,45 @@ This composes with the GPU timing probe in §5.6 — one offscreen pass does bot
 
 ## 6. Package layout
 
+**One package. `flutter pub add glass_forge` and everything works.**
+
 ```
-glass_forge/                    melos workspace
+glass_forge/                    pub workspace
   packages/
-    glass_forge/                core. pure Flutter. no native, no beta deps.
-                                shapes, SDF, runtime producer, composition,
-                                tier engine, motion, tokens.
-                                works on every platform, degrades on Skia/web.
-    glass_forge_gpu/            Flutter GPU geometry producer.
-                                flutter_gpu (beta) + native-assets hook.
-                                opt-in; self-registers with the core.
-    glass_forge_platform/       native signals plugin: Reduce Transparency,
-                                thermal status, thermal headroom, low power.
-                                opt-in; core degrades gracefully without it.
-  example/                      workbench app
-  benchmark/                    device benchmark harness
+    glass_forge/                THE package. Rendering, both geometry
+                                producers, tier engine, motion, tokens, and
+                                the native signals (Swift / Kotlin / macOS).
+  apps/
+    glass_forge_workbench/      visual workbench
+    glass_forge_benchmark/      device benchmark harness
 ```
 
-Rationale is cost isolation. Shipping the GPU producer in core would compile a
-`.shaderbundle` into every consumer alongside the runtime shaders, and drag in
-a beta dependency plus a native-assets build hook. Shipping the platform
-channel in core would make `glass_forge` a plugin, forcing native build steps
-on consumers who only want the pure-Dart path. Both stay opt-in.
+An earlier draft split this three ways — core, a Flutter GPU accelerator, and
+a native-signals plugin — to keep the build hook and the native code off
+consumers who did not want them. That was wrong, for a reason worth recording
+so nobody re-proposes it:
+
+**Splitting pushes a tier decision onto the caller.** The whole thesis of this
+package is "callers never branch on tier; the package does." A consumer who
+skipped the native-signals package would silently receive the
+`MediaQuery.highContrast` approximation of Reduce Transparency — the exact
+defect this package exists to fix, and the one every competitor documents in
+its own README. Shipping that as a *packaging* decision would be
+self-inflicted. Cost isolation is not worth a wrong default.
+
+What the single package must therefore guarantee:
+
+- **The Flutter GPU build hook fails soft.** If the shader bundle cannot be
+  built — an unsupported toolchain, an experimental API that moved — the hook
+  warns and the package still works through the runtime-effect producer. A
+  consumer's build must never break because of an optimisation they never
+  asked for.
+- **`flutter_gpu` is loaded behind a capability check**, not a hard import
+  path, so a Flutter release that changes it degrades to the runtime producer
+  rather than failing to compile.
+- **Native signals degrade explicitly.** Where the platform cannot answer,
+  the tier engine falls back to the `highContrast` approximation *and says so*
+  in a debug diagnostic, rather than pretending the answer is "off".
 
 ---
 
