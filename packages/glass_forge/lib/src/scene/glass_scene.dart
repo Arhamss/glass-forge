@@ -22,6 +22,23 @@ class GlassScene {
   /// The current revision. Changes only when the scene really changed.
   int get revision => _revision.value;
 
+  /// The render object that registered this scene's first shape, if any.
+  ///
+  /// Every shape registers under the render object that resolved it (see
+  /// `RenderGlassShape`), so this doubles as a starting point for walking
+  /// ancestor clips between a layer and its content: any registered shape
+  /// works equally well, since they all share this layer, so the first one
+  /// avoids scanning the whole scene to pick one arbitrarily. `null` both
+  /// when the scene is empty and when a caller registered under a key that
+  /// is not a render object, which only `GlassScene`'s own unit tests do.
+  RenderObject? get firstShapeOwner {
+    if (_shapes.isEmpty) {
+      return null;
+    }
+    final key = _shapes.keys.first;
+    return key is RenderObject ? key : null;
+  }
+
   /// Registers or updates the shape identified by [key].
   void register(Object key, ShapeGeometry geometry) {
     final existing = _shapes[key];

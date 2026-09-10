@@ -6,6 +6,13 @@ import 'package:glass_forge/src/scene/glass_scene.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/shapes/shape_geometry.dart';
 
+/// A trivial render object, standing in for a `RenderGlassShape` --
+/// `GlassScene` does not depend on that type, only on the key being a
+/// `RenderObject`.
+class _FakeShape extends RenderConstrainedBox {
+  _FakeShape() : super(additionalConstraints: const BoxConstraints());
+}
+
 ShapeGeometry _geometry({Offset origin = Offset.zero, double radius = 8}) {
   return ShapeGeometry.resolve(
     shape: GlassRoundedRectangle(
@@ -141,6 +148,49 @@ void main() {
       final after = scene.revision;
       scene.unregister('does-not-exist');
       expect(scene.revision, after);
+    },
+  );
+
+  test('firstShapeOwner is null for an empty scene', () {
+    expect(GlassScene().firstShapeOwner, isNull);
+  });
+
+  test(
+    'firstShapeOwner is null when shapes were registered under a key that '
+    'is not a render object',
+    () {
+      // Production code always registers under the RenderGlassShape that
+      // resolved the geometry; only this file's own helper tests register
+      // under plain strings, for brevity. firstShapeOwner exists to hand a
+      // real starting point to the ancestor-clip walk, so it must refuse a
+      // key it cannot walk from rather than hand back something unusable.
+      final scene = GlassScene()..register('a', _geometry());
+      expect(scene.firstShapeOwner, isNull);
+    },
+  );
+
+  test(
+    'firstShapeOwner returns the render object that registered the first '
+    'shape',
+    () {
+      final first = _FakeShape();
+      final second = _FakeShape();
+      final scene = GlassScene()
+        ..register(first, _geometry())
+        ..register(second, _geometry(origin: const Offset(50, 0)));
+
+      expect(scene.firstShapeOwner, same(first));
+    },
+  );
+
+  test(
+    'firstShapeOwner is null again once the last shape unregisters',
+    () {
+      final shape = _FakeShape();
+      final scene = GlassScene()
+        ..register(shape, _geometry())
+        ..unregister(shape);
+      expect(scene.firstShapeOwner, isNull);
     },
   );
 

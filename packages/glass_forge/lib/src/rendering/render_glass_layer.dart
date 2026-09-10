@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:glass_forge/src/composition/filter_snapshot.dart';
 import 'package:glass_forge/src/composition/glass_composition.dart';
 import 'package:glass_forge/src/composition/pixel_buckets.dart';
+import 'package:glass_forge/src/composition/retained_clip_chain.dart';
 import 'package:glass_forge/src/diagnostics/render_counters.dart';
 import 'package:glass_forge/src/geometry/geometry_producer.dart';
 import 'package:glass_forge/src/geometry/matte_generation.dart';
@@ -40,6 +41,12 @@ class RenderGlassLayer extends RenderProxyBox {
 
   /// The shapes belonging to this layer.
   final GlassScene scene = GlassScene();
+
+  final RetainedClipChain _clipChain = RetainedClipChain();
+
+  /// The ancestor clips most recently retained for re-pushing. Test-only.
+  @visibleForTesting
+  List<RetainedClip> get debugClipChain => _clipChain.clips;
 
   final GlassComposition _composition = GlassComposition();
   final GeometryProducer _producer;
@@ -104,21 +111,86 @@ class RenderGlassLayer extends RenderProxyBox {
       return;
     }
 
+    // Collected fresh every paint: an ancestor's position relative to this
+    // layer can change (most commonly by scrolling) without this layer's
+    // own scene ever changing, so nothing else would tell us to re-walk.
+    final firstShape = scene.firstShapeOwner;
+    if (firstShape == null) {
+      _clipChain.clear();
+    } else {
+      _clipChain.collect(firstShape, this);
+    }
+
+    _pushGlassLayers(context, offset, filter);
+  }
+
+  /// Pushes the backdrop pass wrapped in every retained ancestor clip,
+  /// outermost first, with the layer's own local clip innermost.
+  ///
+  /// Scrolling moves material through a viewport, not the viewport through
+  /// the material: each retained clip is re-pushed here, outside this
+  /// layer's own offset, so it stays anchored to its own ancestor's bounds
+  /// instead of moving with this layer's content.
+  void _pushGlassLayers(
+    PaintingContext context,
+    Offset offset,
+    ui.ImageFilter filter,
+  ) {
     GlassRenderCounters.instance.recordBackdropPush();
-    // The clip is computed in this layer's own local space — [offset] is
-    // folded in once, by pushClipRect itself, rather than here too; doing it
-    // twice would shift the clip by offset a second time.
-    final clip = expandToPixelBuckets(Offset.zero & size);
-    context.pushClipRect(needsCompositing, offset, clip, (
-      innerContext,
-      innerOffset,
-    ) {
-      innerContext.pushLayer(
-        BackdropFilterLayer()..filter = filter,
-        super.paint,
-        innerOffset,
-      );
-    });
+
+    void pushBackdrop(PaintingContext innerContext, Offset innerOffset) {
+      // The clip is computed in this layer's own local space — the offset
+      // is folded in once, by pushClipRect itself, rather than here too;
+      // doing it twice would shift the clip by offset a second time.
+      final clip = expandToPixelBuckets(Offset.zero & size);
+      innerContext.pushClipRect(needsCompositing, innerOffset, clip, (
+        clippedContext,
+        clippedOffset,
+      ) {
+        clippedContext.pushLayer(
+          BackdropFilterLayer()..filter = filter,
+          super.paint,
+          clippedOffset,
+        );
+      });
+    }
+
+    // Innermost first when building the closure chain, so that the
+    // outermost clip ends up outermost in the layer tree.
+    var paint = pushBackdrop;
+    for (final captured in _clipChain.clips) {
+      final next = paint;
+      paint = (innerContext, innerOffset) {
+        innerContext.pushTransform(
+          needsCompositing,
+          innerOffset,
+          captured.transform,
+          (transformedContext, transformedOffset) {
+            final rrect = captured.rrect;
+            if (rrect != null) {
+              transformedContext.pushClipRRect(
+                needsCompositing,
+                transformedOffset,
+                captured.rect,
+                rrect,
+                next,
+                clipBehavior: captured.behavior,
+              );
+            } else {
+              transformedContext.pushClipRect(
+                needsCompositing,
+                transformedOffset,
+                captured.rect,
+                next,
+                clipBehavior: captured.behavior,
+              );
+            }
+          },
+        );
+      };
+    }
+
+    paint(context, offset);
   }
 
   void _refreshMatte() {
