@@ -25,5 +25,17 @@ jobs:
         run: flutter build web --release -t lib/main_development.dart
         working-directory: apps/glass_forge_workbench
 
-      - run: flutter analyze
-      - run: flutter test
+      # Workspace-aware: analyzing from the workspace root covers every
+      # package in the pub workspace. Explicit so that stays true on purpose,
+      # not because it happens to be the step's default working directory.
+      - name: flutter analyze
+        run: flutter analyze
+        working-directory: .
+
+      # packages/glass_forge is where test/ actually lives — the pub
+      # workspace root has none. Without this, `flutter test` fails
+      # immediately with `Test directory "test" not found`, before any of
+      # the package's tests, including the SDF contract test, ever run.
+      - name: flutter test
+        run: flutter test
+        working-directory: packages/glass_forge

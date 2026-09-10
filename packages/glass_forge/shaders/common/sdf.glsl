@@ -5,8 +5,18 @@
 //   * uShapeData is read as a GLOBAL, never passed as a parameter. A by-value
 //     array parameter makes spirv-cross emit `float param[96] = uShapeData;`,
 //     which SkSL rejects outright. This is upstream issue #150.
-//   * Array indices are compile-time constants, expanded by macro. SkSL
-//     requires uniform-array indices to be constant.
+//   * SkSL requires uniform-array indices to be constant. gfToLocal,
+//     gfShapeDistance and gfBoundLowerBound all take the shape index `i` as
+//     a plain `int` parameter, and the GF_* macros index uShapeData with
+//     that runtime value — there is no macro expansion to a literal here.
+//     Whether SkSL's inliner substitutes the caller's literal loop index
+//     before its constant-index check is UNVERIFIED: this file has no
+//     includer yet, so nothing has compiled it through a real SkSL target.
+//     Task 9 (geometry.frag includes this file) is what will tell us. If
+//     that build rejects it, the known-good remedy — what upstream's own
+//     web-compatibility branch used for this exact problem — is a
+//     macro-expanded per-index accessor for 0..MAX_SHAPES-1, so every index
+//     becomes a literal.
 //   * Loops have constant bounds and exit with `break`. A non-constant loop
 //     initialiser is the second half of #150.
 //   * No sampler2D parameters anywhere. SkSL rejects those too.

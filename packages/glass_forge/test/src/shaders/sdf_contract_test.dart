@@ -34,15 +34,44 @@ String _stripComments(String source) {
   return buffer.toString();
 }
 
+/// A GLSL scalar, vector, or matrix type name — everything a by-value array
+/// parameter could plausibly be typed as (`uShapeData` itself is `vec4[]`,
+/// not `float[]`, so the type list has to cover more than the one type the
+/// upstream defect happened to use).
+const _glslTypePattern =
+    '(?:bool|u?int|float|double|[iubd]?vec[234]|mat[234](?:x[234])?)';
+
+/// Finds each `for (...)` loop header in [source], tracking paren depth so a
+/// nested call in the bound (e.g. `i < min(4, n)`) cannot truncate the
+/// header early the way a plain `[^)]*` capture would.
+List<String> _forHeaders(String source) {
+  final headers = <String>[];
+  for (final match in RegExp(r'\bfor\s*\(').allMatches(source)) {
+    var depth = 1;
+    var i = match.end;
+    final start = i;
+    while (i < source.length && depth > 0) {
+      if (source[i] == '(') depth++;
+      if (source[i] == ')') depth--;
+      if (depth > 0) i++;
+    }
+    headers.add(source.substring(start, i));
+  }
+  return headers;
+}
+
 void main() {
   final sdf = File('shaders/common/sdf.glsl').readAsStringSync();
   final code = _stripComments(sdf);
 
   test('reads the uniform array as a global, never as a parameter', () {
     // The exact defect behind upstream #150: a by-value array parameter makes
-    // spirv-cross emit an array copy-initializer that SkSL rejects.
+    // spirv-cross emit an array copy-initializer that SkSL rejects. Checked
+    // against every GLSL type, not just `float` — uShapeData itself is
+    // `vec4[]`, so a parameter typed `vec4 shapeData[24]` is exactly the
+    // defect this test exists to catch, and a float-only pattern would miss it.
     expect(
-      RegExp(r'\(\s*[^)]*float\s+\w+\s*\[').hasMatch(code),
+      RegExp(r'\(\s*[^)]*' '$_glslTypePattern' r'\s+\w+\s*\[').hasMatch(code),
       isFalse,
       reason: 'an array parameter would break SkSL compilation',
     );
@@ -64,10 +93,9 @@ void main() {
   });
 
   test('every loop has constant bounds', () {
-    for (final match in RegExp(r'for\s*\(([^)]*)\)').allMatches(code)) {
-      final header = match.group(1)!;
+    for (final header in _forHeaders(code)) {
       expect(
-        RegExp(r'<\s*\d+').hasMatch(header),
+        RegExp(r'<=?\s*\d+').hasMatch(header),
         isTrue,
         reason: 'non-constant loop bound in "$header" breaks SkSL',
       );
