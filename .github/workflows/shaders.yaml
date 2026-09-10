@@ -44,9 +44,10 @@ jobs:
         run: flutter test
         working-directory: packages/glass_forge
 
-      # Tests tagged `impeller` (currently only glass_composition_test.dart,
-      # which constructs `ui.ImageFilter.shader`) are skipped by the step
-      # above: that API throws `UnsupportedError` unless the engine's
+      # Tests tagged `impeller` (currently glass_composition_test.dart and
+      # glass_widgets_test.dart, which construct `ui.ImageFilter.shader`) are
+      # skipped by the step above: that API throws `UnsupportedError` unless
+      # the engine's
       # Impeller backend is active, and `flutter_tester`'s default software
       # backend — what plain `flutter test` runs on — does not enable it.
       # Run them here instead, explicitly selected and with Impeller turned

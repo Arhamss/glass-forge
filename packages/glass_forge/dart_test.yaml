@@ -1,11 +1,11 @@
 # `ui.ImageFilter.shader` throws `UnsupportedError` unless the engine's
 # Impeller backend is active, and `flutter_tester`'s default software
-# backend does not enable it. Tests tagged `impeller` (currently only
-# glass_composition_test.dart — see its `@Tags(['impeller'])`) are marked
-# skipped here so a bare `flutter test` — the invocation every other suite
-# in this package, and CI's default step, uses — passes on the default
-# backend and reports them as skipped instead of failing on an
-# unrelated-looking engine error.
+# backend does not enable it. Tests tagged `impeller` (currently
+# glass_composition_test.dart and glass_widgets_test.dart — see each file's
+# `@Tags(['impeller'])`) are marked skipped here so a bare `flutter test` —
+# the invocation every other suite in this package, and CI's default step,
+# uses — passes on the default backend and reports them as skipped instead
+# of failing on an unrelated-looking engine error.
 #
 # `exclude_tags` cannot do this job: once a tag is in `exclude_tags`,
 # `package:test` drops those tests from the run entirely and no

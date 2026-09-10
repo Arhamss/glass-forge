@@ -10,5 +10,11 @@
 library;
 
 export 'src/glass_forge.dart';
+export 'src/material/glass_material.dart';
+export 'src/material/glass_variant.dart';
 export 'src/platform/glass_forge_platform_interface.dart'
     show GlassForgePlatform;
+export 'src/shapes/glass_shape.dart';
+export 'src/widgets/glass.dart';
+export 'src/widgets/glass_blend_group.dart';
+export 'src/widgets/glass_layer.dart';
