@@ -38,4 +38,39 @@ void main() {
     const shape = GlassOval();
     expect(shape.resolveRadius(const Size(100, 40)), 0);
   });
+
+  test('refraction silhouette and clip silhouette agree for rounded rect', () {
+    const shape = GlassRoundedRectangle(radius: BorderRadius.zero);
+    const size = Size(100, 100);
+    expect(shape.toBorder(size), isA<RoundedRectangleBorder>());
+  });
+
+  test('refraction silhouette and clip silhouette agree for oval', () {
+    const shape = GlassOval();
+    const size = Size(100, 100);
+    expect(shape.toBorder(size), isA<OvalBorder>());
+  });
+
+  test(
+    'refraction silhouette and clip silhouette agree for superellipse, not '
+    'silently a rounded rectangle',
+    () {
+      const shape = GlassSuperellipse(radius: BorderRadius.zero);
+      const size = Size(100, 100);
+      final border = shape.toBorder(size);
+      expect(border, isA<RoundedSuperellipseBorder>());
+      expect(border, isNot(isA<RoundedRectangleBorder>()));
+    },
+  );
+
+  test('clip uses clamped radius, not requested radius', () {
+    const shape = GlassRoundedRectangle(
+      radius: BorderRadius.all(Radius.circular(9000)),
+    );
+    const size = Size(100, 40);
+    final border = shape.toBorder(size) as RoundedRectangleBorder;
+    // The requested radius is 9000, but the limit is half the shorter side
+    // (20). The border should be built from 20, not 9000.
+    expect(border.borderRadius, BorderRadius.circular(20));
+  });
 }
