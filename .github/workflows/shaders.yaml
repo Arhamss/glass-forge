@@ -1,0 +1,29 @@
+name: shaders
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  sksl:
+    name: shaders compile as SkSL
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.2
+
+      - run: flutter pub get
+
+      # A web build compiles every bundled shader through the SkSL target.
+      # This is the gate upstream did not have: it shipped shaders that fail
+      # SkSL twice, and found out from user bug reports months later.
+      - name: build web (compiles shaders as SkSL)
+        run: flutter build web --release
+        working-directory: apps/glass_forge_workbench
+
+      - run: flutter analyze
+      - run: flutter test
