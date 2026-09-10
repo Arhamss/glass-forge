@@ -22,7 +22,7 @@ jobs:
       # This is the gate upstream did not have: it shipped shaders that fail
       # SkSL twice, and found out from user bug reports months later.
       - name: build web (compiles shaders as SkSL)
-        run: flutter build web --release
+        run: flutter build web --release -t lib/main_development.dart
         working-directory: apps/glass_forge_workbench
 
       - run: flutter analyze

@@ -10,8 +10,7 @@
 //   * Loops have constant bounds and exit with `break`. A non-constant loop
 //     initialiser is the second half of #150.
 //   * No sampler2D parameters anywhere. SkSL rejects those too.
-//   * No screen-space partial-derivative built-ins (or their magnitude
-//     convenience wrapper). Rejected on web (flutter#180959), and undefined
+//   * No dFdx/dFdy/fwidth. Rejected on web (flutter#180959), and undefined
 //     after a non-uniform early return. Normals here are analytic.
 //
 // The includer must declare, BEFORE including this file:
