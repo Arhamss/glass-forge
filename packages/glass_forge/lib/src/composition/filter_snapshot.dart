@@ -15,13 +15,17 @@ import 'package:glass_forge/src/geometry/matte_generation.dart';
 @immutable
 class FilterSnapshot {
   /// Creates a snapshot.
-  const FilterSnapshot({
+  ///
+  /// Prefer [FilterSnapshot.of] to ensure [coordinateMapping] is defensively
+  /// copied. This constructor stores the list as-is, so callers must not
+  /// mutate it afterwards.
+  FilterSnapshot({
     required this.texture,
     required this.matteBounds,
     required this.devicePixelRatio,
     required this.materialRevision,
-    required this.coordinateMapping,
-  });
+    required Float32List coordinateMapping,
+  }) : coordinateMapping = Float32List.fromList(coordinateMapping);
 
   /// Captures the current state.
   factory FilterSnapshot.of({
