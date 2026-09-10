@@ -8,7 +8,12 @@ void main() {
     expect(kMaxShapes * floatsPerShape, lessThanOrEqualTo(kMaxShapeFloats));
   });
 
-  test('the cap is documented as measured, not assumed', () {
-    expect(kMaxShapesProvenance, isNotEmpty);
-  });
+  test(
+    'the provenance states the cap is derived, not device-confirmed, and '
+    'names what would confirm it',
+    () {
+      expect(kMaxShapesProvenance, contains('Derived'));
+      expect(kMaxShapesProvenance, contains('shaders/probe.frag'));
+    },
+  );
 }

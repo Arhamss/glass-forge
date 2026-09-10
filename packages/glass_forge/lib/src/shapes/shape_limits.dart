@@ -1,10 +1,11 @@
 /// The maximum number of shapes a single geometry pass can carry.
 ///
-/// This is a measured ceiling, not a preference. Upstream's equivalent is 16,
-/// derived from six floats per shape hitting Impeller's uniform-buffer limit
-/// of 96 floats. Our layout is wider — three `vec4` per shape, because it
-/// carries an inverse affine basis so rotated and non-uniformly scaled shapes
-/// refract in the right direction — so upstream's number does not transfer.
+/// This is derived from the uniform-buffer budget, not yet confirmed on
+/// device. Upstream's equivalent is 16, from six floats per shape hitting
+/// Impeller's uniform-buffer limit of 96 floats. Our layout is wider — three
+/// `vec4` per shape, because it carries an inverse affine basis so rotated
+/// and non-uniformly scaled shapes refract in the right direction — so
+/// upstream's number does not transfer: 96 floats / 12 floats per shape = 8.
 ///
 /// Raise this only after re-running the probe on the weakest backend you
 /// intend to support, and update [kMaxShapesProvenance] with what you saw.

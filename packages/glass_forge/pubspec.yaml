@@ -53,6 +53,4 @@ flutter:
         pluginClass: GlassForgePlugin
 
   shaders:
-    - shaders/geometry.frag
-    - shaders/final_render.frag
     - shaders/probe.frag

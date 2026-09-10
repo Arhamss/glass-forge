@@ -14,7 +14,8 @@ out vec4 fragColor;
 
 void main() {
     // Touch every declared slot so the compiler cannot strip the array.
-    // Constant loop bounds with an early break keeps this SkSL-legal.
+    // The loop runs to completion (no break) so every slot is read; the
+    // bound is a compile-time constant, which keeps this SkSL-legal.
     float acc = 0.0;
     for (int i = 0; i < MAX_SHAPES * 3; i++) {
         acc += uShapeData[i].x;
