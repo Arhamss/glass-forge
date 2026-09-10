@@ -66,6 +66,21 @@ void main() {
     for (var i = 0; i < 10; i++) {
       await tester.pump(const Duration(milliseconds: 16));
     }
+    // The pump loop above cannot move the counter in either direction: a
+    // bare pump() on a tree with nothing dirtied never reaches paint() at
+    // all (see "scrolling bakes no new mattes" above, and the vacuous
+    // reset-then-pump pattern documented on the two tests below it), so on
+    // its own it is not a meaningful check of anything. Driving a genuine
+    // second paint() call directly on the render object is what actually
+    // exercises whether a caching bug in _refreshMatte would spuriously
+    // rebake on an idle repaint.
+    final layer = tester.renderObject<RenderGlassLayer>(
+      find.byType(GlassLayer),
+    );
+    final rootLayer = ContainerLayer();
+    final context = PaintingContext(rootLayer, Rect.largest);
+    layer.paint(context, Offset.zero);
+    rootLayer.dispose();
 
     expect(GlassRenderCounters.instance.matteProduceCount, afterFirst);
   });
