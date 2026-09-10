@@ -54,3 +54,4 @@ flutter:
 
   shaders:
     - shaders/probe.frag
+    - shaders/geometry.frag

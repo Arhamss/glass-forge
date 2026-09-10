@@ -5,18 +5,21 @@
 //   * uShapeData is read as a GLOBAL, never passed as a parameter. A by-value
 //     array parameter makes spirv-cross emit `float param[96] = uShapeData;`,
 //     which SkSL rejects outright. This is upstream issue #150.
-//   * SkSL requires uniform-array indices to be constant. gfToLocal,
-//     gfShapeDistance and gfBoundLowerBound all take the shape index `i` as
-//     a plain `int` parameter, and the GF_* macros index uShapeData with
-//     that runtime value — there is no macro expansion to a literal here.
-//     Whether SkSL's inliner substitutes the caller's literal loop index
-//     before its constant-index check is UNVERIFIED: this file has no
-//     includer yet, so nothing has compiled it through a real SkSL target.
-//     Task 9 (geometry.frag includes this file) is what will tell us. If
-//     that build rejects it, the known-good remedy — what upstream's own
-//     web-compatibility branch used for this exact problem — is a
-//     macro-expanded per-index accessor for 0..MAX_SHAPES-1, so every index
-//     becomes a literal.
+//   * SkSL requires uniform-array indices to be constant, and a plain `int`
+//     parameter does NOT qualify even when every call site happens to pass a
+//     loop index. RESOLVED by Task 9's build — the first thing to compile
+//     this file through a real SkSL target, via geometry.frag, which is its
+//     first includer. impellerc rejected the naive version (gfToLocal,
+//     gfShapeDistance and gfBoundLowerBound indexing uShapeData with a plain
+//     `int i` parameter) with:
+//       error: 19: index expression must be constant
+//           vec2 d = p - uShapeData[(i * 3) + 0].xy;
+//     The fix below — the known-good remedy, matching what upstream's own
+//     web-compatibility branch did for the identical problem — keeps each
+//     function's `(int i, vec2 p)` signature for callers, but dispatches
+//     internally on a runtime if-chain over the literal indices
+//     0..MAX_SHAPES-1: every array access inside a branch uses that
+//     branch's own literal, never `i` itself.
 //   * Loops have constant bounds and exit with `break`. A non-constant loop
 //     initialiser is the second half of #150.
 //   * No sampler2D parameters anywhere. SkSL rejects those too.
@@ -104,39 +107,62 @@ float smoothUnion(float a, float b, float k) {
 #define GF_DISTSCALE(i)  uShapeData[(i) * 3 + 2].z
 #define GF_MARKER(i)     uShapeData[(i) * 3 + 2].w
 
+// Every literal shape index 0..MAX_SHAPES-1 (MAX_SHAPES is always 8; see
+// shape_limits.dart). X is applied to each, once, to build the if-chains
+// below.
+#define GF_SHAPE_CASES(X) X(0) X(1) X(2) X(3) X(4) X(5) X(6) X(7)
+
 vec2 gfToLocal(int i, vec2 p) {
-    vec2 d = p - GF_ORIGIN(i);
-    vec4 m = GF_BASIS(i);
-    return vec2(m.x * d.x + m.y * d.y, m.z * d.x + m.w * d.y);
+#define GF_CASE_TOLOCAL(I) \
+    if (i == (I)) { \
+        vec2 d = p - GF_ORIGIN(I); \
+        vec4 m = GF_BASIS(I); \
+        return vec2(m.x * d.x + m.y * d.y, m.z * d.x + m.w * d.y); \
+    }
+    GF_SHAPE_CASES(GF_CASE_TOLOCAL)
+#undef GF_CASE_TOLOCAL
+    return p;
 }
 
 float gfShapeDistance(int i, vec2 p) {
-    float type = GF_TYPE(i);
-    if (type < 0.5) {
-        return 1e9;
+#define GF_CASE_SHAPE_DISTANCE(I) \
+    if (i == (I)) { \
+        float type = GF_TYPE(I); \
+        if (type < 0.5) { \
+            return 1e9; \
+        } \
+        vec2 local = gfToLocal(I, p); \
+        vec2 extent = GF_EXTENT(I); \
+        float radius = GF_RADIUS(I); \
+        float d; \
+        if (type < 1.5) { \
+            d = sdRoundedBox(local, extent, radius); \
+        } else if (type < 2.5) { \
+            d = sdEllipse(local, extent); \
+        } else { \
+            d = sdSuperellipse(local, extent, radius); \
+        } \
+        return d * GF_DISTSCALE(I); \
     }
-    vec2 local = gfToLocal(i, p);
-    vec2 extent = GF_EXTENT(i);
-    float radius = GF_RADIUS(i);
-    float d;
-    if (type < 1.5) {
-        d = sdRoundedBox(local, extent, radius);
-    } else if (type < 2.5) {
-        d = sdEllipse(local, extent);
-    } else {
-        d = sdSuperellipse(local, extent, radius);
-    }
-    return d * GF_DISTSCALE(i);
+    GF_SHAPE_CASES(GF_CASE_SHAPE_DISTANCE)
+#undef GF_CASE_SHAPE_DISTANCE
+    return 1e9;
 }
 
 // A conservative lower bound on this shape's distance, cheap enough to be
 // worth evaluating before the real SDF. Upstream measured 14-23% GPU savings
 // from culling on this bound; an L-infinity bound culled less and ran slower.
 float gfBoundLowerBound(int i, vec2 p) {
-    if (GF_TYPE(i) < 0.5) {
-        return 1e9;
+#define GF_CASE_BOUND(I) \
+    if (i == (I)) { \
+        if (GF_TYPE(I) < 0.5) { \
+            return 1e9; \
+        } \
+        vec2 local = gfToLocal(I, p); \
+        vec2 d = abs(local) - GF_EXTENT(I); \
+        return length(max(d, vec2(0.0))) * GF_DISTSCALE(I); \
     }
-    vec2 local = gfToLocal(i, p);
-    vec2 d = abs(local) - GF_EXTENT(i);
-    return length(max(d, vec2(0.0))) * GF_DISTSCALE(i);
+    GF_SHAPE_CASES(GF_CASE_BOUND)
+#undef GF_CASE_BOUND
+    return 1e9;
 }
