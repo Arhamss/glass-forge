@@ -122,6 +122,13 @@ class RuntimeGeometryProducer implements GeometryProducer {
 
   @override
   void release(MatteGeneration generation) {
+    if (!generation.isOwner) {
+      // A translated() view aliases its origin's texture rather than owning
+      // it. Both carry the same ui.Image, so disposing here would dispose
+      // the original out from under it. Releasing a view is a no-op; only
+      // the owner can retire the texture.
+      return;
+    }
     if (_live.remove(generation.texture)) {
       generation.texture.dispose();
     }

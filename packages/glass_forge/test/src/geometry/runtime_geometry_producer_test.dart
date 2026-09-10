@@ -99,4 +99,42 @@ void main() {
     expect(producer.capabilities.available, isTrue);
     producer.dispose();
   });
+
+  test(
+    'releasing a translated view does not dispose the texture it borrows',
+    () {
+      // A translated() generation aliases its origin's texture rather than
+      // owning it. release() is keyed on texture identity, so without the
+      // isOwner guard this call would dispose the shared texture out from
+      // under the generation that actually owns it.
+      final producer = RuntimeGeometryProducer();
+      final original = producer.produce(_sceneWithOneShape(), _request)!;
+      final view = original.translated(const Offset(10, 0));
+
+      expect(view.isOwner, isFalse);
+      expect(identical(view.texture, original.texture), isTrue);
+
+      producer.release(view);
+      expect(original.texture.debugDisposed, isFalse);
+
+      producer
+        ..release(original)
+        ..dispose();
+    },
+  );
+
+  test('releasing the owning generation still disposes its texture', () {
+    // The other half of the same hazard: the isOwner guard must not turn
+    // release() into a no-op for the generation that actually owns the
+    // texture, or every matte leaks.
+    final producer = RuntimeGeometryProducer();
+    final generation = producer.produce(_sceneWithOneShape(), _request)!;
+
+    expect(generation.isOwner, isTrue);
+
+    producer.release(generation);
+    expect(generation.texture.debugDisposed, isTrue);
+
+    producer.dispose();
+  });
 }
