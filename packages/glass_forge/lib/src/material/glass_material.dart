@@ -52,11 +52,10 @@ class GlassMaterial {
   /// The fitted clear material. See `apple_presets.dart` for provenance.
   ///
   /// Apple: clear "does not have adaptive behaviors", so unlike
-  /// [GlassMaterial.regular] it does not branch on `brightness` — the
-  /// parameter exists only so both presets share a call shape.
-  factory GlassMaterial.clear({required Brightness brightness}) {
-    // Deliberately unused: see the doc comment above.
-    final _ = brightness;
+  /// [GlassMaterial.regular] this takes no `brightness` — the 35% scrim it
+  /// applies is computed in-shader from sampled backdrop luminance, not from
+  /// platform brightness, so there is nothing here for that parameter to do.
+  factory GlassMaterial.clear() {
     return const GlassMaterial(variant: GlassVariant.clear).copyWith(
       thickness: _appleThickness,
       edgeRefraction: _appleEdgeRefraction,
@@ -113,8 +112,18 @@ class GlassMaterial {
   ///
   /// When false the layer pushes no backdrop filter at all, so an idle or
   /// fully-hidden glass surface costs nothing.
+  ///
+  /// Every field with an independently visible effect at its non-neutral
+  /// value must be checked here, or a material that only sets that one field
+  /// silently vanishes. [saturation] is a multiplier neutral at `1.0`, not
+  /// at `0`, so it is compared to its neutral value rather than to zero.
   bool get rendersAnything =>
-      frost > 0 || edgeRefraction > 0 || tintOpacity > 0 || highlight > 0;
+      frost > 0 ||
+      edgeRefraction > 0 ||
+      tintOpacity > 0 ||
+      highlight > 0 ||
+      contour > 0 ||
+      saturation != 1.0;
 
   /// The displacement range the matte codec should cover, in logical pixels.
   double get maxDisplacement =>

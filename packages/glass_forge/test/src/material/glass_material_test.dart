@@ -31,6 +31,48 @@ void main() {
     expect(material.rendersAnything, isTrue);
   });
 
+  test('contour alone is enough to render', () {
+    // The darkened edge ring is independently visible and needs none of
+    // frost/edgeRefraction/tintOpacity/highlight to be nonzero.
+    final material = const GlassMaterial().copyWith(
+      frost: 0,
+      edgeRefraction: 0,
+      tintOpacity: 0,
+      highlight: 0,
+      contour: 0.5,
+    );
+    expect(material.rendersAnything, isTrue);
+  });
+
+  test('a non-default saturation alone is enough to render', () {
+    // saturation is a multiplier neutral at 1.0, not at 0 — a saturation
+    // shift is visible on its own and must not require ">  0" to register.
+    final material = const GlassMaterial().copyWith(
+      frost: 0,
+      edgeRefraction: 0,
+      tintOpacity: 0,
+      highlight: 0,
+      saturation: 0.5,
+    );
+    expect(material.rendersAnything, isTrue);
+  });
+
+  test(
+    'a material with everything neutral, including saturation, renders '
+    'nothing',
+    () {
+      final material = const GlassMaterial().copyWith(
+        frost: 0,
+        edgeRefraction: 0,
+        tintOpacity: 0,
+        highlight: 0,
+        contour: 0,
+        saturation: 1,
+      );
+      expect(material.rendersAnything, isFalse);
+    },
+  );
+
   test('displacement range is sized to reachable displacement', () {
     final material = const GlassMaterial().copyWith(edgeRefraction: 27.42);
     expect(material.maxDisplacement, closeTo(28.79, 0.01));
@@ -162,7 +204,7 @@ void main() {
     // Apple: clear "does not have adaptive behaviors" and takes a dimming
     // layer instead. Mixing the two variants is explicitly called out as
     // wrong, so they must stay distinguishable.
-    final clear = GlassMaterial.clear(brightness: Brightness.light);
+    final clear = GlassMaterial.clear();
     expect(clear.variant, GlassVariant.clear);
     expect(clear.tintOpacity, 0);
   });
