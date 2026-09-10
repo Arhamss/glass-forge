@@ -7,7 +7,9 @@
 # marked skipped here so a bare `flutter test` — the invocation every other
 # suite in this package, and CI's default step, uses — passes on the default
 # backend and reports them as skipped instead of failing on an
-# unrelated-looking engine error.
+# unrelated-looking engine error. invalidation_test.dart carries the same
+# tag: every assertion in it exercises RenderGlassLayer.paint, which cannot
+# reach a filter to count without a real ui.ImageFilter.shader.
 #
 # `exclude_tags` cannot do this job: once a tag is in `exclude_tags`,
 # `package:test` drops those tests from the run entirely and no
