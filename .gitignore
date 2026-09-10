@@ -43,3 +43,9 @@ app.*.map.json
 # Test related
 coverage
 graphify-out/
+
+# Workspace
+.dart_tool/
+build/
+pubspec.lock
+!/pubspec.lock

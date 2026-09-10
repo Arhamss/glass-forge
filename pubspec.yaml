@@ -1,18 +1,18 @@
-name: glass_forge
-description: Performance-tiered liquid glass rendering for Flutter — real refraction where the GPU allows, graceful degradation everywhere else.
-version: 0.1.0+1
-
+name: glass_forge_workspace
+description: Workspace root for glass_forge — performance-tiered liquid glass for Flutter.
+publish_to: none
 
 environment:
-  sdk: ^3.12.0
-  flutter: ^3.44.0
+  sdk: ^3.13.0
 
-dependencies:
-  flutter:
-    sdk: flutter
+# Dart pub workspaces (native since 3.6) — one shared lockfile, one
+# .dart_tool/package_config.json, no cross-package version skew.
+workspace:
+  - packages/glass_forge
+  - packages/glass_forge_gpu
+  - packages/glass_forge_platform
+  - apps/glass_forge_workbench
+  - apps/glass_forge_benchmark
 
 dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  mocktail: ^1.0.5
   very_good_analysis: ^10.3.0

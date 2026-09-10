@@ -1,0 +1,30 @@
+name: glass_forge
+description: Performance-tiered liquid glass rendering for Flutter — real refraction where the GPU allows, graceful degradation everywhere else.
+version: 0.1.0+1
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+  flutter: ^3.47.0
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Spring physics. Depended on, never vendored — it is stable and maintained.
+  # See docs/reference/motor_teardown.md for what it does and does not give us.
+  motor: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  mocktail: ^1.0.5
+  very_good_analysis: ^10.3.0
+
+flutter:
+  shaders:
+    - shaders/geometry.frag
+    - shaders/final_render.frag
+    - shaders/probe.frag

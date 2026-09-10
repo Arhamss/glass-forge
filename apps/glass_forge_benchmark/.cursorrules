@@ -1,0 +1,159 @@
+# GlassForgeBenchmark - Cursor Rules
+
+## Project Type
+Flutter mobile application using Clean Architecture with BLoC/Cubit pattern.
+
+## Tech Stack
+- Flutter & Dart
+- State Management: flutter_bloc (Cubit pattern)
+- DI: GetIt (via Injector wrapper)
+- Networking: Dio
+- Local Storage: Hive
+- Routing: GoRouter
+- Styling: Custom `AppColors`, context-based text styles, dual font setup (BBBPoppins for headings, SFProRounded for body)
+- Localization: flutter_localizations with ARB files + static `Localization` service
+
+## Architecture Rules
+
+### Feature Modules
+Each feature lives in `lib/features/<name>/` with:
+- `data/models/` - Data models and DTOs
+- `data/repository/` - Repository implementation (concrete, uses ApiService)
+- `domain/repository/` - Abstract repository interface
+- `presentation/cubit/` - Cubit (cubit.dart) and State (state.dart)
+- `presentation/views/` - Screen widgets
+- `presentation/widgets/` - Feature-specific widgets
+
+### Naming Conventions
+- Files: `snake_case.dart`
+- Classes: `PascalCase`
+- Variables/functions: `camelCase`
+- Screen files: `<feature>_screen.dart`
+- Cubit files: `cubit.dart` and `state.dart` inside feature's `presentation/cubit/`
+- Repository: `<feature>_repository.dart` (abstract), `<feature>_repository_impl.dart` (concrete)
+
+### State Management
+- Use Cubit (not full Bloc with events) for state management
+- States use DataState<T> enum with: initial, loading, loaded, failure
+- Register cubits in `lib/app/view/app_page.dart` via MultiBlocProvider
+- Resolve repository dependencies via `Injector.resolve<Type>()`
+
+### Styling
+- Colors: Use `AppColors` semantic constants (e.g., `AppColors.primary`, `AppColors.surface`, `AppColors.textPrimary`, `AppColors.textSecondary`, `AppColors.error`)
+- Text: Use context extension. Two font families:
+  - Headings (BBBPoppins via `AppFonts.heading`): `display`, `h1`–`h5` (+ Medium/Bold variants)
+  - Body (SFProRounded via `AppFonts.body`): `p1`–`p2` (+ Medium/Bold), `caption` (+ Medium/Bold), `overline`
+- Text modifiers: `.primary` (textPrimary), `.secondary` (textOnPrimary), `.light` (textSecondary), `.hint` (textTertiary)
+- Assets: Reference via `AssetPaths` constants
+
+### API Layer
+- Use `ApiService` for all network calls (GET, POST, PUT, PATCH, DELETE)
+- Pass `CancelToken? cancelToken` through repository → ApiService for cancellable requests
+- Wrap responses in `RepositoryResponse<T>` — check `result.isCancelled` after await
+- Define endpoints in `lib/core/endpoints/endpoints.dart`
+- Handle errors via `AppApiException`
+
+### Navigation
+- Define routes in `lib/go_router/routes.dart`
+- Use named routes: `context.goNamed(AppRouteNames.home)`
+- Add route config in `lib/go_router/router.dart`
+
+### Localization
+- **Widgets/screens (have BuildContext):** use `context.l10n.keyName` (import `l10n/l10n.dart`)
+- **Non-widget code (validators, formatters, models):** use `Localization.keyName` (import `l10n/localization_service.dart`)
+- ARB files in `lib/l10n/arb/` (app_en.arb, app_es.arb)
+- After adding new ARB keys, add matching static getters to `lib/l10n/localization_service.dart`
+- Run `flutter gen-l10n` after modifying ARB files
+
+### Imports
+- Use the barrel file `exports.dart` for common imports (Material, Bloc, GoRouter, AppColors, etc.)
+- Feature-specific imports should be direct
+
+### Form Validation
+- Use `FieldValidators` static methods for form validation
+- Available: emailValidator, passwordValidator, phoneValidator, nameValidator, textValidator
+
+### Core Widgets
+Prefer using existing core widgets from `lib/utils/widgets/core_widgets/`:
+- CustomAppBar
+- `CustomButton` with factories: `.primary` (`primary` filled), `.secondary` (`primaryMuted` filled), `.tertiary` (outlined), `.danger` (`error` filled), `.text` (ghost)
+- `CustomTextField` with factories: `.email`, `.password`, `.number`, `.phone`, `.description`, `.search`
+- CustomDropdown, SearchableDropdown
+- CustomSectionTitle, CustomConfirmationDialog, CustomBottomSheet
+- PaginatedListView, PaginatedGridView
+
+### DI Registration
+- Register new singletons/factories in `lib/core/di/modules/app_modules.dart`
+- Use `Injector.resolve<Type>()` to resolve
+
+### WebSocket
+- `SocketService` in `lib/core/socket_service/` — auto-reconnect, auth, room management
+- Resolve via `Injector.resolve<SocketService>()`
+- Socket URL per-flavor in `AppEnv.socketUrl`
+- Use `AppLogger` for all socket-related logging
+
+## Code Style
+- Follow `very_good_analysis` lint rules
+- Prefer const constructors
+- Use trailing commas for better formatting
+- Keep widgets small and composable
+- Extract reusable widgets to the feature's widgets folder
+
+## Coding Standards & Quality Rules
+- **No dead code** — delete unused imports, variables, methods, classes, widgets, models, files
+- **No commented-out code** — delete removed code entirely, git preserves history
+- **No useless comments** — no doc comments on self-explanatory methods, no section separators, no `// ===== ... =====` dividers
+- **No TODO comments** in committed code — resolve before commit or track in issue tracker
+- **Resolve all analyzer hints** — never suppress with `// ignore:`, fix the issue
+- **No `setState()`** — use Cubit state management exclusively
+- **No `_buildXyz()` methods** — extract into separate StatelessWidget files
+- **No private widgets in view files** — extract to their own StatelessWidget files
+- **One class per file** — never put multiple widget/model classes in a single file
+- **No business logic in views** — views call cubit methods; cubits handle logic
+- **View files should not exceed ~1000 lines** — refactor if they do
+- **Dispose all controllers** in `dispose()` — `TextEditingController`, `ScrollController`, `FocusNode`, `AnimationController`, `Timer`, etc.
+- **Cancel tokens in `close()`** — cubits that make API calls must cancel `_cancelToken` in `close()`. Before each call: `_cancelToken?.cancel(); _cancelToken = CancelToken();`. After await: `if (result.isCancelled) return;`
+- **Always use `buildWhen`/`listenWhen`** on BlocBuilder/BlocListener
+- **If `listenWhen` checks 5+ variables, split the listener** — use separate focused listeners with `MultiBlocListener`
+- **Use `execute()` from `repository_response.dart`** for all repository methods — no manual try-catch
+- **Callbacks return `T` directly** — `execute()` wraps the result in `RepositoryResponse<T>`
+- **Void operations**: `execute<void>(() async { ... })` — no return needed inside callback
+- **Business-level failures** throw `AppApiException` inside the callback
+- **No try-catch in cubits** — error handling belongs in repositories
+- **Always log errors** with `AppLogger.error('descriptive message', exception, stackTrace)` in repositories
+- **No `response.statusCode == 200` checks** — `ApiService` throws on non-2xx
+- **Use `Future.wait`** for independent async calls — never await sequentially
+- **One model per file** — never put multiple model classes in a single file
+- **No model duplication across features** — shared models go in `core/models/common/`
+- **Use `PaginationModel<T>`** for paginated state — no manual pagination fields
+- **Use `DataState<T>`** to wrap every async field in state
+- **Models parse resiliently** — `as Type? ?? default`, skip malformed list items via `whereType`
+- **No manual Hive adapters** — use code generation with `build_runner`
+- **MANDATORY custom components** — `CustomButton` (never `ElevatedButton`/`TextButton`/`OutlinedButton`), `CustomTextField` (never `TextField`/`TextFormField`), `CustomConfirmationDialog` (never `AlertDialog`), `CustomBottomSheet`, `ToastHelper` (never `SnackBar`/`ScaffoldMessenger`), `AppLogger` (never `print`/`debugPrint`), `DateTimeHelper` (never raw `DateFormat`), `CustomCachedImageWidget` (never `Image.network` or raw `CachedNetworkImage`), `UserAvatar` (never `CircleAvatar` or `ClipOval(Image.network(...))`)
+- **`AppColors` for ALL colors** — no hardcoded `Color(0x...)` or `Colors.xxx`
+- **Create enums with extensions** for display names, colors, icons — never scatter switch statements
+- **Enums for finite value sets** — no string comparisons like `== 'pending'`. Use `fromString` factories
+- **Never define enums inline** in widget files — own file in `utils/enums/` or `data/models/`
+- **No spelling mistakes** in class names, variable names, file names, or widget names — typos are permanent
+- **Widget folders organized by concern** — subfolders, not flat dumps
+- **Reusability first** — check `utils/widgets/core_widgets/` before creating new widgets. If used by 2+ features, move to `core_widgets/`
+- **Use package imports** — never relative imports (`import 'package:glass_forge_benchmark/...'` not `import '../../../'`)
+- **Keep simple things inline** — a Padding with a Text, a Row with 2 children, a simple ternary. Only extract to a separate widget file when 30+ lines or reused.
+- **No over-engineering** — no abstract base classes for one implementation, no utility functions used once, no wrapper widgets that just pass through props, no unnecessary Container wrapping
+- **No unnecessary wrapping** — don't wrap Text in Container for padding (use Padding), don't wrap single child in Column/Row
+- **SizedBox for spacing** — `SizedBox(height: 16)` not `Padding(padding: EdgeInsets.only(top: 16))`. Use spacing scale: 4, 8, 12, 16, 20, 24, 32
+- **Never fetch in cubit constructor** — use an `init()` method called from the screen. Simple setters are one-liners.
+- **No dynamic when type is known** — use actual types. Prefer `Object?` over `dynamic` for top type.
+- **Review AI-generated code** — don't blindly commit; verify it follows these standards
+- **No `Co-Authored-By` AI lines** in git commit messages
+- **Conventional commit prefixes** — `feat:`, `fix:`, `chore:`, `refactor:`, etc.
+
+## File Structure for New Features
+When creating a new feature, create all required directories and files:
+1. Abstract repository in domain/repository/
+2. Repository implementation in data/repository/
+3. Models in data/models/
+4. Cubit and State in presentation/cubit/
+5. Screen in presentation/views/
+6. Register cubit in app_page.dart
+7. Add route in go_router/router.dart and routes.dart

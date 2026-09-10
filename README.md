@@ -5,9 +5,24 @@ Liquid glass for Flutter that is honest about the GPU it is running on.
 Real refraction where the device can afford it, a graceful climb-down
 everywhere else, and the frame timings published so the claim is checkable.
 
-> **Status: scaffold.** Nothing is implemented yet. Start with
-> [`PROJECT_BRIEF.md`](PROJECT_BRIEF.md) — the thesis, the research and the
-> plan. This README describes where it is going, not where it is.
+> **Status: scaffold.** No rendering is implemented yet. The research and the
+> design are done and written down; start with the
+> [architecture design](docs/superpowers/specs/2026-09-10-glass-forge-architecture-design.md).
+> This README describes where it is going, not where it is.
+
+## Layout
+
+A pub workspace — one lockfile, one resolution, no cross-package version skew.
+
+| Package | What it is | Costs you |
+|---|---|---|
+| [`packages/glass_forge`](packages/glass_forge) | The core. Shapes, SDF, runtime-effect geometry producer, composition, tier engine, motion, tokens. | Nothing beyond Flutter and `motor`. Works on every platform. |
+| [`packages/glass_forge_gpu`](packages/glass_forge_gpu) | Flutter GPU geometry producer. Faster where available. | A beta SDK dependency and a native-assets build hook. Opt-in. |
+| [`packages/glass_forge_platform`](packages/glass_forge_platform) | Native signals: Reduce Transparency, thermal status, low-power mode. | Native build steps. Opt-in; the core degrades without it. |
+| [`apps/glass_forge_workbench`](apps/glass_forge_workbench) | Visual workbench — test surfaces, tier forcing, material knobs. | — |
+| [`apps/glass_forge_benchmark`](apps/glass_forge_benchmark) | Device benchmark harness. Deliberately minimal so it measures the renderer, not itself. | — |
+
+Add a package, get the faster path. Leave it out and you do not pay for it.
 
 ## Why
 
@@ -30,12 +45,27 @@ honours today.
 
 ## Documentation
 
+**Design**
+
 | Document | Contents |
 |---|---|
-| [`PROJECT_BRIEF.md`](PROJECT_BRIEF.md) | Thesis, tier design, licensing duties, first-weekend plan |
-| [`docs/reference/liquid_glass_renderer_teardown.md`](docs/reference/liquid_glass_renderer_teardown.md) | Upstream architecture, the batching design, the SkSL defect and its fix |
-| [`docs/reference/kibu_glass_inventory.md`](docs/reference/kibu_glass_inventory.md) | The 63 real surfaces driving the design |
-| [`THIRD_PARTY.md`](THIRD_PARTY.md) | MIT attribution — fill in before vendoring |
+| [Architecture design](docs/superpowers/specs/2026-09-10-glass-forge-architecture-design.md) | Locked decisions, the ten invariants, the render graph, decomposition |
+| [Renderer core design](docs/superpowers/specs/2026-09-10-renderer-core-design.md) | Sub-project 1: API, shaders, invalidation, acceptance criteria |
+| [`PROJECT_BRIEF.md`](PROJECT_BRIEF.md) | The original thesis. Several assumptions in it have since been falsified — see the architecture design §1 |
+
+**Research**
+
+| Document | Contents |
+|---|---|
+| [Upstream teardown](docs/reference/liquid_glass_renderer_teardown.md) | `liquid_glass_renderer` 0.2.0-dev.4 by source read: pipeline, batching, ~25 defects |
+| [Upstream rewrite](docs/reference/upstream_rewrite.md) | The unreleased Flutter GPU rewrite: what to take, what it drops, repo health |
+| [`motor` teardown](docs/reference/motor_teardown.md) | Spring physics: what it gives us, and the six gaps we fill ourselves |
+| [Flutter rendering capabilities](docs/reference/flutter_rendering_capabilities.md) | What Flutter 3.47 actually exposes — backend detection, thermal, accessibility, engine bugs |
+| [Apple Liquid Glass spec](docs/reference/apple_liquid_glass_spec.md) | The material as an implementable contract |
+| [Shader techniques](docs/reference/shader_techniques.md) | Techniques with licence provenance |
+| [Competitive landscape](docs/reference/competitive_landscape.md) | What others shipped, and what they document as broken |
+| [KiBU inventory](docs/reference/kibu_glass_inventory.md) | The 63 surfaces that motivated the design |
+| [`THIRD_PARTY.md`](THIRD_PARTY.md) | Attribution — upstream is under three licences, not one |
 
 ## Credit
 
