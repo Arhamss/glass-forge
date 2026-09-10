@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Encodes group membership into a single float the shader can branch on.
 ///
 /// The shader walks the shape array once and needs to know, per shape, whether
@@ -24,12 +26,32 @@ double encodeBlendMarker({required bool startsGroup, required double blend}) {
 /// Scoped to its own layer. A nested layer's shapes must never register into
 /// an outer layer's group, or they would blend across a boundary the user
 /// drew deliberately.
-class BlendGroupLink {
+///
+/// A [ChangeNotifier] on purpose: which member is "first" — and therefore
+/// carries the group-opening marker — can change without that member's own
+/// widget rebuilding at all. If the first member unmounts, the new first
+/// member needs to hear about it and re-sync its own geometry; nothing about
+/// *its* build changed, only the group's. Listening is how it finds out.
+class BlendGroupLink extends ChangeNotifier {
   /// Creates a group whose members merge over [blend] logical pixels.
-  BlendGroupLink({required this.blend});
+  BlendGroupLink({required this._blend});
+
+  double _blend;
 
   /// How wide the smooth-min between members is, in logical pixels.
-  final double blend;
+  ///
+  /// Mutable, not replaced: swapping in a whole new [BlendGroupLink] when
+  /// this changes would force every still-attached member to migrate
+  /// listeners across two objects for no reason, and would leave the old
+  /// link's disposal timing to chase whichever member unsubscribes last.
+  double get blend => _blend;
+  set blend(double value) {
+    if (_blend == value) {
+      return;
+    }
+    _blend = value;
+    notifyListeners();
+  }
 
   final List<Object> _members = <Object>[];
 
@@ -45,13 +67,20 @@ class BlendGroupLink {
 
   /// Adds [key] to the group if it is not already a member.
   void add(Object key) {
-    if (!_members.contains(key)) {
-      _members.add(key);
+    if (_members.contains(key)) {
+      return;
     }
+    _members.add(key);
+    notifyListeners();
   }
 
   /// Removes [key] from the group.
-  void remove(Object key) => _members.remove(key);
+  void remove(Object key) {
+    if (!_members.remove(key)) {
+      return;
+    }
+    notifyListeners();
+  }
 
   /// Whether [key] is the group's first member, and therefore the shape that
   /// carries the group-opening marker.

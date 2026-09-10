@@ -20,14 +20,21 @@ class GlassBlendGroup extends StatefulWidget {
 }
 
 class _GlassBlendGroupState extends State<GlassBlendGroup> {
-  late BlendGroupLink _link = BlendGroupLink(blend: widget.blend);
+  late final BlendGroupLink _link = BlendGroupLink(blend: widget.blend);
 
   @override
   void didUpdateWidget(GlassBlendGroup oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.blend != widget.blend) {
-      _link = BlendGroupLink(blend: widget.blend);
-    }
+    // Updated in place, rather than replacing the link: every still-attached
+    // `RenderGlassShape` already listens to this exact instance, and it
+    // notifies them of the new blend width itself.
+    _link.blend = widget.blend;
+  }
+
+  @override
+  void dispose() {
+    _link.dispose();
+    super.dispose();
   }
 
   @override

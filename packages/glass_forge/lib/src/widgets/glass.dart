@@ -61,7 +61,7 @@ class Glass extends StatelessWidget {
       shape: shape,
       group: group,
       child: ClipPath(
-        clipper: _GlassShapeClipper(shape),
+        clipper: GlassShapeClipper(shape),
         clipBehavior: clipBehavior,
         child: child ?? const SizedBox.shrink(),
       ),
@@ -76,9 +76,14 @@ class Glass extends StatelessWidget {
 /// against [Size.zero], as though the shape had no size, would resolve every
 /// corner radius to zero — the clip would then disagree with the SDF at
 /// every corner the shape actually paints at.
-class _GlassShapeClipper extends CustomClipper<Path> {
+///
+/// Not private: exercised directly by tests, since [GlassShape]'s value
+/// equality (what makes [shouldReclip] skip a rebuilt-but-unchanged shape)
+/// has no other externally observable effect.
+@visibleForTesting
+class GlassShapeClipper extends CustomClipper<Path> {
   /// Creates a clipper for [shape].
-  const _GlassShapeClipper(this.shape);
+  const GlassShapeClipper(this.shape);
 
   /// The shape being clipped to.
   final GlassShape shape;
@@ -89,7 +94,7 @@ class _GlassShapeClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(CustomClipper<Path> oldClipper) {
-    return oldClipper is! _GlassShapeClipper || oldClipper.shape != shape;
+    return oldClipper is! GlassShapeClipper || oldClipper.shape != shape;
   }
 }
 

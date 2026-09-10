@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:glass_forge/src/shapes/shape_type.dart';
 
@@ -7,7 +8,12 @@ import 'package:glass_forge/src/shapes/shape_type.dart';
 ///
 /// Deliberately a closed set. Every member has an exact SDF whose silhouette
 /// matches the Flutter clip used for its children — an open family would make
-/// that guarantee impossible to keep.
+/// that guarantee impossible to keep. Every member is also a value type: it
+/// carries `==`/`hashCode` by its fields, because callers routinely rebuild a
+/// non-const shape every frame (a radius bound to theme, state, or an
+/// animation) and both `RenderGlassShape` and `GlassShapeClipper` need to
+/// tell that apart from a real change.
+@immutable
 sealed class GlassShape {
   const GlassShape();
 
@@ -46,6 +52,14 @@ class GlassRoundedRectangle extends GlassShape {
   ShapeBorder toBorder(Size size) => RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(resolveRadius(size)),
       );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GlassRoundedRectangle && other.radius == radius);
+
+  @override
+  int get hashCode => Object.hash(GlassRoundedRectangle, radius);
 }
 
 /// An ellipse inscribed in the shape's bounds.
@@ -61,6 +75,12 @@ class GlassOval extends GlassShape {
 
   @override
   ShapeBorder toBorder(Size size) => const OvalBorder();
+
+  @override
+  bool operator ==(Object other) => other is GlassOval;
+
+  @override
+  int get hashCode => (GlassOval).hashCode;
 }
 
 /// A rounded superellipse, matching Flutter's `RoundedSuperellipse`.
@@ -81,6 +101,14 @@ class GlassSuperellipse extends GlassShape {
   ShapeBorder toBorder(Size size) => RoundedSuperellipseBorder(
         borderRadius: BorderRadius.circular(resolveRadius(size)),
       );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GlassSuperellipse && other.radius == radius);
+
+  @override
+  int get hashCode => Object.hash(GlassSuperellipse, radius);
 }
 
 double _clampRadius(BorderRadius radius, Size size) {

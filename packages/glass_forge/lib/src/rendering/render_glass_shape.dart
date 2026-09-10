@@ -41,14 +41,33 @@ class RenderGlassShape extends RenderProxyBox {
       return;
     }
     if (attached) {
-      _group?.remove(this);
+      _leaveGroup();
     }
     _group = value;
     if (attached) {
-      _group?.add(this);
+      _joinGroup();
     }
     _syncGeometry();
   }
+
+  void _joinGroup() {
+    _group?.add(this);
+    _group?.addListener(_onGroupChanged);
+  }
+
+  void _leaveGroup() {
+    _group?.removeListener(_onGroupChanged);
+    _group?.remove(this);
+  }
+
+  /// Re-derives this shape's marker when group membership or blend changes
+  /// out from under it.
+  ///
+  /// This is the whole reason [group] is a listenable: if this shape's own
+  /// group's first member unmounts, *this* shape may become first without a
+  /// single property of its own changing — nothing else would ever prompt it
+  /// to re-sync.
+  void _onGroupChanged() => _syncGeometry();
 
   /// The marker this shape's geometry carries, derived from group
   /// membership: whoever [BlendGroupLink.isFirst] names opens the group.
@@ -66,7 +85,7 @@ class RenderGlassShape extends RenderProxyBox {
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
-    _group?.add(this);
+    _joinGroup();
     _layer = _findAncestorLayer();
     _syncGeometry();
   }
@@ -76,7 +95,7 @@ class RenderGlassShape extends RenderProxyBox {
     _layer?.scene.unregister(this);
     _layer?.markNeedsPaint();
     _layer = null;
-    _group?.remove(this);
+    _leaveGroup();
     super.detach();
   }
 
