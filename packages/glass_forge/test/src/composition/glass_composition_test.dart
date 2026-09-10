@@ -1,3 +1,11 @@
+// This suite constructs `ui.ImageFilter.shader`, which throws
+// `UnsupportedError` outside Impeller. `flutter_tester`'s default software
+// backend does not enable Impeller, so this file is excluded from a bare
+// `flutter test` run (see dart_test.yaml) and only runs via the separate
+// `flutter test --tags impeller --run-skipped --enable-impeller` CI step.
+@Tags(<String>['impeller'])
+library;
+
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';

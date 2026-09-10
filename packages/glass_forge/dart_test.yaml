@@ -1,0 +1,26 @@
+# `ui.ImageFilter.shader` throws `UnsupportedError` unless the engine's
+# Impeller backend is active, and `flutter_tester`'s default software
+# backend does not enable it. Tests tagged `impeller` (currently only
+# glass_composition_test.dart — see its `@Tags(['impeller'])`) are marked
+# skipped here so a bare `flutter test` — the invocation every other suite
+# in this package, and CI's default step, uses — passes on the default
+# backend and reports them as skipped instead of failing on an
+# unrelated-looking engine error.
+#
+# `exclude_tags` cannot do this job: once a tag is in `exclude_tags`,
+# `package:test` drops those tests from the run entirely and no
+# command-line flag can bring them back (`--exclude-tags` only ORs into the
+# config's default, it never replaces it — verified empirically). `skip`
+# keeps them selectable: CI runs them separately with
+# `flutter test --tags impeller --run-skipped --enable-impeller` (see
+# .github/workflows/shaders.yaml). If that step ever turns out not to be
+# viable on headless CI runners (no GPU/Vulkan for Impeller to bind to),
+# move those tests to a device/integration lane rather than deleting them
+# or dropping this skip.
+tags:
+  impeller:
+    skip: >-
+      Requires the Impeller rendering engine (constructs
+      ui.ImageFilter.shader), which flutter_tester's default software
+      backend does not enable. Run explicitly with
+      `flutter test --tags impeller --run-skipped --enable-impeller`.

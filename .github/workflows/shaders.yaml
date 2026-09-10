@@ -36,6 +36,29 @@ jobs:
       # workspace root has none. Without this, `flutter test` fails
       # immediately with `Test directory "test" not found`, before any of
       # the package's tests, including the SDF contract test, ever run.
+      #
+      # This bare invocation reports anything tagged `impeller` as skipped
+      # rather than running it (see dart_test.yaml) — see the step below
+      # for why, and for where those tests actually run.
       - name: flutter test
         run: flutter test
+        working-directory: packages/glass_forge
+
+      # Tests tagged `impeller` (currently only glass_composition_test.dart,
+      # which constructs `ui.ImageFilter.shader`) are skipped by the step
+      # above: that API throws `UnsupportedError` unless the engine's
+      # Impeller backend is active, and `flutter_tester`'s default software
+      # backend — what plain `flutter test` runs on — does not enable it.
+      # Run them here instead, explicitly selected and with Impeller turned
+      # on. `--run-skipped` is required alongside `--tags`: dart_test.yaml
+      # marks the tag `skip`, not `exclude_tags` (exclusions can't be
+      # un-excluded from the command line — verified empirically — so
+      # `skip` is what leaves them selectable at all).
+      #
+      # If this step ever turns out not to be viable on headless CI runners
+      # (no GPU/Vulkan for Impeller to bind to), move these tests to a
+      # device/integration lane rather than deleting them or dropping the
+      # flag on the step above.
+      - name: flutter test (impeller)
+        run: flutter test --tags impeller --run-skipped --enable-impeller
         working-directory: packages/glass_forge
