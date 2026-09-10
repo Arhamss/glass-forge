@@ -42,15 +42,12 @@ class ShaderLibrary {
   Future<void>? _warmUp;
   bool _warmUpComplete = false;
 
-  /// Whether the shaders that exist have loaded and are safe to [acquire].
+  /// Whether every shader has loaded and is safe to [acquire].
   ///
-  /// This is deliberately not "every [GlassShaderId] loaded": `finalRender`'s
-  /// asset, `shaders/final_render.frag`, does not exist until Task 13 ships
-  /// it, so [warmUp] tolerates that one shader failing to load. `isReady`
-  /// becomes `true` once warm-up has finished attempting every shader,
-  /// whether or not `finalRender` actually loaded; `geometry` and `probe`
-  /// are always required to have loaded, since a failure there is a real
-  /// bug and [warmUp] lets it propagate instead of reaching this point.
+  /// `true` once warm-up has finished loading `geometry`, `probe` and
+  /// `finalRender`. A load failure for any of them propagates out of
+  /// [warmUp] instead of being swallowed, so reaching `true` means all
+  /// three are genuinely ready.
   bool get isReady => _warmUpComplete;
 
   /// How many shaders are checked out. Test-only.
@@ -62,42 +59,11 @@ class ShaderLibrary {
 
   Future<void> _loadAll() async {
     for (final id in GlassShaderId.values) {
-      try {
-        _programs[id] = await ui.FragmentProgram.fromAsset(id.assetKey);
-      } on Object catch (error) {
-        if (id != GlassShaderId.finalRender) {
-          // `geometry` and `probe` both ship today and are declared in
-          // `pubspec.yaml`; a load failure for either is a real bug — a
-          // typo in the asset key, a bundling failure, a genuine GLSL
-          // compile error — and must propagate with the engine's own
-          // message intact rather than be swallowed here.
-          rethrow;
-        }
-        // TEMPORARY SCAFFOLDING — remove once Task 13 ships
-        // `shaders/final_render.frag`.
-        //
-        // `GlassShaderId` enumerates all three shaders this package will
-        // ever use, including `finalRender`, because that is the correct,
-        // final API — but `final_render.frag` does not exist until Task 13,
-        // and it is not declared in `pubspec.yaml` yet either. Without this
-        // narrow carve-out, `warmUp()` would throw for every caller and
-        // every test in the window between this task and that one, over an
-        // asset that is known-missing rather than a real failure. The
-        // tolerance is scoped to `finalRender` only — a missing asset and a
-        // failed GLSL compile both surface as the same plain `Exception`
-        // from the engine, with nothing to distinguish them, so tolerating
-        // every shader's failure here would just as happily swallow a
-        // genuine compile error in `geometry` or `probe`.
-        //
-        // Once `final_render.frag` exists, delete this branch entirely: a
-        // missing or failing asset at that point means something is
-        // actually broken and `warmUp()` should throw for it too, not
-        // shrug.
-        debugPrint(
-          'ShaderLibrary: ${id.assetKey} did not load (expected until '
-          'Task 13 ships final_render.frag): $error',
-        );
-      }
+      // Every shader is declared in `pubspec.yaml` and required to load. A
+      // failure here — a typo in the asset key, a bundling failure, a
+      // genuine GLSL compile error — is a real bug and must propagate with
+      // the engine's own message intact rather than be swallowed.
+      _programs[id] = await ui.FragmentProgram.fromAsset(id.assetKey);
     }
     _warmUpComplete = true;
   }
@@ -110,23 +76,13 @@ class ShaderLibrary {
   ui.FragmentShader acquire(GlassShaderId id) {
     final program = _programs[id];
     if (program == null) {
-      final String reason;
-      if (!_warmUpComplete) {
-        reason = 'warmUp() has not completed';
-      } else if (id == GlassShaderId.finalRender) {
-        // The one tolerated gap: see the scaffolding note on
-        // ShaderLibrary._loadAll. Task 13 removes both the gap and this
-        // branch.
-        reason = '${id.assetKey} does not exist yet — Task 13 ships it';
-      } else {
-        // warmUp() only reaches _warmUpComplete = true after every shader
-        // other than finalRender has loaded successfully (see _loadAll), so
-        // this should be unreachable — but if it happens, it is a real bug,
-        // not the finalRender scaffolding gap.
-        reason =
-            '${id.assetKey} failed to load; this is not the '
-            'finalRender scaffolding gap';
-      }
+      // warmUp() only reaches _warmUpComplete = true after every shader has
+      // loaded successfully — a failure for any of them propagates out of
+      // _loadAll instead (see warmUp) — so the only way to land here is
+      // calling acquire() before warmUp() has completed.
+      final reason = _warmUpComplete
+          ? '${id.assetKey} failed to load; this should be unreachable'
+          : 'warmUp() has not completed';
       throw StateError(
         'ShaderLibrary.acquire($id) failed: $reason. Await '
         'ShaderLibrary.instance.warmUp() during app startup.',
