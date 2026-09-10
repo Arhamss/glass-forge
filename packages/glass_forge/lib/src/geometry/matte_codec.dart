@@ -10,12 +10,28 @@ import 'package:flutter/rendering.dart';
 /// - **R, G** — the unit surface normal, in an asymmetric 0..254 code so that
 ///   -1, 0 and +1 are all exactly representable. A symmetric code cannot hit
 ///   all three, and a flat surface then acquires a permanent sub-pixel tilt.
-/// - **B** — signed edge distance, sqrt-companded on both sides.
-/// - **A** — displacement magnitude, sqrt-companded.
+/// - **B** — signed edge distance, companded toward **zero**.
+/// - **A** — displacement magnitude, companded toward the **maximum**.
 ///
-/// Storing a normal plus a magnitude rather than a displacement vector is what
-/// makes 8 bits enough. Companding then spends the code points near zero,
-/// where the narrow contour and highlight ramps live and where banding shows.
+/// Storing a normal plus a magnitude rather than a displacement vector is
+/// what makes 8 bits enough. The two channels are companded in opposite
+/// directions, deliberately, because they need precision in opposite places:
+///
+/// - Displacement magnitude follows the convex-squircle edge profile, which
+///   is steep near the inner edge of the band and goes nearly flat as it
+///   approaches the shape edge — where the magnitude is largest. Banding
+///   shows up where the signal is flattest, since many screen pixels then
+///   land on the same few code points, so this channel spends its precision
+///   near the maximum via `1 - sqrt(1 - x)`.
+/// - Signed edge distance is what coverage, the contour and the bevel key
+///   off of, and all three are computed near distance zero — the shape edge
+///   itself. This channel spends its precision near zero via `sqrt(x)`.
+///
+/// Do not "unify" these back into one compander: `1 - sqrt(1 - x)` is steepest
+/// (its derivative is largest) as `x` approaches 1, so it concentrates code
+/// points near the *maximum*, not zero. `sqrt(x)` is steepest near `x = 0`
+/// and concentrates code points there instead. Each channel uses the one that
+/// matches where its own precision needs to live.
 ///
 /// This class is the Dart mirror of `shaders/common/codec.glsl`. The two are
 /// tested against each other; if they drift, the matte decodes to nonsense.
@@ -50,7 +66,7 @@ class MatteCodec {
     out[0] = _encodeSigned(unit.dx);
     out[1] = _encodeSigned(unit.dy);
     out[2] = _encodeCompandedSigned(signedDistance / maxDisplacement);
-    out[3] = _encodeCompanded(
+    out[3] = _encodeTowardMax(
       (displacementMagnitude / maxDisplacement).clamp(0.0, 1.0),
     );
     return out;
@@ -63,7 +79,7 @@ class MatteCodec {
     return (
       normal: Offset(_decodeSigned(rgba[0]), _decodeSigned(rgba[1])),
       signedDistance: _decodeCompandedSigned(rgba[2]) * maxDisplacement,
-      displacement: _decodeCompanded(rgba[3]) * maxDisplacement,
+      displacement: _decodeTowardMax(rgba[3]) * maxDisplacement,
     );
   }
 
@@ -78,25 +94,41 @@ class MatteCodec {
     return (encoded * 255 / 254) * 2 - 1;
   }
 
-  static double _encodeCompanded(double linear) {
+  // Concentrates precision near the maximum of the 0..1 range: this is
+  // steepest (its derivative is largest) as `linear` approaches 1. Used for
+  // displacement magnitude, whose edge profile goes flat near the shape
+  // edge — the maximum — which is where banding needs to be fought.
+  static double _encodeTowardMax(double linear) {
     final normalized = 1 - math.sqrt(1 - linear.clamp(0.0, 1.0));
     return (normalized * 255).roundToDouble() / 255;
   }
 
-  static double _decodeCompanded(double encoded) {
+  static double _decodeTowardMax(double encoded) {
     final inverse = 1 - encoded;
     return 1 - inverse * inverse;
   }
 
+  // Concentrates precision near zero: this is steepest as `linear`
+  // approaches 0. Used for signed edge distance, since coverage, the
+  // contour and the bevel are all computed near distance zero.
+  static double _encodeTowardZero(double linear) {
+    final normalized = math.sqrt(linear.clamp(0.0, 1.0));
+    return (normalized * 255).roundToDouble() / 255;
+  }
+
+  static double _decodeTowardZero(double encoded) {
+    return encoded * encoded;
+  }
+
   static double _encodeCompandedSigned(double value) {
     final clamped = value.clamp(-1.0, 1.0);
-    final magnitude = _encodeCompanded(clamped.abs());
+    final magnitude = _encodeTowardZero(clamped.abs());
     return clamped.isNegative ? 0.5 - magnitude * 0.5 : 0.5 + magnitude * 0.5;
   }
 
   static double _decodeCompandedSigned(double encoded) {
     final centered = (encoded - 0.5) * 2;
-    final magnitude = _decodeCompanded(centered.abs());
+    final magnitude = _decodeTowardZero(centered.abs());
     return centered.isNegative ? -magnitude : magnitude;
   }
 }

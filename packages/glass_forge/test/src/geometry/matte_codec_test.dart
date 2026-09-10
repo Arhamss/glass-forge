@@ -17,8 +17,9 @@ void main() {
   });
 
   test('round-trips displacement within the 8-bit error bound', () {
-    // sqrt companding spends code points where the eye is: near zero
-    // displacement, where the contour and highlight ramps live.
+    // The displacement channel is companded toward the maximum, but the
+    // round trip still has to stay under half a physical pixel everywhere,
+    // including near zero.
     for (var i = 0; i <= 32; i++) {
       final magnitude = 32 * i / 32;
       final decoded = codec.decode(
@@ -32,8 +33,12 @@ void main() {
     }
   });
 
-  test('resolves small displacements more finely than large ones', () {
-    double errorNear(double magnitude) {
+  /// The worst round-trip error for displacement magnitude, sampled densely
+  /// across [t0, t1] (as a fraction of `maxDisplacement`).
+  double worstDisplacementError(double t0, double t1) {
+    var worst = 0.0;
+    for (var i = 0; i <= 200; i++) {
+      final magnitude = 32 * (t0 + (t1 - t0) * i / 200);
       final decoded = codec.decode(
         codec.encode(
           normal: const Offset(1, 0),
@@ -41,11 +46,58 @@ void main() {
           displacementMagnitude: magnitude,
         ),
       );
-      return (decoded.displacement - magnitude).abs();
+      final error = (decoded.displacement - magnitude).abs();
+      if (error > worst) worst = error;
     }
+    return worst;
+  }
 
-    expect(errorNear(1), lessThan(errorNear(30)));
-  });
+  /// The worst round-trip error for signed distance, sampled densely across
+  /// [t0, t1] (as a fraction of `maxDisplacement`, on the positive side).
+  double worstSignedDistanceError(double t0, double t1) {
+    var worst = 0.0;
+    for (var i = 0; i <= 200; i++) {
+      final distance = 32 * (t0 + (t1 - t0) * i / 200);
+      final decoded = codec.decode(
+        codec.encode(
+          normal: const Offset(0, 1),
+          signedDistance: distance,
+          displacementMagnitude: 0,
+        ),
+      );
+      final error = (decoded.signedDistance - distance).abs();
+      if (error > worst) worst = error;
+    }
+    return worst;
+  }
+
+  test(
+    'concentrates displacement-magnitude precision near the maximum, '
+    'not zero',
+    () {
+      // The convex-squircle edge profile is steep near the inner edge of
+      // the band and nearly flat near the shape edge (maximum
+      // displacement). Banding shows up where the signal is flattest, so
+      // the worst-case error there must be the smaller of the two, not the
+      // worst-case error near zero.
+      final nearZero = worstDisplacementError(0, 0.05);
+      final nearMax = worstDisplacementError(0.95, 1);
+      expect(nearMax, lessThan(nearZero));
+    },
+  );
+
+  test(
+    'concentrates signed-distance precision near zero, not the maximum',
+    () {
+      // Coverage, the contour and the bevel are all computed from signed
+      // distance near zero — the shape edge — so the worst-case error there
+      // must be the smaller of the two, not the worst-case error near the
+      // maximum.
+      final nearZero = worstSignedDistanceError(0, 0.05);
+      final nearMax = worstSignedDistanceError(0.95, 1);
+      expect(nearZero, lessThan(nearMax));
+    },
+  );
 
   test('round-trips signed distance on both sides of the edge', () {
     for (final d in const [-24.0, -1.0, 0.0, 1.0, 24.0]) {
