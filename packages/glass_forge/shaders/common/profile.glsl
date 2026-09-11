@@ -71,6 +71,37 @@ float gfDisplacementMagnitude(float sd, float height, float amount) {
     return gfEdgeProfile(1.0 + sd / height) * amount;
 }
 
+// How deep into a shape the band's samples reach, in pixels.
+//
+// A texel `s` pixels in samples the backdrop `s + gfDisplacementMagnitude`
+// in. In units of the band, x + r * (1 - x^4)^(1/4) with r = amount/height,
+// which peaks at (1 + r^(4/3))^(3/4) -- 1.68 bands at Apple's spread of 0,
+// so the deepest sample lands well inside the band's own inner edge.
+float gfEdgeBandReach(float height, float amount) {
+    float r = amount / max(height, 1e-3);
+    return height * pow(1.0 + pow(r, 4.0 / 3.0), 0.75);
+}
+
+// How much of the band a shape `depth` pixels deep at its core has room
+// for: 1 when every sample stays on its own side of the medial axis, less
+// when the band has to shrink -- height and amount together -- to keep them
+// there.
+//
+// The SDF normal turns right round across a shape's medial axis. A band
+// that reaches past it -- every 44 pt control and 52 pt bar, at Apple's
+// 27.42 pt -- has each half refracting from the far side of the axis, so
+// the two halves of the image trade places and the surface tears along
+// its centreline, where the normal flips from one texel to the next. The
+// union-neck fade (gfNeckFade) cannot see that seam until the stencil
+// straddles it, a pixel from the axis, long after the band is pushing at
+// full strength. Shrinking the band until its deepest sample reaches the
+// axis and no further keeps the halves apart and leaves the axis
+// undisplaced, which is what a thin pane's centre does. A shape with room
+// for the whole band is left exactly as it was.
+float gfEdgeBandFit(float depth, float height, float amount) {
+    return min(1.0, depth / gfEdgeBandReach(height, amount));
+}
+
 // Dome profile.
 //
 // The other model: a sphere cap spanning the shape's whole interior depth,

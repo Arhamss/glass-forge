@@ -76,7 +76,8 @@ vec4 gfBakeMatte(vec2 p, float maxDisplacement, float edgeRefraction,
         return gfBakeDome(p, maxDisplacement, edgeRefraction, profile.y);
     }
 
-    float sd = gfSceneDistance(p);
+    vec3 scene = gfSceneSample(p, vec2(-1.0));
+    float sd = scene.x;
 
     // Far outside every shape: encode a saturated *positive* distance rather
     // than a zeroed texel. The final pass derives coverage from channel B
@@ -92,9 +93,20 @@ vec4 gfBakeMatte(vec2 p, float maxDisplacement, float edgeRefraction,
     vec2 normal = gfUnitOrZero(difference);
     float band = mix(edgeRefraction, edgeRefraction * 4.0,
                      clamp(spread, 0.0, 1.0));
-    float magnitude = gfDisplacementMagnitude(min(sd, 0.0), band,
-                                              edgeRefraction)
-                    * gfNeckFade(difference, 1.0);
+
+    // Only the band and the fringe outside it displace anything, so only
+    // they pay for the second fold that finds how deep the shape is at its
+    // core (see gfEdgeBandFit). A single shape's core depth is its
+    // inradius; where blended shapes merge, the core runs through the neck
+    // and the depth is the neck's own.
+    float magnitude = 0.0;
+    if (-sd < band) {
+        float depth = max(-gfSceneDistance(scene.yz), 1.0);
+        float fit = gfEdgeBandFit(depth, band, edgeRefraction);
+        magnitude = gfDisplacementMagnitude(min(sd, 0.0), band * fit,
+                                            edgeRefraction * fit)
+                  * gfNeckFade(difference, 1.0);
+    }
 
     // The real signed distance, on both sides of the boundary, and NOT
     // premultiplied by coverage. Both matter now that the final pass reads
