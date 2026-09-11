@@ -14,8 +14,10 @@ import 'package:glass_forge/src/widgets/glass.dart';
 /// Resolves the role against the enclosing [GlassTheme], the incoming
 /// constraints and the scheme, then draws the shadow, the glass and the
 /// vibrant label colour that go with it. Still belongs inside a single
-/// `GlassLayer` for the whole screen — one layer is one backdrop capture,
-/// and a layer per surface costs one each.
+/// `GlassLayer` for the whole screen: a layer captures the backdrop once
+/// per distinct material among its shapes, so five roles under one layer
+/// cost five captures however many surfaces play them, where a layer per
+/// surface costs one each.
 class GlassSurface extends StatelessWidget {
   /// Creates a surface for [role].
   const GlassSurface({

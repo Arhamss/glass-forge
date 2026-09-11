@@ -4,12 +4,18 @@ import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/rendering/render_glass_layer.dart';
 import 'package:glass_forge/src/tier/glass_tier_scope.dart';
 
-/// One backdrop capture, shared by every `Glass` beneath it.
+/// One backdrop capture per material, shared by every `Glass` beneath it.
 ///
 /// Apple's own guidance is that "glass cannot sample other glass", and that a
 /// container lets nearby elements share one sampling region. The same
 /// applies here for the same reason: one layer around a screen's worth of
 /// controls costs one capture, while a layer per control costs one each.
+///
+/// Per material, not per shape: shapes that override [material] are grouped
+/// by the material they asked for and each group captures once, so a screen
+/// of controls that all inherit still costs exactly one. Overlapping shapes
+/// belong in the same material, or in one `GlassBlendGroup` — where two
+/// captures overlap, the later one samples the earlier one's glass.
 ///
 /// Its shaders load asynchronously, but [child] never waits on them:
 /// [RenderGlassLayer] always exists and always paints its subtree in place,

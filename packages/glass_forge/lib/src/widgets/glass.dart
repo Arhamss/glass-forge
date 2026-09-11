@@ -3,6 +3,7 @@ import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/rendering/render_glass_shape.dart';
 import 'package:glass_forge/src/scene/blend_group_link.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
+import 'package:glass_forge/src/tier/glass_tier_scope.dart';
 import 'package:glass_forge/src/widgets/glass_blend_group.dart';
 import 'package:glass_forge/src/widgets/glass_layer.dart';
 
@@ -26,9 +27,17 @@ class Glass extends StatelessWidget {
 
   /// Overrides the enclosing layer's material for this shape alone.
   ///
-  /// Composition is exactly one filter per layer, so nothing consumes a
-  /// per-shape override yet; it is accepted now so a future task can wire it
-  /// without a breaking constructor change.
+  /// Costs a second backdrop pass in that layer, not a second one per shape:
+  /// the layer groups its shapes by material and pushes one pass per
+  /// distinct material among them, so ten cards sharing one override still
+  /// cost one pass between them. Leave it null wherever the layer's own
+  /// material will do.
+  ///
+  /// Ignored for a shape inside a `GlassBlendGroup` whose group already
+  /// renders with another material. Shapes that smooth-min into one another
+  /// are one surface, and one surface has one material; the group takes the
+  /// material its first shape asked for. Debug builds say so when it
+  /// happens.
   final GlassMaterial? material;
 
   /// Whether [child] sits behind the glass and is refracted by it.
@@ -60,6 +69,7 @@ class Glass extends StatelessWidget {
     return _RawGlass(
       shape: shape,
       group: group,
+      material: _resolveMaterialFor(context, material),
       child: ClipPath(
         clipper: GlassShapeClipper(shape),
         clipBehavior: clipBehavior,
@@ -67,6 +77,33 @@ class Glass extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The material to hand the render object, degraded to the resolved tier.
+///
+/// `GlassLayer` already degrades the material it puts in scope, so
+/// inheriting needs nothing done and stays null all the way down — which
+/// is also what lets the layer re-route inheriting shapes when its own
+/// material changes. An override is degraded here instead, because the
+/// parts of that degradation that come from accessibility settings are not
+/// preferences to opt out of, and a per-shape material that skipped them
+/// would be exactly such an opt-out.
+GlassMaterial? _resolveMaterialFor(
+  BuildContext context,
+  GlassMaterial? override,
+) {
+  if (override == null) {
+    return null;
+  }
+  final resolved = GlassTierScope.maybeOf(context);
+  if (resolved == null) {
+    return override;
+  }
+  return resolved.materialFor(
+    override,
+    brightness:
+        MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light,
+  );
 }
 
 /// Clips to [shape] at paint time, once its size is known.
@@ -102,15 +139,21 @@ class _RawGlass extends SingleChildRenderObjectWidget {
   const _RawGlass({
     required this.shape,
     required this.group,
+    required this.material,
     required Widget super.child,
   });
 
   final GlassShape shape;
   final BlendGroupLink? group;
+  final GlassMaterial? material;
 
   @override
   RenderGlassShape createRenderObject(BuildContext context) {
-    return RenderGlassShape(shape: shape, group: group);
+    return RenderGlassShape(
+      shape: shape,
+      group: group,
+      material: material,
+    );
   }
 
   @override
@@ -120,6 +163,7 @@ class _RawGlass extends SingleChildRenderObjectWidget {
   ) {
     renderObject
       ..shape = shape
-      ..group = group;
+      ..group = group
+      ..material = material;
   }
 }
