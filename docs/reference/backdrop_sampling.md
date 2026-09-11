@@ -109,6 +109,16 @@ continuously-varying displacement range is not in question.
   numbers are real captures from the probe's own `SchedulerBinding` timings
   callback, not invented — but see the caveat immediately below before
   reading anything into the ~2.5 ms gap.
+
+  **Never cite these as a performance figure.** A debug build carries the
+  full assert and observatory overhead and the Simulator has no real GPU;
+  the absolute values say nothing about shipped performance, and the gap
+  between two debug numbers is not a measurement of anything. The benchmark
+  harness added in sub-project 5 refuses to gate on a debug-mode report for
+  exactly this reason (`BenchmarkRunMode` marks it `skippedUntrustworthy`
+  rather than letting it pass). Numbers worth quoting come from
+  `flutter run --profile -t benchmark/run_scene_benchmarks.dart` on real
+  hardware, and none have been captured yet.
 - **A known SkSL constraint, re-hit via the brief's own snippet.**
   `shaders/common/sdf.glsl` already documents this, from Task 9: "No
   sampler2D parameters anywhere. SkSL rejects those too." This was not a
