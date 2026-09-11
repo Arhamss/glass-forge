@@ -20,6 +20,7 @@ class AppRouter {
       const publicRoutes = <String>[
         AppRoutes.splash,
         AppRoutes.loginScreen,
+        AppRoutes.samplingProbe,
       ];
 
       final location = state.matchedLocation;
@@ -48,6 +49,11 @@ class AppRouter {
         name: AppRouteNames.loginScreen,
         path: AppRoutes.loginScreen,
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        name: AppRouteNames.samplingProbe,
+        path: AppRoutes.samplingProbe,
+        builder: (context, state) => const SamplingProbeView(),
       ),
       // TODO(codeable): Add more routes here
 

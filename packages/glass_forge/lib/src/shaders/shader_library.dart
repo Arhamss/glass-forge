@@ -11,7 +11,18 @@ enum GlassShaderId {
   finalRender('packages/glass_forge/shaders/final_render.frag'),
 
   /// Reports the render backend and uniform capacity.
-  probe('packages/glass_forge/shaders/probe.frag');
+  probe('packages/glass_forge/shaders/probe.frag'),
+
+  /// [finalRender], but reconstructing the backdrop bilinearly instead of at
+  /// the engine's nearest-neighbour default.
+  ///
+  /// Exists only to measure flutter#186945 against [finalRender] — see
+  /// `docs/reference/backdrop_sampling.md`. Bound only when
+  /// `debugBilinearBackdropSampling` (`package:glass_forge/src/debug.dart`)
+  /// is set, which the sampling probe screen is the only thing that does.
+  finalRenderBilinearProbe(
+    'packages/glass_forge/shaders/final_render_bilinear_probe.frag',
+  );
 
   const GlassShaderId(this.assetKey);
 
@@ -44,10 +55,9 @@ class ShaderLibrary {
 
   /// Whether every shader has loaded and is safe to [acquire].
   ///
-  /// `true` once warm-up has finished loading `geometry`, `probe` and
-  /// `finalRender`. A load failure for any of them propagates out of
-  /// [warmUp] instead of being swallowed, so reaching `true` means all
-  /// three are genuinely ready.
+  /// `true` once warm-up has finished loading every [GlassShaderId]. A load
+  /// failure for any of them propagates out of [warmUp] instead of being
+  /// swallowed, so reaching `true` means all of them are genuinely ready.
   bool get isReady => _warmUpComplete;
 
   /// How many shaders are checked out. Test-only.

@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:glass_forge/src/composition/filter_snapshot.dart';
+import 'package:glass_forge/src/debug.dart';
 import 'package:glass_forge/src/geometry/matte_generation.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/material/glass_variant.dart';
@@ -40,8 +41,10 @@ class GlassComposition {
       return _filter;
     }
 
-    final shader = _shader ??=
-        ShaderLibrary.instance.acquire(GlassShaderId.finalRender);
+    final shaderId = debugBilinearBackdropSampling
+        ? GlassShaderId.finalRenderBilinearProbe
+        : GlassShaderId.finalRender;
+    final shader = _shader ??= ShaderLibrary.instance.acquire(shaderId);
     _writeUniforms(shader, matte, material, snapshot, devicePixelRatio);
 
     final glass = ui.ImageFilter.shader(shader);

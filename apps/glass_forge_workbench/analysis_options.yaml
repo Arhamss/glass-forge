@@ -6,6 +6,7 @@ analyzer:
     - android/**
     - ios/**
     - web/**
+    - macos/**
   errors:
     avoid_positional_boolean_parameters: ignore
     lines_longer_than_80_chars: ignore

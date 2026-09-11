@@ -5,6 +5,7 @@ class AppRoutes {
 
   static const splash = '/';
   static const loginScreen = '/login';
+  static const samplingProbe = '/sampling-probe';
   // TODO(codeable): Uncomment when adding shell navigation
   // static const homeScreen = '/home';
   // static const searchScreen = '/search';
@@ -16,6 +17,7 @@ class AppRouteNames {
 
   static const splash = 'splash';
   static const loginScreen = 'login';
+  static const samplingProbe = 'samplingProbe';
   // TODO(codeable): Uncomment when adding shell navigation
   // static const homeScreen = 'home';
   // static const searchScreen = 'search';
