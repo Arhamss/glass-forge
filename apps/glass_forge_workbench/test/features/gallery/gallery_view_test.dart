@@ -6,6 +6,7 @@ import 'package:glass_forge_workbench/features/gallery/presentation/views/galler
 import 'package:glass_forge_workbench/features/gallery/presentation/widgets/gallery_stage.dart';
 import 'package:glass_forge_workbench/features/gallery/presentation/widgets/instrument/gallery_resolution_group.dart';
 import 'package:glass_forge_workbench/features/gallery/presentation/widgets/instrument/gallery_roster_row.dart';
+import 'package:glass_forge_workbench/utils/extensions/glass_surface_role_extensions.dart';
 
 GalleryCubit _cubitOf(WidgetTester tester) =>
     tester.element(find.byType(GalleryStage)).read<GalleryCubit>();
@@ -61,6 +62,34 @@ void main() {
         find.descendant(of: resolution, matching: find.text('adapts')),
         findsOneWidget,
         reason: 'past the gate a navigation bar is no longer chrome',
+      );
+    });
+
+    testWidgets('a selected row drops the grey that fails on its own fill',
+        (tester) async {
+      _useAPhone(tester);
+      await tester.pumpWidget(const MaterialApp(home: GalleryView()));
+
+      Color? schemeLineColour(GlassSurfaceRole role) => tester
+          .widget<Text>(
+            find.descendant(
+              of: find.widgetWithText(GalleryRosterRow, role.label),
+              matching: find.textContaining('in a light app'),
+            ),
+          )
+          .style
+          ?.color;
+
+      // The selected row's 12% fill lifts the ground under it, and the
+      // subtle grey measures 3.3:1 there. See
+      // test/constants/stage_contrast_test.dart for the numbers.
+      expect(
+        schemeLineColour(GlassSurfaceRole.navigationBar),
+        AppColors.stageForegroundMuted,
+      );
+      expect(
+        schemeLineColour(GlassSurfaceRole.sheet),
+        AppColors.stageForegroundSubtle,
       );
     });
 

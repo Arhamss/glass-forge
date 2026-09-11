@@ -53,7 +53,7 @@ class GalleryResolutionGroup extends StatelessWidget {
       cells: [
         InstrumentValueRow(
           label: 'Adaptation',
-          value: 'flips',
+          value: adaptation.verb,
           note: adaptation.consequence,
         ),
         InstrumentValueRow(
