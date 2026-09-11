@@ -7,7 +7,7 @@ class AppRouter {
       _rootNavigatorKey.currentState?.context;
 
   static final router = GoRouter(
-    initialLocation: AppRoutes.motion,
+    initialLocation: AppRoutes.specimen,
     debugLogDiagnostics: true,
     navigatorKey: _rootNavigatorKey,
     redirect: (context, state) {
