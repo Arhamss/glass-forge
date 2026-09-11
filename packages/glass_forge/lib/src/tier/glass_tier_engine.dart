@@ -124,13 +124,19 @@ class GlassTierEngine extends ChangeNotifier
     _recompute();
   }
 
-  ResolvedTier _resolve() {
+  /// Resolves the current signals, carrying the dome's hysteresis forward
+  /// from [previous], the verdict being replaced.
+  ///
+  /// Null only for the first verdict, which has no history to hold domes
+  /// flat with. See [resolveTier] for why domes need any.
+  ResolvedTier _resolve({ResolvedTier? previous}) {
     return resolveTier(
       capabilities: _capabilities,
       thermal: _thermal.value,
       frameHealth: _watchdog.value,
       accessibility: _accessibility.value,
       requested: _requested,
+      domeWasFlattened: previous != null && !previous.dome,
     );
   }
 
@@ -138,7 +144,7 @@ class GlassTierEngine extends ChangeNotifier
     if (_disposed) {
       return;
     }
-    final next = _resolve();
+    final next = _resolve(previous: _value);
     if (next == _value) {
       return;
     }

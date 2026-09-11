@@ -1,10 +1,14 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
+import 'package:glass_forge/src/material/glass_profile.dart';
 import 'package:glass_forge/src/platform/glass_forge_platform_interface.dart';
 import 'package:glass_forge/src/rendering/render_glass_layer.dart';
 import 'package:glass_forge/src/tier/accessibility_signals.dart';
+import 'package:glass_forge/src/tier/frame_watchdog.dart';
 import 'package:glass_forge/src/tier/glass_tier_engine.dart';
 import 'package:glass_forge/src/tier/glass_tier_scope.dart';
 import 'package:glass_forge/src/tier/render_capabilities.dart';
@@ -242,6 +246,68 @@ void main() {
     // the session, which makes every downgrade the engine resolves invisible
     // to the thing that renders.
     expect(_renderLayer(tester).tier, GeometryTier.portable);
+  });
+
+  testWidgets('a dome released from its hold on the same rung is redrawn', (
+    tester,
+  ) async {
+    final platform = _SilentPlatform();
+    final watchdog = FrameWatchdog(
+      frameBudget: const Duration(microseconds: 16667),
+      windowFrames: 100,
+      recoveryFrames: 20,
+    );
+    final engine = GlassTierEngine(
+      watchdog: watchdog,
+      thermal: ThermalSignal(platform: platform),
+      accessibility: AccessibilitySignalSource(
+        platform: platform,
+        features: () => const FakeAccessibilityFeatures(),
+      ),
+      capabilities: _capable,
+    );
+    addTearDown(engine.dispose);
+    addTearDown(watchdog.dispose);
+    ui.FrameTiming frame(int rasterMicros) => ui.FrameTiming(
+      vsyncStart: 0,
+      buildStart: 0,
+      buildFinish: 1000,
+      rasterStart: 1000,
+      rasterFinish: 1000 + rasterMicros,
+      rasterFinishWallTime: 1000 + rasterMicros,
+    );
+
+    await _mount(
+      tester,
+      GlassTierScope(
+        engine: engine,
+        child: GlassLayer(
+          material: GlassMaterial.dome(),
+          child: const SizedBox(width: 10, height: 10),
+        ),
+      ),
+    );
+    expect(_scopedMaterial(tester).profile, GlassProfile.dome);
+
+    watchdog.recordTimings(List<ui.FrameTiming>.filled(100, frame(40000)));
+    await tester.pump();
+    expect(_scopedMaterial(tester).profile, GlassProfile.edgeBand);
+
+    for (var i = 0; i < 200 && watchdog.value == FrameHealth.saturated; i++) {
+      watchdog.recordTimings(<ui.FrameTiming>[frame(1000)]);
+    }
+    await tester.pump();
+    expect(engine.value.tier, GlassTier.balanced);
+    expect(_scopedMaterial(tester).profile, GlassProfile.edgeBand);
+
+    // Pinning the rung it is already on lifts the hold without moving the
+    // tier. The scope must see the profile change on its own; filtering on
+    // the tier alone would leave this layer flat for as long as the pin
+    // lasts.
+    engine.requested = GlassTier.balanced;
+    await tester.pump();
+    expect(engine.value.tier, GlassTier.balanced);
+    expect(_scopedMaterial(tester).profile, GlassProfile.dome);
   });
 
   testWidgets('a scope with no engine of its own still resolves a tier', (

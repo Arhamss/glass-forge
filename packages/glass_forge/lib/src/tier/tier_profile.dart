@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
+import 'package:glass_forge/src/material/glass_profile.dart';
 
 /// Every axis a tier can move, and how far it has moved each one.
 ///
@@ -26,6 +27,7 @@ class TierProfile {
     this.refractionScale = 1.0,
     this.blurScale = 1.0,
     this.chromaticAberration = true,
+    this.dome = true,
     this.specularScale = 1.0,
     this.elasticMotion = true,
     this.minimumFrost = 0.0,
@@ -46,6 +48,58 @@ class TierProfile {
 
   /// Whether the 3-tap dispersion may run at all.
   final bool chromaticAberration;
+
+  /// Whether a [GlassProfile.dome] material may stay a dome.
+  ///
+  /// False flattens it to [GlassProfile.edgeBand], keeping its tint,
+  /// saturation, frost, light, contour and dispersion; this profile's scales
+  /// and floors then apply as they would to any edge band. What flattening
+  /// takes away is the lens across the interior, the one thing the edge band
+  /// cannot draw, and it adds nothing the dome did not show:
+  ///
+  /// - **The rim refracts no wider than the edge the dome lit.** Under a dome
+  ///   `thickness` is the width of the lit edge, so after this profile's
+  ///   [refractionScale] the displacement is capped at it. A band mirrors
+  ///   the strip just inside itself — `gfEdgeBandFit` keeps its samples off
+  ///   the medial axis, but the profile still turns back on itself within
+  ///   the band — and the dome preset has no frost to hide that. Rendered
+  ///   offscreen over a grid in the Impeller test lane, with the fitted
+  ///   band, the preset flattened at half its rim displacement (20 px)
+  ///   duplicated and hooked the backdrop all round the rim of a 160 px
+  ///   square and folded a disc into a C on a 44 px pill; 14 px did the
+  ///   same more narrowly. Capped at its 8 px thickness it read as the same
+  ///   clear glass gone flat. On a control that size the dome itself
+  ///   displaces its rim about 8 px, since it never moves more than 0.35 of
+  ///   a shape's depth, so there the rim barely changes across the swap.
+  /// - **Refraction spread goes to zero.** It shapes only the edge band, so
+  ///   on a dome it was never visible, and flattening must not switch on a
+  ///   setting nobody could see.
+  ///
+  /// It is an axis of its own because nothing else on the ladder cuts what
+  /// a dome costs. Nothing has timed that cost yet. These are counts of
+  /// work read off the shaders, per texel or fragment, not durations:
+  ///
+  /// - **The bake** (`shaders/common/matte_pass.glsl`), paid again whenever
+  ///   a shape moves or the material changes. The edge band folds the
+  ///   scene 5 times — once for distance, 4 for the normal — and a 6th
+  ///   inside the band, for the depth its fit needs. The dome folds it 7
+  ///   times everywhere: distance, the steering proxy, the depth at the
+  ///   core and 4 for the direction. 5 of those 7 widen every blend to at
+  ///   least 3 rim displacements, which keeps the bound check from culling
+  ///   any shape that near.
+  /// - **The final pass** (`shaders/final_render.frag`), paid every frame.
+  ///   The edge band reads the backdrop once a fragment, or 3 times with
+  ///   dispersion. The dome reads it bilinearly, 4 taps a read: 4 taps, or
+  ///   12 with dispersion.
+  ///
+  /// So [chromaticAberration] is the largest cut a dome can take and stay a
+  /// dome, 12 taps to 4, and [GlassTier.balanced] takes it. After that only
+  /// this flag cuts much: [blurScale] saves only what frost costs, and the
+  /// dome preset has no frost, while a smaller [refractionScale] moves the
+  /// same taps and folds a shorter distance. Flattening takes the reads
+  /// from 4 to 1, and the bake from 7 folds a texel to 5, or 6 in the
+  /// band.
+  final bool dome;
 
   /// Multiplier on the rim highlight.
   final double specularScale;
@@ -94,18 +148,26 @@ class TierProfile {
 
   /// Applies this profile's limits to [material].
   ///
-  /// Scales come first and floors come second, so a floor always wins: the
-  /// point of a floor is that the user asked for at least this much
-  /// obscuring, and a performance scale must not undo an accessibility
-  /// requirement.
+  /// A dome is flattened first, when [dome] says so, so that every scale and
+  /// floor after it lands on the surface that will actually be drawn. Then
+  /// scales come first and floors second, so a floor always wins: the point
+  /// of a floor is that the user asked for at least this much obscuring,
+  /// and a performance scale must not undo an accessibility requirement.
   GlassMaterial applyTo(
     GlassMaterial material, {
     required Brightness brightness,
   }) {
+    // Before the early return below as well, so that a material degraded to
+    // nothing does not still claim a profile it will never be drawn with.
+    final flattens = !dome && material.profile == GlassProfile.dome;
+    final surface = flattens
+        ? material.copyWith(profile: GlassProfile.edgeBand, refractionSpread: 0)
+        : material;
+
     if (rendersNothing) {
       // Every field `rendersAnything` checks, driven to its neutral value —
       // including `saturation`, which is neutral at 1 rather than at 0.
-      return material.copyWith(
+      return surface.copyWith(
         edgeRefraction: 0,
         refractionSpread: 0,
         frost: 0,
@@ -117,25 +179,29 @@ class TierProfile {
       );
     }
 
-    final refraction = material.edgeRefraction * refractionScale;
-    return material.copyWith(
+    final scaled = surface.edgeRefraction * refractionScale;
+    // See [dome] for why a flattened rim is held to the width of the edge
+    // the dome lit. Typed, so a thickness of zero stays a double.
+    final double lit = math.max(surface.thickness, 0);
+    final refraction = flattens ? math.min(scaled, lit) : scaled;
+    return surface.copyWith(
       edgeRefraction: refraction,
       // Spread describes how far inward a band reaches. With no band it is
       // not merely unused, it is meaningless, and leaving it set would make
       // a re-baked matte differ for no visible reason.
-      refractionSpread: refraction <= 0 ? 0 : material.refractionSpread,
-      frost: math.max(material.frost * blurScale, minimumFrost),
+      refractionSpread: refraction <= 0 ? 0 : surface.refractionSpread,
+      frost: math.max(surface.frost * blurScale, minimumFrost),
       chromaticAberration: chromaticAberration
-          ? material.chromaticAberration
+          ? surface.chromaticAberration
           : 0,
-      highlight: material.highlight * specularScale,
-      tintOpacity: math.max(material.tintOpacity, minimumTintOpacity),
-      contour: math.max(material.contour, minimumContour),
+      highlight: surface.highlight * specularScale,
+      tintOpacity: math.max(surface.tintOpacity, minimumTintOpacity),
+      contour: math.max(surface.contour, minimumContour),
       tint: monochromeTint
           ? (brightness == Brightness.dark
                 ? const Color(0xFF000000)
                 : const Color(0xFFFFFFFF))
-          : material.tint,
+          : surface.tint,
     );
   }
 
@@ -145,6 +211,7 @@ class TierProfile {
     double? refractionScale,
     double? blurScale,
     bool? chromaticAberration,
+    bool? dome,
     double? specularScale,
     bool? elasticMotion,
     double? minimumFrost,
@@ -158,6 +225,7 @@ class TierProfile {
       refractionScale: refractionScale ?? this.refractionScale,
       blurScale: blurScale ?? this.blurScale,
       chromaticAberration: chromaticAberration ?? this.chromaticAberration,
+      dome: dome ?? this.dome,
       specularScale: specularScale ?? this.specularScale,
       elasticMotion: elasticMotion ?? this.elasticMotion,
       minimumFrost: minimumFrost ?? this.minimumFrost,
@@ -178,6 +246,7 @@ class TierProfile {
         other.refractionScale == refractionScale &&
         other.blurScale == blurScale &&
         other.chromaticAberration == chromaticAberration &&
+        other.dome == dome &&
         other.specularScale == specularScale &&
         other.elasticMotion == elasticMotion &&
         other.minimumFrost == minimumFrost &&
@@ -193,6 +262,7 @@ class TierProfile {
     refractionScale,
     blurScale,
     chromaticAberration,
+    dome,
     specularScale,
     elasticMotion,
     minimumFrost,
@@ -210,7 +280,8 @@ class TierProfile {
 /// right place, not appending it.
 enum GlassTier {
   /// Everything on: the Flutter GPU geometry pass, full edge refraction,
-  /// full blur, dispersion, both specular lobes.
+  /// full blur, dispersion, both specular lobes. A dome stays a dome,
+  /// dispersion and all.
   full(TierProfile(geometry: GeometryTier.accelerated)),
 
   /// The runtime-effect geometry pass, still at full optical quality, minus
@@ -220,6 +291,11 @@ enum GlassTier {
   /// worst cost-to-visibility ratio — three taps per fragment for an effect
   /// whose presence in Apple's own material is not even established (see
   /// the architecture spec's open question 5).
+  ///
+  /// For a dome this is the cheaper dome. Its taps are bilinear, so
+  /// dispersion is 8 of its 12 backdrop taps a fragment, and the dome preset
+  /// already keeps dispersion low. A strained device keeps its lens here;
+  /// see [TierProfile.dome].
   balanced(
     TierProfile(
       geometry: GeometryTier.portable,
@@ -227,13 +303,27 @@ enum GlassTier {
     ),
   ),
 
-  /// Half the lensing, less blur, one specular lobe's worth of highlight.
+  /// Half the lensing, less blur, one specular lobe's worth of highlight,
+  /// and no domes.
+  ///
+  /// A dome kept as a dome here would cost exactly what it cost at
+  /// [balanced]: dispersion is already gone, the preset has no frost for
+  /// the blur scale to save, and half the displacement is the same taps and
+  /// folds (see [TierProfile.dome] for the counts). Frame health can take
+  /// the ladder two rungs down and no further, so a saturated device whose
+  /// second rung saved nothing would stay saturated. Flattening is the only
+  /// cut left, so this is where it happens. Getting here takes serious heat
+  /// or sustained dropped frames, not a stutter.
+  ///
+  /// The flattened dome keeps a refracting rim no wider than the edge it
+  /// lit as a dome; [TierProfile.dome] has the renders that decided that.
   reduced(
     TierProfile(
       geometry: GeometryTier.portable,
       refractionScale: 0.5,
       blurScale: 0.6,
       chromaticAberration: false,
+      dome: false,
       specularScale: 0.5,
     ),
   ),
@@ -245,12 +335,21 @@ enum GlassTier {
   /// coverage to work with and degrades to blurring the layer's whole
   /// rectangle, which is both wrong-looking and not cheaper. What this tier
   /// drops is the optical work, not the silhouette.
+  ///
+  /// No domes either, and not only for cost. A dome with no displacement
+  /// still bakes a field of zeros at the dome's 7 folds and reads its
+  /// backdrop through bilinear taps with nothing to interpolate. It still
+  /// shades as a dome, too: glints, and a Beer-Lambert darkening that
+  /// spreads the contour over the lit edge. The border this rung promises,
+  /// and the one Increase Contrast and Reduce Transparency ask for by
+  /// pinning it, is the edge band's contour ring.
   flat(
     TierProfile(
       geometry: GeometryTier.portable,
       refractionScale: 0,
       blurScale: 0.5,
       chromaticAberration: false,
+      dome: false,
       specularScale: 0.25,
       minimumTintOpacity: 0.55,
       minimumContour: 0.3,
@@ -268,6 +367,7 @@ enum GlassTier {
       refractionScale: 0,
       blurScale: 0,
       chromaticAberration: false,
+      dome: false,
       specularScale: 0,
       rendersNothing: true,
     ),

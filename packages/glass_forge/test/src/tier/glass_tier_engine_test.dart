@@ -54,7 +54,8 @@ ui.FrameTiming _frame(int rasterMicros) {
   FrameWatchdog watchdog,
   ThermalSignal thermal,
   AccessibilitySignalSource accessibility,
-}) _build({GlassTier? requested}) {
+})
+_build({GlassTier? requested}) {
   final platform = _SilentPlatform();
   final watchdog = FrameWatchdog(
     frameBudget: const Duration(microseconds: 16667),
@@ -183,6 +184,62 @@ void main() {
 
     expect(parts.engine.value.tier, GlassTier.reduced);
   });
+
+  test('holds domes flat through a recovery, then brings them back', () {
+    final parts = _build();
+    addTearDown(parts.engine.dispose);
+    addTearDown(parts.watchdog.dispose);
+    addTearDown(parts.thermal.dispose);
+    addTearDown(parts.accessibility.dispose);
+
+    parts.watchdog.recordTimings(
+      List<ui.FrameTiming>.filled(100, _frame(40000)),
+    );
+    expect(parts.engine.value.tier, GlassTier.reduced);
+    expect(parts.engine.value.dome, isFalse);
+
+    // Clean frames, one at a time, until the watchdog climbs a step. The
+    // window has to drain before a clean run can start, so a step takes at
+    // most the window plus one run: 120 frames with this watchdog. The cap
+    // only stops a broken watchdog from looping forever.
+    void recoverOneStep() {
+      final from = parts.watchdog.value;
+      for (var i = 0; i < 200 && parts.watchdog.value == from; i++) {
+        parts.watchdog.recordTimings(<ui.FrameTiming>[_frame(1000)]);
+      }
+      expect(parts.watchdog.value.index, from.index - 1);
+    }
+
+    recoverOneStep();
+    // Balanced would keep a dome that had never been flattened. This one
+    // was, and the engine remembers.
+    expect(parts.engine.value.tier, GlassTier.balanced);
+    expect(parts.engine.value.dome, isFalse);
+    expect(parts.engine.value.domeHeld, isTrue);
+
+    recoverOneStep();
+    expect(parts.engine.value.tier, GlassTier.full);
+    expect(parts.engine.value.dome, isTrue);
+  });
+
+  test(
+    'lifting a pin that flattened domes restores them on a healthy device',
+    () {
+      final parts = _build();
+      addTearDown(parts.engine.dispose);
+      addTearDown(parts.watchdog.dispose);
+      addTearDown(parts.thermal.dispose);
+      addTearDown(parts.accessibility.dispose);
+      parts.engine.requested = GlassTier.reduced;
+      expect(parts.engine.value.dome, isFalse);
+
+      // Nothing is wrong with the device, so nothing holds domes flat once
+      // the caller stops asking for them to be.
+      parts.engine.requested = null;
+      expect(parts.engine.value.tier, GlassTier.full);
+      expect(parts.engine.value.dome, isTrue);
+    },
+  );
 
   test('leaves injected signals alive when it is disposed', () {
     final parts = _build();

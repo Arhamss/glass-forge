@@ -3,10 +3,14 @@ import 'dart:ui' show Brightness, Color;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
+import 'package:glass_forge/src/material/glass_profile.dart';
 import 'package:glass_forge/src/tier/tier_profile.dart';
 
 GlassMaterial get _regular =>
     GlassMaterial.regular(brightness: Brightness.dark);
+
+GlassMaterial _onRung(GlassTier tier, GlassMaterial material) =>
+    tier.profile.applyTo(material, brightness: Brightness.dark);
 
 void main() {
   group('applyTo', () {
@@ -121,6 +125,156 @@ void main() {
     });
   });
 
+  group('domes', () {
+    test('full keeps a dome exactly as it was written', () {
+      final dome = GlassMaterial.dome();
+
+      expect(_onRung(GlassTier.full, dome), dome);
+    });
+
+    test('balanced keeps the lens and takes only its dispersion', () {
+      final dome = GlassMaterial.dome();
+      // The preset's dispersion is the thing this rung exists to cut; a
+      // preset without any would make the assertion below vacuous.
+      expect(dome.chromaticAberration, greaterThan(0));
+
+      final balanced = _onRung(GlassTier.balanced, dome);
+
+      expect(balanced.profile, GlassProfile.dome);
+      expect(balanced.chromaticAberration, 0);
+      expect(balanced, dome.copyWith(chromaticAberration: 0));
+    });
+
+    test('reduced, flat and off flatten a dome to the edge band', () {
+      final dome = GlassMaterial.dome();
+
+      for (final tier in [GlassTier.reduced, GlassTier.flat, GlassTier.off]) {
+        expect(
+          _onRung(tier, dome).profile,
+          GlassProfile.edgeBand,
+          reason: '${tier.name} must not keep a dome',
+        );
+      }
+    });
+
+    test("a flattened dome is the same glass on a flat pane, not Apple's", () {
+      final dome = GlassMaterial.dome();
+
+      for (final tier in GlassTier.values) {
+        if (tier.profile.dome) {
+          continue;
+        }
+        final flattened = _onRung(tier, dome);
+        final pane = _onRung(
+          tier,
+          dome.copyWith(profile: GlassProfile.edgeBand),
+        );
+        // The rim is the one field flattening touches for itself, so put it
+        // aside and the rest must be identical: a flattened dome is the
+        // developer's own glass on a flat pane. Resetting a field to a
+        // default, or reaching for a preset on the way down, fails here.
+        expect(
+          flattened.copyWith(edgeRefraction: 0),
+          pane.copyWith(edgeRefraction: 0),
+          reason: tier.name,
+        );
+      }
+
+      final reduced = _onRung(GlassTier.reduced, dome);
+      // Concretely, at the first rung that flattens: the dome's vivid,
+      // unfrosted, upper-left-lit glass on a flat pane.
+      expect(reduced.saturation, dome.saturation);
+      expect(reduced.frost, 0);
+      expect(reduced.lightDirection, dome.lightDirection);
+      expect(reduced.tint, dome.tint);
+    });
+
+    test('a flattened rim never outreaches the edge the dome lit', () {
+      // The cap applies after the rung's scale, not before: it is a limit
+      // on what is drawn, not another scale.
+      final deep = GlassMaterial.dome().copyWith(thickness: 100);
+      final thin = GlassMaterial.dome().copyWith(thickness: 2);
+
+      expect(
+        _onRung(GlassTier.reduced, deep).edgeRefraction,
+        deep.edgeRefraction * 0.5,
+        reason: 'a thick dome has room for the whole scaled rim',
+      );
+      expect(_onRung(GlassTier.reduced, thin).edgeRefraction, 2);
+      // The preset: 40 halved to 20, held to its 8 of thickness.
+      expect(
+        _onRung(GlassTier.reduced, GlassMaterial.dome()).edgeRefraction,
+        8,
+      );
+    });
+
+    test('flattening does not switch on a spread the dome never showed', () {
+      final spread = GlassMaterial.dome().copyWith(refractionSpread: 1);
+
+      // Spread shapes only the edge band, so on a dome it did nothing and
+      // the developer never saw it. Flattening must not make it visible —
+      // it would widen the band far past the rim the cap above allows.
+      expect(_onRung(GlassTier.reduced, spread).refractionSpread, 0);
+      // An edge band that asked for one still gets it.
+      expect(
+        _onRung(
+          GlassTier.reduced,
+          spread.copyWith(profile: GlassProfile.edgeBand),
+        ).refractionSpread,
+        1,
+      );
+    });
+
+    test('a dome degraded to nothing does not still claim to be one', () {
+      final off = _onRung(GlassTier.off, GlassMaterial.dome());
+
+      expect(off.rendersAnything, isFalse);
+      expect(off.profile, GlassProfile.edgeBand);
+    });
+
+    test('the dome axis never touches an edge band', () {
+      // Every surface that is not a dome must come out of every rung
+      // exactly as it did before domes were an axis at all.
+      final materials = <GlassMaterial>[
+        _regular,
+        GlassMaterial.clear(),
+        const GlassMaterial(refractionSpread: 0.5, chromaticAberration: 2),
+      ];
+      for (final tier in GlassTier.values) {
+        for (final material in materials) {
+          expect(
+            tier.profile
+                .copyWith(dome: false)
+                .applyTo(
+                  material,
+                  brightness: Brightness.dark,
+                ),
+            tier.profile
+                .copyWith(dome: true)
+                .applyTo(
+                  material,
+                  brightness: Brightness.dark,
+                ),
+            reason: tier.name,
+          );
+        }
+      }
+    });
+
+    test('a profile that differs only in domes is a different profile', () {
+      // GlassTierScope rebuilds glass layers when the resolved profile
+      // changes. If equality ignored this axis, domes held flat by the
+      // hysteresis would never be redrawn when the hold ended.
+      final keeps = GlassTier.balanced.profile;
+      final flattens = keeps.copyWith(dome: false);
+
+      expect(flattens, isNot(keeps));
+      expect(flattens.dome, isFalse);
+      expect(flattens.copyWith(), flattens);
+      expect(flattens.copyWith(dome: true), keeps);
+    });
+  });
+
   group('the ladder', () {
     test('is ordered from richest to poorest', () {
       expect(GlassTier.full.index, lessThan(GlassTier.balanced.index));
@@ -143,6 +297,19 @@ void main() {
       // broken rather than degraded.
       expect(GlassTier.full.lowered(10), GlassTier.flat);
       expect(GlassTier.reduced.lowered(5), GlassTier.flat);
+    });
+
+    test('once a rung flattens domes, every poorer rung does too', () {
+      // A ladder that flattened at one rung and restored domes further
+      // down would give a hotter device a costlier surface.
+      var flattened = false;
+      for (final tier in GlassTier.values) {
+        if (flattened) {
+          expect(tier.profile.dome, isFalse, reason: tier.name);
+        }
+        flattened = flattened || !tier.profile.dome;
+      }
+      expect(flattened, isTrue);
     });
 
     test('lowered by zero steps is the identity, and never climbs', () {

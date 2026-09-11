@@ -3,6 +3,7 @@ import 'dart:ui' show Brightness;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
+import 'package:glass_forge/src/material/glass_profile.dart';
 import 'package:glass_forge/src/tier/accessibility_signals.dart';
 import 'package:glass_forge/src/tier/frame_watchdog.dart';
 import 'package:glass_forge/src/tier/render_capabilities.dart';
@@ -51,6 +52,7 @@ ResolvedTier _resolve({
   FrameHealth frameHealth = FrameHealth.healthy,
   AccessibilitySignals accessibility = _noAccessibilitySettings,
   GlassTier? requested,
+  bool domeWasFlattened = false,
 }) {
   return resolveTier(
     capabilities: capabilities,
@@ -58,8 +60,13 @@ ResolvedTier _resolve({
     frameHealth: frameHealth,
     accessibility: accessibility,
     requested: requested,
+    domeWasFlattened: domeWasFlattened,
   );
 }
+
+/// What [resolved] does to the dome preset.
+GlassMaterial _dome(ResolvedTier resolved) =>
+    resolved.materialFor(GlassMaterial.dome(), brightness: Brightness.dark);
 
 void main() {
   group('capability', () {
@@ -313,6 +320,240 @@ void main() {
         _resolve(capabilities: _skia, requested: GlassTier.full).tier,
         GlassTier.off,
       );
+    });
+  });
+
+  group('domes', () {
+    test('a capable, healthy device draws a dome as written', () {
+      final resolved = _resolve();
+
+      expect(resolved.dome, isTrue);
+      expect(_dome(resolved), GlassMaterial.dome());
+    });
+
+    test('strained frames keep the lens and drop its dispersion', () {
+      final resolved = _resolve(frameHealth: FrameHealth.strained);
+
+      expect(resolved.tier, GlassTier.balanced);
+      expect(_dome(resolved).profile, GlassProfile.dome);
+      expect(_dome(resolved).chromaticAberration, 0);
+    });
+
+    test('saturated frames flatten it', () {
+      final resolved = _resolve(frameHealth: FrameHealth.saturated);
+
+      expect(resolved.tier, GlassTier.reduced);
+      expect(resolved.dome, isFalse);
+      expect(_dome(resolved).profile, GlassProfile.edgeBand);
+    });
+
+    test('serious heat flattens it, and fair heat does not', () {
+      expect(
+        _dome(_resolve(thermal: ThermalState.fair)).profile,
+        GlassProfile.dome,
+      );
+      expect(
+        _dome(_resolve(thermal: ThermalState.serious)).profile,
+        GlassProfile.edgeBand,
+      );
+    });
+
+    test('a device capped at balanced keeps it until frames strain', () {
+      expect(_resolve(capabilities: _noAcceleratedGeometry).dome, isTrue);
+
+      final strained = _resolve(
+        capabilities: _noAcceleratedGeometry,
+        frameHealth: FrameHealth.strained,
+      );
+      expect(strained.tier, GlassTier.reduced);
+      expect(strained.dome, isFalse);
+    });
+  });
+
+  group('dome hysteresis', () {
+    test('the same signals keep or hold a dome depending on history', () {
+      // The band itself. Strained frames on a full-ceiling device mean
+      // balanced, where a dome that was never flattened survives; one that
+      // was flattened stays flat, because the watchdog has climbed only one
+      // of the two steps back to healthy.
+      final never = _resolve(frameHealth: FrameHealth.strained);
+      final after = _resolve(
+        frameHealth: FrameHealth.strained,
+        domeWasFlattened: true,
+      );
+
+      expect(never.tier, GlassTier.balanced);
+      expect(after.tier, GlassTier.balanced);
+      expect(never.dome, isTrue);
+      expect(after.dome, isFalse);
+      expect(_dome(after).profile, GlassProfile.edgeBand);
+    });
+
+    test('a saturated episode keeps domes flat until frames are healthy', () {
+      // One verdict feeding the next, as the engine does it.
+      var dome = true;
+      final seen = <(GlassTier, bool)>[];
+      for (final health in [
+        FrameHealth.healthy,
+        FrameHealth.saturated,
+        FrameHealth.strained,
+        FrameHealth.healthy,
+      ]) {
+        final resolved = _resolve(
+          frameHealth: health,
+          domeWasFlattened: !dome,
+        );
+        dome = resolved.dome;
+        seen.add((resolved.tier, dome));
+      }
+
+      expect(seen, [
+        (GlassTier.full, true),
+        (GlassTier.reduced, false),
+        (GlassTier.balanced, false),
+        (GlassTier.full, true),
+      ]);
+    });
+
+    test('the hold is reported as a hold', () {
+      final held = _resolve(
+        frameHealth: FrameHealth.strained,
+        domeWasFlattened: true,
+      );
+
+      expect(held.domeHeld, isTrue);
+      expect(held.describe(), contains('held flat'));
+      // Flat because the rung says so is not a hold.
+      final flattened = _resolve(frameHealth: FrameHealth.saturated);
+      expect(flattened.domeHeld, isFalse);
+      expect(flattened.describe(), isNot(contains('held')));
+    });
+
+    test('on a device capped at balanced the hold ends at the ceiling', () {
+      // Such a device can never reach full. A hold that waited for full
+      // would take its domes away for the rest of the session after one
+      // strained moment.
+      final recovered = _resolve(
+        capabilities: _noAcceleratedGeometry,
+        domeWasFlattened: true,
+      );
+
+      expect(recovered.tier, GlassTier.balanced);
+      expect(recovered.dome, isTrue);
+    });
+
+    test('heat that has passed brings domes straight back', () {
+      final hot = _resolve(thermal: ThermalState.serious);
+      final cooled = _resolve(
+        thermal: ThermalState.fair,
+        domeWasFlattened: !hot.dome,
+      );
+
+      expect(hot.dome, isFalse);
+      expect(cooled.tier, GlassTier.full);
+      expect(cooled.dome, isTrue);
+    });
+
+    test('history cannot keep a dome on a rung that flattens it', () {
+      expect(
+        _resolve(frameHealth: FrameHealth.saturated).dome,
+        isFalse,
+      );
+      expect(_resolve(requested: GlassTier.flat).dome, isFalse);
+    });
+  });
+
+  group('domes and an explicit request', () {
+    test('a pinned full keeps domes whatever the heat, frames or history', () {
+      final resolved = _resolve(
+        thermal: ThermalState.critical,
+        frameHealth: FrameHealth.saturated,
+        requested: GlassTier.full,
+        domeWasFlattened: true,
+      );
+
+      expect(resolved.tier, GlassTier.full);
+      expect(_dome(resolved), GlassMaterial.dome());
+    });
+
+    test('a pinned balanced keeps domes even inside the hold band', () {
+      final resolved = _resolve(
+        frameHealth: FrameHealth.strained,
+        requested: GlassTier.balanced,
+        domeWasFlattened: true,
+      );
+
+      expect(resolved.dome, isTrue);
+      expect(resolved.domeHeld, isFalse);
+    });
+
+    test('a pinned reduced flattens domes on a healthy device', () {
+      expect(
+        _dome(_resolve(requested: GlassTier.reduced)).profile,
+        GlassProfile.edgeBand,
+      );
+    });
+
+    test('does not lift Reduce Transparency or Increase Contrast off one', () {
+      for (final settings in const [
+        AccessibilitySignals(reduceTransparency: true),
+        AccessibilitySignals(increaseContrast: true),
+      ]) {
+        final resolved = _resolve(
+          accessibility: settings,
+          requested: GlassTier.full,
+        );
+
+        expect(resolved.dome, isFalse);
+        expect(_dome(resolved).profile, GlassProfile.edgeBand);
+      }
+    });
+
+    test('does not lift a backend that cannot run the shader', () {
+      final resolved = _resolve(capabilities: _skia, requested: GlassTier.full);
+
+      expect(_dome(resolved).rendersAnything, isFalse);
+      expect(_dome(resolved).profile, GlassProfile.edgeBand);
+    });
+  });
+
+  group('domes and accessibility', () {
+    test('Reduce Transparency flattens a dome and frosts it as it would a '
+        'pane', () {
+      final resolved = _resolve(
+        accessibility: const AccessibilitySignals(reduceTransparency: true),
+      );
+      final degraded = _dome(resolved);
+
+      expect(degraded.profile, GlassProfile.edgeBand);
+      // The dome preset has no frost and almost no tint, so both floors
+      // have to do all the work here.
+      expect(degraded.frost, greaterThanOrEqualTo(24));
+      expect(degraded.tintOpacity, greaterThanOrEqualTo(0.85));
+      expect(degraded.edgeRefraction, 0);
+      expect(resolved.geometry, GeometryTier.portable);
+    });
+
+    test('Increase Contrast flattens a dome, and the border survives', () {
+      final degraded = _resolve(
+        accessibility: const AccessibilitySignals(increaseContrast: true),
+      ).materialFor(GlassMaterial.dome(), brightness: Brightness.light);
+
+      expect(degraded.profile, GlassProfile.edgeBand);
+      expect(degraded.tintOpacity, greaterThanOrEqualTo(0.95));
+      expect(degraded.tint.r, 1.0);
+      expect(degraded.contour, greaterThanOrEqualTo(0.6));
+      expect(degraded.highlight, 0);
+      expect(degraded.edgeRefraction, 0);
+    });
+
+    test('Reduce Motion keeps a dome a dome', () {
+      final resolved = _resolve(
+        accessibility: const AccessibilitySignals(reduceMotion: true),
+      );
+
+      expect(resolved.elasticMotion, isFalse);
+      expect(_dome(resolved), GlassMaterial.dome());
     });
   });
 

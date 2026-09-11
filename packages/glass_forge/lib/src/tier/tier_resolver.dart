@@ -77,6 +77,18 @@ class ResolvedTier {
   /// [TierProfile.elasticMotion].
   bool get elasticMotion => profile.elasticMotion;
 
+  /// Whether a dome stays a dome. See [TierProfile.dome].
+  bool get dome => profile.dome;
+
+  /// Whether domes are flat only because the hysteresis is holding them
+  /// there: [tier] has room for a dome, but frames have not recovered since
+  /// the last time one was flattened.
+  ///
+  /// Evidence, like [frameSteps]. A developer who sees a flat dome on a
+  /// rung that should keep it needs to know that the engine is waiting
+  /// rather than broken.
+  bool get domeHeld => tier.profile.dome && !profile.dome;
+
   /// Whether the thermal channel has ever answered.
   ///
   /// False means unknown, which is not the same as [ThermalState.nominal] and
@@ -96,7 +108,12 @@ class ResolvedTier {
     final accessibilityText = accessibility.reduceTransparencyIsApproximated
         ? 'reduceTransparency=${accessibility.reduceTransparency}~'
         : 'reduceTransparency=${accessibility.reduceTransparency}';
-    return 'glass tier ${tier.name} '
+    final domeText = dome
+        ? 'kept'
+        : domeHeld
+        ? 'held flat until frames recover'
+        : 'flat';
+    return 'glass tier ${tier.name}, domes $domeText '
         '(requested: ${requested?.name ?? 'auto'}, '
         'capability: ${capabilityCeiling.name}, '
         'thermal: $thermalText -> ${thermalCeiling.name}, '
@@ -150,7 +167,8 @@ class ResolvedTier {
 /// A pure function on purpose: the signals are stateful (the thermal reading
 /// is sticky, the watchdog carries hysteresis), but the combination of them
 /// is not, so it can be tested exhaustively without a device, a clock or a
-/// widget tree.
+/// widget tree. The one piece of history it needs, the dome's, arrives as an
+/// argument for the same reason.
 ///
 /// The four inputs do not combine the same way, and the difference is not
 /// arbitrary:
@@ -175,12 +193,38 @@ class ResolvedTier {
 /// of them would be opting out on their users' behalf. Nor does it lift a
 /// backend that cannot run the shader at all, which is not a preference
 /// either.
+///
+/// **Domes carry the one piece of history.** [domeWasFlattened] says
+/// whether the verdict this one replaces had flattened them, and it is the
+/// only input that is not a signal. Flattening sheds most of a dome's work
+/// at once (see `TierProfile.dome`), so a device saturated by domes recovers
+/// quickly once they are flat. With no memory, the watchdog's first step
+/// back up would bring them back at [GlassTier.balanced], and with them the
+/// load that saturated it: a lens turning into a pane and back once per
+/// watchdog recovery, which is the popping the watchdog's own hysteresis
+/// exists to prevent. So domes flatten on reaching [GlassTier.reduced], and
+/// once flat they stay flat until frame health is healthy again, not merely
+/// one step better:
+///
+/// - a full-ceiling device that frames took to `reduced` must climb twice,
+///   each step a clean run of the watchdog's own, before domes return;
+/// - on a device capped at [GlassTier.balanced] one step is all the way
+///   back, so the watchdog's own recovery is the whole hold;
+/// - heat has no hold of its own. A thermal state is the platform's
+///   verdict on the device's temperature, which trails load by the
+///   device's thermal mass rather than following it frame by frame.
+///
+/// A request pins domes as it pins everything else: a pinned rung gets what
+/// that rung gives, whatever the history. Accessibility still wins over
+/// both, because Reduce Transparency and Increase Contrast pin
+/// [GlassTier.flat], which flattens domes.
 ResolvedTier resolveTier({
   required RenderCapabilities capabilities,
   required ThermalState? thermal,
   required FrameHealth frameHealth,
   required AccessibilitySignals accessibility,
   GlassTier? requested,
+  bool domeWasFlattened = false,
 }) {
   final capabilityCeiling = _capabilityCeiling(capabilities);
   final thermalCeiling = _thermalCeiling(thermal);
@@ -202,9 +246,19 @@ ResolvedTier resolveTier({
   }
   tier = tier.clampedTo(accessibilityCeiling);
 
+  final dome = _keepsDome(
+    tier: tier,
+    requested: requested,
+    frameSteps: frameSteps,
+    domeWasFlattened: domeWasFlattened,
+  );
+
   return ResolvedTier(
     tier: tier,
-    profile: _applyAccessibility(tier.profile, accessibility),
+    profile: _applyAccessibility(
+      tier.profile.copyWith(dome: dome),
+      accessibility,
+    ),
     capabilities: capabilities,
     thermal: thermal,
     frameHealth: frameHealth,
@@ -215,6 +269,25 @@ ResolvedTier resolveTier({
     frameSteps: frameSteps,
     requested: requested,
   );
+}
+
+/// Whether domes survive on [tier], given the verdict before this one.
+bool _keepsDome({
+  required GlassTier tier,
+  required GlassTier? requested,
+  required int frameSteps,
+  required bool domeWasFlattened,
+}) {
+  if (!tier.profile.dome) {
+    return false;
+  }
+  if (requested != null) {
+    // The hold below is a performance mechanism, and a request beats every
+    // performance signal. Holding a pinned `full` flat because frames were
+    // bad before the pin would be the engine overriding the caller.
+    return true;
+  }
+  return !domeWasFlattened || frameSteps == 0;
 }
 
 GlassTier _capabilityCeiling(RenderCapabilities capabilities) {
@@ -261,7 +334,11 @@ GlassTier _accessibilityCeiling(AccessibilitySignals accessibility) {
   if (accessibility.reduceTransparency || accessibility.increaseContrast) {
     // Both settings remove lensing, and lensing is what every rung above
     // `flat` exists to provide. Pinning the rung as well as the profile
-    // keeps the reported tier honest about what is on screen.
+    // keeps the reported tier honest about what is on screen. It is also
+    // what flattens a dome under either setting: a lens magnifying the
+    // content behind it is the opposite of obscuring it, and the border
+    // Increase Contrast asks for is the edge band's contour ring, which a
+    // dome does not draw. See `GlassTier.flat`.
     return GlassTier.flat;
   }
   return GlassTier.full;
@@ -288,7 +365,8 @@ int _frameSteps(FrameHealth health) {
 /// contour, and no speculars to soften it. Reduce Motion "disables any
 /// elastic properties for the material": the motion flag, and nothing
 /// optical — claims that it also eliminates lensing go beyond what Apple
-/// says.
+/// says. Reduce Motion keeps a dome a dome for the same reason: a lens
+/// that does not move is not motion.
 TierProfile _applyAccessibility(
   TierProfile profile,
   AccessibilitySignals accessibility,
