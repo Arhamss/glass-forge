@@ -23,6 +23,16 @@ void _useAPhone(WidgetTester tester) {
 
 void main() {
   group('MotionView', () {
+    testWidgets('the surface you throw around is a dome', (tester) async {
+      // The screen where the glass should feel like a lens in hand: the
+      // Apple edge band's flat interior reads as a frosted pane here.
+      _useAPhone(tester);
+      await tester.pumpWidget(const MaterialApp(home: MotionView()));
+      final layer = tester.widget<GlassLayer>(find.byType(GlassLayer));
+      expect(layer.material, GlassMaterial.dome());
+      expect(layer.material.profile, GlassProfile.dome);
+    });
+
     testWidgets('the spring sliders reach the surface that springs',
         (tester) async {
       _useAPhone(tester);

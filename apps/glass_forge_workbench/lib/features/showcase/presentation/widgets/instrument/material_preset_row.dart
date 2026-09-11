@@ -4,9 +4,14 @@ import 'package:glass_forge_workbench/features/showcase/presentation/widgets/ins
 import 'package:glass_forge_workbench/utils/helpers/demonstration_glass_material.dart';
 
 /// One-tap access to the material presets: the demonstration preset this
-/// screen defaults to, plus the three fitted against real iOS 27 captures,
-/// so the values the design bible calls out are never more than a tap
-/// away from the raw sliders.
+/// screen defaults to, the dome, and the three fitted against real iOS 27
+/// captures, so the values the design bible calls out are never more than
+/// a tap away from the raw sliders.
+///
+/// The dome sits beside the Apple presets on purpose. It is a different
+/// optical model, not a different setting of the same one, and flipping
+/// between the two over one backdrop is the quickest way to see what that
+/// difference is.
 class MaterialPresetRow extends StatelessWidget {
   /// Creates the row.
   const MaterialPresetRow({
@@ -23,42 +28,63 @@ class MaterialPresetRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final regularDark = GlassMaterial.regular(brightness: Brightness.dark);
+    final regularLight = GlassMaterial.regular(brightness: Brightness.light);
+    final dome = GlassMaterial.dome();
+    final demonstration = demonstrationGlassMaterial();
+    final clear = GlassMaterial.clear();
+
+    // Two rows, split by where the numbers came from: the workbench's own
+    // materials above, the ones fitted to iOS 27 captures below. Five in one
+    // row left each cell too narrow to hold its name.
+    return Column(
       children: [
-        Expanded(
-          child: MaterialPresetCell(
-            label: 'Demonstration',
-            isSelected: material == demonstrationGlassMaterial(),
-            onTap: () => onPresetSelected(demonstrationGlassMaterial()),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: MaterialPresetCell(
-            label: 'Regular · Dark',
-            isSelected: material == GlassMaterial.regular(brightness: Brightness.dark),
-            onTap: () => onPresetSelected(
-              GlassMaterial.regular(brightness: Brightness.dark),
+        Row(
+          children: [
+            Expanded(
+              child: MaterialPresetCell(
+                label: 'Demonstration',
+                isSelected: material == demonstration,
+                onTap: () => onPresetSelected(demonstration),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: MaterialPresetCell(
-            label: 'Regular · Light',
-            isSelected: material == GlassMaterial.regular(brightness: Brightness.light),
-            onTap: () => onPresetSelected(
-              GlassMaterial.regular(brightness: Brightness.light),
+            const SizedBox(width: 8),
+            Expanded(
+              child: MaterialPresetCell(
+                label: 'Dome',
+                isSelected: material == dome,
+                onTap: () => onPresetSelected(dome),
+              ),
             ),
-          ),
+          ],
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: MaterialPresetCell(
-            label: 'Clear',
-            isSelected: material == GlassMaterial.clear(),
-            onTap: () => onPresetSelected(GlassMaterial.clear()),
-          ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: MaterialPresetCell(
+                label: 'Regular · Dark',
+                isSelected: material == regularDark,
+                onTap: () => onPresetSelected(regularDark),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: MaterialPresetCell(
+                label: 'Regular · Light',
+                isSelected: material == regularLight,
+                onTap: () => onPresetSelected(regularLight),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: MaterialPresetCell(
+                label: 'Clear',
+                isSelected: material == clear,
+                onTap: () => onPresetSelected(clear),
+              ),
+            ),
+          ],
         ),
       ],
     );

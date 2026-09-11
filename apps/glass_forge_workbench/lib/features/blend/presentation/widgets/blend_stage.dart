@@ -5,7 +5,6 @@ import 'package:glass_forge_workbench/features/blend/presentation/widgets/blend_
 import 'package:glass_forge_workbench/features/blend/presentation/widgets/blend_verdict_caption.dart';
 import 'package:glass_forge_workbench/utils/enums/blend_arrangement.dart';
 import 'package:glass_forge_workbench/utils/enums/glass_backdrop.dart';
-import 'package:glass_forge_workbench/utils/helpers/demonstration_glass_material.dart';
 import 'package:glass_forge_workbench/utils/widgets/stage/backdrop_rail.dart';
 import 'package:glass_forge_workbench/utils/widgets/stage/glass_backdrop_surface.dart';
 import 'package:glass_forge_workbench/utils/widgets/stage/stage_caption.dart';
@@ -47,7 +46,9 @@ class BlendStage extends StatelessWidget {
             children: [
               GlassBackdropSurface(backdrop: state.backdrop),
               GlassLayer(
-                material: demonstrationGlassMaterial(),
+                // The dome, so a merge reads as two lenses pooling into
+                // one rather than two flat panes fusing at the rim.
+                material: GlassMaterial.dome(),
                 child: GlassBlendGroup(
                   blend: state.blend,
                   child: BlendField(

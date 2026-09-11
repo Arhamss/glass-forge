@@ -23,6 +23,16 @@ void _useAPhone(WidgetTester tester) {
 
 void main() {
   group('BlendView', () {
+    testWidgets('the shapes are domes, not flat panes', (tester) async {
+      // The merge is the thing this screen shows, and two flat panes fusing
+      // at the rim read as frosted plastic over a soft backdrop.
+      _useAPhone(tester);
+      await tester.pumpWidget(const MaterialApp(home: BlendView()));
+      final layer = tester.widget<GlassLayer>(find.byType(GlassLayer));
+      expect(layer.material, GlassMaterial.dome());
+      expect(layer.material.profile, GlassProfile.dome);
+    });
+
     testWidgets('the blend slider reaches the group that does the folding',
         (tester) async {
       _useAPhone(tester);

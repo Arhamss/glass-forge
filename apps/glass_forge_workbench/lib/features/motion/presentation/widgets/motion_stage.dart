@@ -3,7 +3,6 @@ import 'package:glass_forge_workbench/exports.dart';
 import 'package:glass_forge_workbench/features/motion/presentation/cubit/motion_state.dart';
 import 'package:glass_forge_workbench/features/motion/presentation/widgets/motion_specimen.dart';
 import 'package:glass_forge_workbench/utils/enums/glass_backdrop.dart';
-import 'package:glass_forge_workbench/utils/helpers/demonstration_glass_material.dart';
 import 'package:glass_forge_workbench/utils/widgets/stage/backdrop_rail.dart';
 import 'package:glass_forge_workbench/utils/widgets/stage/glass_backdrop_surface.dart';
 import 'package:glass_forge_workbench/utils/widgets/stage/stage_caption.dart';
@@ -37,7 +36,10 @@ class MotionStage extends StatelessWidget {
         Align(
           alignment: const Alignment(0, 0.2),
           child: GlassLayer(
-            material: demonstrationGlassMaterial(),
+            // The dome rather than Apple's edge band: a flat pane over a
+            // soft backdrop reads as frosted plastic, and this is the
+            // screen where the surface should feel like a lens in hand.
+            material: GlassMaterial.dome(),
             child: MotionSpecimen(state: state),
           ),
         ),
