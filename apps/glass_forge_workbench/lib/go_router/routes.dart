@@ -5,12 +5,12 @@ class AppRoutes {
 
   static const splash = '/';
   static const loginScreen = '/login';
+  static const gallery = '/gallery';
   static const specimen = '/specimen';
+  static const blend = '/blend';
+  static const tiers = '/tiers';
+  static const motion = '/motion';
   static const samplingProbe = '/sampling-probe';
-  // TODO(codeable): Uncomment when adding shell navigation
-  // static const homeScreen = '/home';
-  // static const searchScreen = '/search';
-  // static const profileScreen = '/profile';
 }
 
 class AppRouteNames {
@@ -18,10 +18,10 @@ class AppRouteNames {
 
   static const splash = 'splash';
   static const loginScreen = 'login';
+  static const gallery = 'gallery';
   static const specimen = 'specimen';
+  static const blend = 'blend';
+  static const tiers = 'tiers';
+  static const motion = 'motion';
   static const samplingProbe = 'samplingProbe';
-  // TODO(codeable): Uncomment when adding shell navigation
-  // static const homeScreen = 'home';
-  // static const searchScreen = 'search';
-  // static const profileScreen = 'profile';
 }

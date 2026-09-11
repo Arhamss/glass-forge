@@ -1,7 +1,7 @@
 import 'package:glass_forge_workbench/exports.dart';
 import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument/tint_swatch_row.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument_panel.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument_slider.dart';
+import 'package:glass_forge_workbench/utils/widgets/instrument/instrument_panel.dart';
+import 'package:glass_forge_workbench/utils/widgets/instrument/instrument_slider.dart';
 
 /// The instrument's "Tint" group: how strongly a colour is mixed into the
 /// glass, and which colour.

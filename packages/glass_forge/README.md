@@ -72,7 +72,7 @@ instead of looking like a rectangle being scaled.
 ```dart
 InteractiveGlass(
   drag: const GlassDrag(),
-  settleMotion: const GlassMotion.bouncy(),
+  settleMotion: const GlassMotion.smooth(),
   onTap: () {},
   child: const Glass(shape: GlassOval()),
 )

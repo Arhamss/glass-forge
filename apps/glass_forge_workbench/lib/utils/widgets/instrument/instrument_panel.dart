@@ -1,7 +1,7 @@
 import 'package:glass_forge_workbench/exports.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument/instrument_grid_texture.dart';
+import 'package:glass_forge_workbench/utils/widgets/instrument/instrument_grid_texture.dart';
 
-/// The solid, never-glass control sheet beneath `SpecimenStage`.
+/// The solid, never-glass control sheet beneath every stage.
 ///
 /// Apple's own glass guidance is "never glass on glass," and practically: a
 /// glass instrument panel re-tints every time the specimen above it

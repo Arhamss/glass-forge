@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/backdrops/checkerboard_backdrop.dart';
+import 'package:glass_forge_workbench/utils/widgets/stage/backdrops/checkerboard_backdrop.dart';
 
 void main() {
   testWidgets(

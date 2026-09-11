@@ -1,6 +1,6 @@
 import 'package:glass_forge_workbench/exports.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument_panel.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument_slider.dart';
+import 'package:glass_forge_workbench/utils/widgets/instrument/instrument_panel.dart';
+import 'package:glass_forge_workbench/utils/widgets/instrument/instrument_slider.dart';
 
 /// The instrument's "Optics" group: how the backdrop is filtered before it
 /// reaches the eye — blur, dispersion, and saturation.

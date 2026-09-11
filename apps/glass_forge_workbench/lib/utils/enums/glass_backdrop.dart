@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 /// The five synthetic backdrops the showcase renders glass specimens over.
 ///
 /// Per docs/design/workbench-design.md, backdrops are the product surface,
@@ -29,5 +31,26 @@ extension GlassBackdropX on GlassBackdrop {
     GlassBackdrop.photographic => 'Photographic',
     GlassBackdrop.gradientMesh => 'Gradient mesh',
     GlassBackdrop.pureBlack => 'Void',
+  };
+
+  /// The mean colour of this backdrop, for surfaces that need to be told
+  /// what is behind them.
+  ///
+  /// Backdrop content, not UI chrome, so deliberately outside AppColors —
+  /// the same reasoning the painters themselves carry.
+  ///
+  /// `GlassSurface.backdrop` takes a single colour, and nothing in the
+  /// package samples the real thing yet, so these are measured by hand off
+  /// the painters: the average of the checkerboard's two squares, of the
+  /// stripes at equal coverage, and of the blob fields over the stage
+  /// ground. Every one of the five is dark, because the stage is — so a
+  /// flipping surface settles on the dark scheme over all of them, which is
+  /// the honest answer rather than a missing case.
+  Color get meanColor => switch (this) {
+    GlassBackdrop.checkerboard => const Color(0xFF293042),
+    GlassBackdrop.diagonals => const Color(0xFF222837),
+    GlassBackdrop.photographic => const Color(0xFF4A3742),
+    GlassBackdrop.gradientMesh => const Color(0xFF594552),
+    GlassBackdrop.pureBlack => const Color(0xFF000000),
   };
 }

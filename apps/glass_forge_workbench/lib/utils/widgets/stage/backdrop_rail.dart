@@ -1,8 +1,8 @@
 import 'package:glass_forge_workbench/exports.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/stage/backdrop_rail_segment.dart';
 import 'package:glass_forge_workbench/utils/enums/glass_backdrop.dart';
+import 'package:glass_forge_workbench/utils/widgets/stage/backdrop_rail_segment.dart';
 
-/// The backdrop-picker rail pinned to the bottom edge of `SpecimenStage`.
+/// The backdrop-picker rail pinned to the bottom edge of a stage.
 ///
 /// A labelled segmented control, not colour-only swatches — colour alone
 /// fails for colour-blind viewers picking between backdrops whose colours

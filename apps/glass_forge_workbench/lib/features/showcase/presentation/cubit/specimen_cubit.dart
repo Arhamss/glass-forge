@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_workbench/features/showcase/presentation/cubit/specimen_state.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/material/demonstration_glass_material.dart';
 import 'package:glass_forge_workbench/utils/enums/glass_backdrop.dart';
 import 'package:glass_forge_workbench/utils/enums/showcase_shape.dart';
+import 'package:glass_forge_workbench/utils/helpers/demonstration_glass_material.dart';
 
 /// Drives the specimen screen: which shape and backdrop are shown, and
 /// every knob on the live [GlassMaterial].

@@ -1,14 +1,10 @@
 import 'package:glass_forge_workbench/exports.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/backdrops/checkerboard_backdrop.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/backdrops/diagonals_backdrop.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/backdrops/gradient_mesh_backdrop.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/backdrops/photographic_backdrop.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/backdrops/void_backdrop.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/stage/backdrop_rail.dart';
 import 'package:glass_forge_workbench/utils/enums/glass_backdrop.dart';
+import 'package:glass_forge_workbench/utils/widgets/stage/backdrop_rail.dart';
+import 'package:glass_forge_workbench/utils/widgets/stage/glass_backdrop_surface.dart';
 
-/// The stage zone shared by every showcase screen: a live glass specimen
-/// over a swappable backdrop, edge-to-edge with no chrome on top of it.
+/// The specimen screen's stage: a live glass specimen over a swappable
+/// backdrop, edge-to-edge with no chrome on top of it.
 ///
 /// The backdrop-picker rail is the one exception — it sits as a thin strip
 /// pinned to the stage's bottom edge, per docs/design/workbench-design.md.
@@ -35,13 +31,7 @@ class SpecimenStage extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        switch (backdrop) {
-          GlassBackdrop.checkerboard => const CheckerboardBackdrop(),
-          GlassBackdrop.diagonals => const DiagonalsBackdrop(),
-          GlassBackdrop.photographic => const PhotographicBackdrop(),
-          GlassBackdrop.gradientMesh => const GradientMeshBackdrop(),
-          GlassBackdrop.pureBlack => const VoidBackdrop(),
-        },
+        GlassBackdropSurface(backdrop: backdrop),
         Center(child: child),
         Align(
           alignment: Alignment.bottomCenter,

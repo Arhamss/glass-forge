@@ -25,7 +25,7 @@ class InstrumentSlider extends StatelessWidget {
   /// The knob's current value.
   final double value;
 
-  /// The value's unit, e.g. `'px'`.
+  /// The value's unit, e.g. `'px'`. Empty for a ratio, which has none.
   final String unit;
 
   /// Called with the new value as the thumb is dragged.
@@ -39,6 +39,10 @@ class InstrumentSlider extends StatelessWidget {
 
   /// How many digits after the decimal point the value is shown with.
   final int fractionDigits;
+
+  String get _reading => unit.isEmpty
+      ? value.toStringAsFixed(fractionDigits)
+      : '${value.toStringAsFixed(fractionDigits)} $unit';
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +59,7 @@ class InstrumentSlider extends StatelessWidget {
             ),
             const Spacer(),
             Text(
-              '${value.toStringAsFixed(fractionDigits)} $unit',
+              _reading,
               style: context.p2Medium.copyWith(
                 color: AppColors.stageForeground,
                 fontFeatures: const [FontFeature.tabularFigures()],
@@ -73,7 +77,16 @@ class InstrumentSlider extends StatelessWidget {
             overlayColor: AppColors.stageForeground.withValues(alpha: 0.12),
             thumbSize: WidgetStateProperty.all(const Size(14, 14)),
           ),
-          child: Slider(value: value, min: min, max: max, onChanged: onChanged),
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            // Without this a screen reader reads a percentage of the
+            // track, which on a screen made of units is the one number
+            // nobody wants.
+            semanticFormatterCallback: (_) => '$label, $_reading',
+            onChanged: onChanged,
+          ),
         ),
       ],
     );

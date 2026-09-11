@@ -1,7 +1,7 @@
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_workbench/exports.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/material/demonstration_glass_material.dart';
 import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument/material_preset_cell.dart';
+import 'package:glass_forge_workbench/utils/helpers/demonstration_glass_material.dart';
 
 /// One-tap access to the material presets: the demonstration preset this
 /// screen defaults to, plus the three fitted against real iOS 27 captures,

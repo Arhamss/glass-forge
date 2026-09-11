@@ -18,8 +18,8 @@ void main() {
       MaterialApp(
         home: GlassLayer(
           material: GlassMaterial.regular(brightness: Brightness.dark),
-          child: Stack(
-            children: const [
+          child: const Stack(
+            children: [
               SizedBox.expand(),
               Align(
                 alignment: Alignment.bottomCenter,
@@ -63,7 +63,7 @@ void main() {
         home: GlassLayer(
           child: InteractiveGlass(
             drag: const GlassDrag(),
-            settleMotion: const GlassMotion.bouncy(),
+            settleMotion: const GlassMotion.smooth(),
             onTap: () {},
             child: const Glass(shape: GlassOval()),
           ),

@@ -1,7 +1,7 @@
 import 'package:glass_forge_workbench/exports.dart';
 import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument/light_direction_dial.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument_panel.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument_slider.dart';
+import 'package:glass_forge_workbench/utils/widgets/instrument/instrument_panel.dart';
+import 'package:glass_forge_workbench/utils/widgets/instrument/instrument_slider.dart';
 
 /// The instrument's "Light" group: rim highlight strength, edge contour,
 /// and the direction the rim light comes from.

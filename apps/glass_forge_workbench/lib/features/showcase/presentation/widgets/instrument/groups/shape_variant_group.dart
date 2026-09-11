@@ -1,10 +1,10 @@
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_workbench/exports.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument/instrument_segmented_control.dart';
 import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument/material_preset_row.dart';
-import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument_panel.dart';
 import 'package:glass_forge_workbench/utils/enums/showcase_shape.dart';
 import 'package:glass_forge_workbench/utils/extensions/glass_variant_extensions.dart';
+import 'package:glass_forge_workbench/utils/widgets/instrument/instrument_panel.dart';
+import 'package:glass_forge_workbench/utils/widgets/instrument/instrument_segmented_control.dart';
 
 /// The instrument's "Specimen" group: shape, variant, and the material
 /// presets fitted against real iOS 27 captures.
