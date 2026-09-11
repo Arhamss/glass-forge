@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/geometry/geometry_producer.dart';
+import 'package:glass_forge/src/geometry/matte_codec.dart';
 import 'package:glass_forge/src/geometry/runtime_geometry_producer.dart';
 import 'package:glass_forge/src/scene/glass_scene.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
@@ -35,6 +38,8 @@ void main() {
 
   setUpAll(ShaderLibrary.instance.warmUp);
   tearDownAll(ShaderLibrary.instance.disposeAll);
+
+  _matteContentTests();
 
   test('produces a generation stamped with the scene revision', () {
     final producer = RuntimeGeometryProducer();
@@ -136,5 +141,99 @@ void main() {
     expect(generation.texture.debugDisposed, isTrue);
 
     producer.dispose();
+  });
+}
+
+/// Bakes a matte for one large rounded rectangle and reads its pixels back.
+///
+/// Large on purpose: the edge-band profile leaves the interior undistorted,
+/// so a shape has to be several times wider than the band before it has a
+/// genuine interior — the region where the displacement magnitude is exactly
+/// zero and the signed distance is the only thing left that knows the
+/// surface is there.
+Future<({ByteData pixels, Rect bounds, MatteCodec codec, int width})>
+_bakeLargeSquare() async {
+  final producer = RuntimeGeometryProducer();
+  final scene = GlassScene()
+    ..register(
+      'a',
+      ShapeGeometry.resolve(
+        shape: const GlassRoundedRectangle(
+          radius: BorderRadius.all(Radius.circular(24)),
+        ),
+        size: const Size(400, 400),
+        toLayer: Matrix4.identity(),
+        devicePixelRatio: 1,
+      ),
+    );
+  final generation = producer.produce(scene, _request)!;
+  final pixels = (await generation.texture.toByteData())!;
+  final result = (
+    pixels: pixels,
+    bounds: generation.bounds,
+    codec: generation.codec,
+    width: generation.texture.width,
+  );
+  producer
+    ..release(generation)
+    ..dispose();
+  return result;
+}
+
+Float32List _texelAt(
+  ByteData pixels,
+  int width,
+  Rect bounds,
+  Offset layerPoint,
+) {
+  final px = (layerPoint.dx - bounds.left).floor();
+  final py = (layerPoint.dy - bounds.top).floor();
+  final base = (py * width + px) * 4;
+  return Float32List.fromList([
+    pixels.getUint8(base) / 255,
+    pixels.getUint8(base + 1) / 255,
+    pixels.getUint8(base + 2) / 255,
+    pixels.getUint8(base + 3) / 255,
+  ]);
+}
+
+void _matteContentTests() {
+  test(
+    'the deep interior carries a signed distance even though its '
+    'displacement magnitude is zero',
+    () async {
+      final baked = await _bakeLargeSquare();
+      final centre = _texelAt(
+        baked.pixels,
+        baked.width,
+        baked.bounds,
+        const Offset(200, 200),
+      );
+      final decoded = baked.codec.decode(centre);
+
+      // The regression this pins: the final pass used to derive coverage
+      // from the alpha channel, which the band profile drives to exactly
+      // zero across the whole interior by design. Every shape was therefore
+      // hollow — its middle received no tint, no saturation, no rim and no
+      // scrim, only the composed blur. Alpha being zero here is correct;
+      // coverage must come from the signed distance instead.
+      expect(decoded.displacement, 0);
+      expect(decoded.signedDistance, lessThan(-_request.maxDisplacement / 2));
+    },
+  );
+
+  test('a texel outside the shape encodes a positive distance', () async {
+    final baked = await _bakeLargeSquare();
+    // Inside the padded bounds but outside the rounded corner's arc.
+    final corner = _texelAt(
+      baked.pixels,
+      baked.width,
+      baked.bounds,
+      const Offset(1, 1),
+    );
+
+    // A zeroed texel would decode to -maxDisplacement, the deep interior,
+    // and the padding around every shape would read as solid glass.
+    expect(baked.codec.decode(corner).signedDistance, greaterThan(0));
   });
 }

@@ -45,7 +45,20 @@ void main() {
     expect(codec.contains('1.0 - sqrt(1.0 - clamp'), isTrue);
   });
 
-  test('output is premultiplied', () {
-    expect(geometry.contains('encoded * alpha'), isTrue);
+  test('the matte carries a real signed distance on both sides of the edge',
+      () {
+    // Not `min(sd, 0.0)`, and not scaled by coverage. The final pass derives
+    // coverage, the contour and the rim falloff from this channel, so an
+    // interior-clamped value cannot say how far outside a texel is, and a
+    // premultiplied one decays toward the code for "deep inside" at exactly
+    // the fringe where coverage is being resolved.
+    expect(geometry.contains('gfEncodeMatte(normal, sd, magnitude'), isTrue);
+    expect(geometry.contains('encoded * alpha'), isFalse);
+  });
+
+  test('texels past the band encode as outside, never as a zeroed texel', () {
+    // A zeroed texel decodes to -maxDisplacement -- the deep interior --
+    // which would make the padding around every shape read as solid glass.
+    expect(geometry.contains('vec4(0.5, 0.5, 1.0, 0.0)'), isTrue);
   });
 }

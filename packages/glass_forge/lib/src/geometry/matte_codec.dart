@@ -72,6 +72,17 @@ class MatteCodec {
     return out;
   }
 
+  /// Decodes just the signed edge distance from a texel's blue channel.
+  ///
+  /// The Dart mirror of `gfDecodeMatteDistance`. The final pass derives
+  /// coverage, the contour and the rim falloff from this and never from the
+  /// displacement magnitude in the alpha channel — the edge-band profile
+  /// drives that magnitude to exactly zero across the whole interior on
+  /// purpose, so keying coverage off it leaves every shape hollow.
+  double decodeSignedDistance(double blue) {
+    return _decodeCompandedSigned(blue) * maxDisplacement;
+  }
+
   /// Decodes one texel produced by [encode].
   ({Offset normal, double signedDistance, double displacement}) decode(
     Float32List rgba,

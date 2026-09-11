@@ -64,17 +64,16 @@ void main() {
     float maxDisplacement = uOptical.x;
     float edgeRefraction  = uOptical.y;
     float spread          = uOptical.z;
-    float aaWidth         = uOptical.w;
 
     float sd = gfSceneDistance(p);
 
-    // Centred half-pixel coverage. Screen-space derivative functions are
-    // unavailable in runtime effects even on Impeller, so the width comes
-    // from the caller, computed from the transform basis. The matte reserves
-    // half a pixel of padding for this.
-    float alpha = 1.0 - smoothstep(-aaWidth, aaWidth, sd);
-    if (alpha <= 0.0) {
-        fragColor = vec4(0.0);
+    // Far outside every shape: encode a saturated *positive* distance rather
+    // than a zeroed texel. The final pass derives coverage from channel B
+    // (see gfDecodeMatteDistance), and a zeroed texel decodes as
+    // -maxDisplacement -- the deep interior -- which would make the padding
+    // around each shape read as solid glass.
+    if (sd > maxDisplacement) {
+        fragColor = vec4(0.5, 0.5, 1.0, 0.0);
         return;
     }
 
@@ -82,6 +81,12 @@ void main() {
     float band = mix(edgeRefraction, edgeRefraction * 4.0, clamp(spread, 0.0, 1.0));
     float magnitude = gfDisplacementMagnitude(min(sd, 0.0), band, edgeRefraction);
 
-    vec4 encoded = gfEncodeMatte(normal, min(sd, 0.0), magnitude, maxDisplacement);
-    fragColor = encoded * alpha;   // premultiplied output
+    // The real signed distance, on both sides of the boundary, and NOT
+    // premultiplied by coverage. Both matter now that the final pass reads
+    // this channel: clamping it to the interior leaves it unable to say how
+    // far outside a texel is, and premultiplying scales it toward zero --
+    // which decodes as "deep inside" -- at exactly the fringe where coverage
+    // is being resolved. Antialiasing is the final pass's job; uOptical.w
+    // (aaWidth) still sizes the matte's padding on the Dart side.
+    fragColor = gfEncodeMatte(normal, sd, magnitude, maxDisplacement);
 }

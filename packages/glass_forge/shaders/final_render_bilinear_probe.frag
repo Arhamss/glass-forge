@@ -48,12 +48,25 @@ void main() {
     ) + uMapOffset;
 
     vec2 matteUV = (matteSpace - uMatteRect.xy) / max(uMatteRect.zw, vec2(1.0));
-    vec4 encoded = texture(uMatte, matteUV);
 
-    float coverage = encoded.a > 0.0 ? 1.0 : 0.0;
+    // Coverage is derived exactly as final_render.frag derives it -- from the
+    // signed distance in channel B, not the displacement magnitude in A. A
+    // probe that covers a different set of fragments than the shader it is
+    // measuring is measuring a different image.
     if (matteUV.x < 0.0 || matteUV.x > 1.0 ||
-        matteUV.y < 0.0 || matteUV.y > 1.0 || coverage == 0.0) {
-        fragColor = texture(uBackdrop, frag / uSize);
+        matteUV.y < 0.0 || matteUV.y > 1.0) {
+        fragColor = vec4(0.0);
+        return;
+    }
+
+    vec4 encoded = texture(uMatte, matteUV);
+    float signedDistance = gfDecodeMatteDistance(encoded.b) * uOptical.x;
+    float mapScale = sqrt(abs(uMapBasis.x * uMapBasis.w
+                            - uMapBasis.y * uMapBasis.z));
+    float coverage = clamp(0.5 - signedDistance / max(mapScale, 1e-3),
+                           0.0, 1.0);
+    if (coverage <= 0.0) {
+        fragColor = vec4(0.0);
         return;
     }
 
@@ -106,5 +119,5 @@ void main() {
     float guard = pow(max(luma, 0.0), 0.25);
     refracted += vec3(rim * uLighting.x * guard * 0.35);
 
-    fragColor = vec4(refracted, 1.0);
+    fragColor = vec4(refracted * coverage, coverage);
 }

@@ -63,3 +63,16 @@ vec4 gfEncodeMatte(vec2 normal, float signedDistance, float magnitude,
         gfEncodeCompandedMax(clamp(magnitude / maxDisplacement, 0.0, 1.0))
     );
 }
+
+// Inverse of the signed-distance half of gfEncodeMatte: returns the distance
+// normalised to -1..1, negative inside the shape.
+//
+// The final pass derives coverage, the contour and the rim falloff from this
+// -- never from the displacement magnitude in channel A, which the edge-band
+// profile drives to exactly zero across the whole interior on purpose
+// (common/profile.glsl). Keying coverage off channel A gives every shape a
+// hollow middle that receives no tint, no saturation, no rim and no scrim.
+float gfDecodeMatteDistance(float b) {
+    float s = b * 2.0 - 1.0;
+    return s * abs(s);
+}
