@@ -56,13 +56,16 @@ class GlassMotionController extends Animation<GlassMotionState>
     this.respectReduceMotion = true,
   }) {
     _ticker = vsync.createTicker(_tick);
-    // Resolved once. `CupertinoMotion.description` rebuilds a
-    // SpringDescription from a sqrt and a pow on every single access, so
-    // reading it per frame — or worse, per axis per frame — is a real cost
-    // for a value that cannot change.
+    // Resolved once, springs and tolerances alike. `CupertinoMotion
+    // .description` rebuilds a SpringDescription from a sqrt and a pow on
+    // every single access, and `GlassMotion.tolerance` allocates; reading
+    // either per frame — or worse, per axis per frame — is a real cost for
+    // values that cannot change.
     _followSpring = followMotion.spring;
     _settleSpring = settleMotion.spring;
     _pressSpring = pressMotion.spring;
+    _followTolerance = followMotion.tolerance;
+    _settleTolerance = settleMotion.tolerance;
     _pressTolerance = pressMotion.scaledTo(_pressTravelPixels).tolerance;
     if (respectReduceMotion) {
       GlassReduceMotion.instance.addListener(_onReduceMotionChanged);
@@ -114,6 +117,8 @@ class GlassMotionController extends Animation<GlassMotionState>
   late final SpringDescription _followSpring;
   late final SpringDescription _settleSpring;
   late final SpringDescription _pressSpring;
+  late final Tolerance _followTolerance;
+  late final Tolerance _settleTolerance;
   late final Tolerance _pressTolerance;
 
   Duration _lastTick = Duration.zero;
@@ -283,9 +288,7 @@ class GlassMotionController extends Animation<GlassMotionState>
 
     final following = _phase == GlassMotionPhase.following;
     final spring = following ? _followSpring : _settleSpring;
-    final tolerance = following
-        ? followMotion.tolerance
-        : settleMotion.tolerance;
+    final tolerance = following ? _followTolerance : _settleTolerance;
 
     // Non-short-circuiting on purpose: every channel advances every frame.
     var moving = _x.advance(dt: step, spring: spring, tolerance: tolerance);
