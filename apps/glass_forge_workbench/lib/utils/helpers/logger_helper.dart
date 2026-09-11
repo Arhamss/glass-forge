@@ -97,11 +97,6 @@ class AppLogger {
     if (kDebugMode) debugPrint('  ⚪ $message');
   }
 
-  static String _maskToken(String token) {
-    if (token.length <= 12) return '***';
-    return '${token.substring(0, 6)}…${token.substring(token.length - 4)}';
-  }
-
   static void authToken(String? token) {
     if (!kDebugMode || token == null || token.isEmpty) return;
     final buf = StringBuffer()
@@ -109,7 +104,7 @@ class AppLogger {
       ..writeln('  ╔${'═' * _w}')
       ..writeln('  ║ 🔑 Auth Token')
       ..writeln('  ╟${'─' * _w}')
-      ..writeln('  ║   ${_maskToken(token)}')
+      ..writeln('  ║   $token')
       ..write('  ╚${'═' * _w}');
     debugPrint(buf.toString(), wrapWidth: 1024);
   }
