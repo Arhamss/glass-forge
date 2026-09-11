@@ -3,18 +3,19 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_workbench/features/showcase/presentation/cubit/specimen_state.dart';
+import 'package:glass_forge_workbench/features/showcase/presentation/material/demonstration_glass_material.dart';
 import 'package:glass_forge_workbench/utils/enums/glass_backdrop.dart';
 import 'package:glass_forge_workbench/utils/enums/showcase_shape.dart';
 
 /// Drives the specimen screen: which shape and backdrop are shown, and
 /// every knob on the live [GlassMaterial].
 class SpecimenCubit extends Cubit<SpecimenState> {
-  /// Creates the cubit, defaulting to the Apple-fitted dark regular
-  /// material so the stage looks right before anyone touches a slider.
+  /// Creates the cubit, defaulting to the demonstration material so the
+  /// optical bend is visible before anyone touches a slider. See
+  /// `demonstration_glass_material.dart` for why the Apple-fitted presets
+  /// are not used here.
   SpecimenCubit()
-    : super(
-        SpecimenState(material: GlassMaterial.regular(brightness: Brightness.dark)),
-      );
+    : super(SpecimenState(material: demonstrationGlassMaterial()));
 
   /// Removes the native splash overlay. This screen is the app's landing
   /// destination, so nothing else calls [FlutterNativeSplash.remove].

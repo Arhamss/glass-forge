@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_workbench/exports.dart';
 import 'package:glass_forge_workbench/features/showcase/presentation/cubit/specimen_cubit.dart';
@@ -21,7 +23,12 @@ class SpecimenView extends StatelessWidget {
   /// Creates the view.
   const SpecimenView({super.key});
 
-  static const _specimenSize = 220.0;
+  /// Fraction of the stage's shorter dimension the specimen occupies.
+  ///
+  /// Refraction only reads at a boundary — the eye needs undistorted
+  /// backdrop next to the distorted backdrop to see the bend. Kept well
+  /// under 1.0 so generous backdrop stays visible around the specimen.
+  static const _specimenSizeFraction = 0.5;
 
   @override
   Widget build(BuildContext context) {
@@ -40,17 +47,27 @@ class SpecimenView extends StatelessWidget {
                     previous.backdrop != current.backdrop,
                 builder: (context, state) {
                   final cubit = context.read<SpecimenCubit>();
-                  return GlassLayer(
-                    material: state.material,
-                    child: SpecimenStage(
-                      backdrop: state.backdrop,
-                      onBackdropChanged: cubit.setBackdrop,
-                      child: SizedBox(
-                        width: _specimenSize,
-                        height: _specimenSize,
-                        child: Glass(shape: state.shape.toGlassShape()),
-                      ),
-                    ),
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final specimenSize =
+                          math.min(
+                            constraints.maxWidth,
+                            constraints.maxHeight,
+                          ) *
+                          _specimenSizeFraction;
+                      return GlassLayer(
+                        material: state.material,
+                        child: SpecimenStage(
+                          backdrop: state.backdrop,
+                          onBackdropChanged: cubit.setBackdrop,
+                          child: SizedBox(
+                            width: specimenSize,
+                            height: specimenSize,
+                            child: Glass(shape: state.shape.toGlassShape()),
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),

@@ -31,17 +31,24 @@ class BackdropRail extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: AppColors.stageBorder),
         ),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final backdrop in GlassBackdrop.values)
-                BackdropRailSegment(
-                  label: backdrop.label,
-                  isSelected: backdrop == selected,
-                  onTap: () => onChanged(backdrop),
-                ),
-            ],
+        // A horizontal SingleChildScrollView is given loose height
+        // constraints by the Stack/Align above it and, left alone, claims
+        // the whole stage's height for its cross axis. IntrinsicHeight
+        // pins it to its content's real height instead, so the rail stays
+        // a thin strip rather than a tall band down the specimen.
+        child: IntrinsicHeight(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final backdrop in GlassBackdrop.values)
+                  BackdropRailSegment(
+                    label: backdrop.label,
+                    isSelected: backdrop == selected,
+                    onTap: () => onChanged(backdrop),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

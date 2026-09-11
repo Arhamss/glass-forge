@@ -24,25 +24,31 @@ class BackdropRailSegment extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Container(
+      child: ConstrainedBox(
+        // The hit area meets the 44pt touch-target floor even though the
+        // visual pill below it stays thin — Center expands to fill this
+        // box without stretching the pill it wraps.
         constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
-        padding: const EdgeInsetsDirectional.symmetric(
-          horizontal: 16,
-          vertical: 12,
-        ),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.stageForeground.withValues(alpha: 0.12)
-              : AppColors.transparent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          label,
-          style: context.captionMedium.copyWith(
-            color: isSelected
-                ? AppColors.stageForeground
-                : AppColors.stageForegroundMuted,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? AppColors.stageForeground.withValues(alpha: 0.12)
+                  : AppColors.transparent,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              label,
+              style: context.captionMedium.copyWith(
+                color: isSelected
+                    ? AppColors.stageForeground
+                    : AppColors.stageForegroundMuted,
+              ),
+            ),
           ),
         ),
       ),
