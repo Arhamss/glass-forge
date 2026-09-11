@@ -1,0 +1,219 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:glass_forge/src/design/glass_surfaces.dart';
+import 'package:glass_forge/src/design/glass_theme.dart';
+import 'package:glass_forge/src/shapes/glass_shape.dart';
+import 'package:glass_forge/src/widgets/glass.dart';
+
+/// One semantic surface, in one line.
+///
+/// ```dart
+/// GlassSurface.navigationBar(child: NavBarContents())
+/// ```
+///
+/// Resolves the role against the enclosing [GlassTheme], the incoming
+/// constraints and the scheme, then draws the shadow, the glass and the
+/// vibrant label colour that go with it. Still belongs inside a single
+/// `GlassLayer` for the whole screen — one layer is one backdrop capture,
+/// and a layer per surface costs one each.
+class GlassSurface extends StatelessWidget {
+  /// Creates a surface for [role].
+  const GlassSurface({
+    required this.role,
+    this.child,
+    this.backdrop,
+    this.clipBehavior = Clip.antiAlias,
+    super.key,
+  });
+
+  /// A navigation bar, tab bar or toolbar.
+  const GlassSurface.navigationBar({
+    Widget? child,
+    Color? backdrop,
+    Clip clipBehavior = Clip.antiAlias,
+    Key? key,
+  }) : this(
+         role: GlassSurfaceRole.navigationBar,
+         child: child,
+         backdrop: backdrop,
+         clipBehavior: clipBehavior,
+         key: key,
+       );
+
+  /// A sheet, popover or sidebar.
+  const GlassSurface.sheet({
+    Widget? child,
+    Color? backdrop,
+    Clip clipBehavior = Clip.antiAlias,
+    Key? key,
+  }) : this(
+         role: GlassSurfaceRole.sheet,
+         child: child,
+         backdrop: backdrop,
+         clipBehavior: clipBehavior,
+         key: key,
+       );
+
+  /// A card in the content layer.
+  const GlassSurface.card({
+    Widget? child,
+    Color? backdrop,
+    Clip clipBehavior = Clip.antiAlias,
+    Key? key,
+  }) : this(
+         role: GlassSurfaceRole.card,
+         child: child,
+         backdrop: backdrop,
+         clipBehavior: clipBehavior,
+         key: key,
+       );
+
+  /// A button, toggle, slider or segmented control.
+  const GlassSurface.control({
+    Widget? child,
+    Color? backdrop,
+    Clip clipBehavior = Clip.antiAlias,
+    Key? key,
+  }) : this(
+         role: GlassSurfaceRole.control,
+         child: child,
+         backdrop: backdrop,
+         clipBehavior: clipBehavior,
+         key: key,
+       );
+
+  /// The dimming layer under a modal.
+  const GlassSurface.scrim({
+    Widget? child,
+    Color? backdrop,
+    Clip clipBehavior = Clip.antiAlias,
+    Key? key,
+  }) : this(
+         role: GlassSurfaceRole.scrim,
+         child: child,
+         backdrop: backdrop,
+         clipBehavior: clipBehavior,
+         key: key,
+       );
+
+  /// Which role this surface plays.
+  final GlassSurfaceRole role;
+
+  /// Content drawn on the glass.
+  final Widget? child;
+
+  /// What is behind this surface, where the app knows.
+  ///
+  /// Supplying it is what turns the role's adaptation on: a flipping surface
+  /// can choose its scheme, and an adapting one can thicken its tint until
+  /// labels clear the role's contrast target. Nothing samples this
+  /// automatically yet, so leaving it null is the honest default rather than
+  /// a missing feature.
+  final Color? backdrop;
+
+  /// How [child] is clipped to the resolved shape.
+  final Clip clipBehavior;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // `biggest` is already infinite on an unbounded axis, and that is
+        // the right answer rather than a fallback: a surface that may grow
+        // without limit is not a small element, so the size gate demotes it
+        // to `adapt`. On a bounded axis this over-estimates — the child may
+        // render narrower than its constraint — which errs in the same safe
+        // direction. A caller that knows the real size can call
+        // `GlassTheme.surfaceOf` with it and do better.
+        final style = GlassTheme.surfaceOf(
+          context,
+          role,
+          size: constraints.biggest,
+          backdrop: backdrop,
+        );
+
+        final content = DefaultTextStyle.merge(
+          style: TextStyle(color: style.labelColor),
+          child: IconTheme.merge(
+            data: IconThemeData(color: style.labelColor),
+            child: child ?? const SizedBox.shrink(),
+          ),
+        );
+
+        final glass = Glass(
+          shape: style.shape,
+          material: style.material,
+          clipBehavior: clipBehavior,
+          child: content,
+        );
+
+        if (style.shadows.isEmpty) {
+          return glass;
+        }
+        return CustomPaint(
+          painter: _GlassShadowPainter(
+            shape: style.shape,
+            shadows: style.shadows,
+          ),
+          child: glass,
+        );
+      },
+    );
+  }
+}
+
+/// Paints a surface's shadows with the surface's own silhouette cut out.
+///
+/// A [BoxShadow] is drawn as a blurred, *filled* copy of the shape. Under an
+/// opaque surface that fill is invisible, which is why every Material
+/// elevation gets away with it. Glass is translucent, so the same fill shows
+/// straight through the surface it is meant to sit under and reads as a grey
+/// slab inside the glass. Clipping the silhouette out leaves only the
+/// penumbra, which is the part that was doing the work.
+class _GlassShadowPainter extends CustomPainter {
+  const _GlassShadowPainter({required this.shape, required this.shadows});
+
+  final GlassShape shape;
+  final List<BoxShadow> shadows;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = shape.toBorder(size).getOuterPath(Offset.zero & size);
+
+    // How far outside the surface any of these shadows can reach. A Gaussian
+    // mask filter is effectively dead by three sigma, and `blurSigma` is
+    // `blurRadius / 2`, so the reach is 1.5 blur radii plus however far the
+    // shadow was offset. Under-estimating here would clip a shadow's own
+    // tail off with a hard edge.
+    var reach = 0.0;
+    for (final shadow in shadows) {
+      final offset = shadow.offset.distance;
+      final extent = shadow.blurRadius * 1.5 + shadow.spreadRadius + offset;
+      if (extent > reach) {
+        reach = extent;
+      }
+    }
+
+    final outside = Path.combine(
+      PathOperation.difference,
+      Path()..addRect((Offset.zero & size).inflate(reach)),
+      path,
+    );
+
+    canvas
+      ..save()
+      ..clipPath(outside);
+    for (final shadow in shadows) {
+      canvas.drawPath(
+        path.shift(shadow.offset),
+        shadow.toPaint(),
+      );
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_GlassShadowPainter oldDelegate) =>
+      oldDelegate.shape != shape ||
+      !listEquals(oldDelegate.shadows, shadows);
+}
