@@ -3,9 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:glass_forge/src/geometry/matte_codec.dart';
+import 'package:glass_forge/src/material/glass_profile.dart';
 import 'package:glass_forge/src/material/glass_variant.dart';
 
 part 'apple_presets.dart';
+part 'dome_preset.dart';
 
 /// How a glass surface looks.
 ///
@@ -18,6 +20,7 @@ class GlassMaterial {
   /// Creates a material.
   const GlassMaterial({
     this.variant = GlassVariant.regular,
+    this.profile = GlassProfile.edgeBand,
     this.thickness = 12.0,
     this.edgeRefraction = 27.42,
     this.refractionSpread = 0.0,
@@ -66,8 +69,40 @@ class GlassMaterial {
     );
   }
 
+  /// The lens a dome of glass makes, as opposed to Apple's flat pane.
+  ///
+  /// Not fitted data: the Apple presets are, and this is not one of them.
+  /// See `dome_preset.dart` for what each value is doing and why.
+  factory GlassMaterial.dome() {
+    return const GlassMaterial(profile: GlassProfile.dome).copyWith(
+      thickness: _domeThickness,
+      edgeRefraction: _domeEdgeRefraction,
+      frost: _domeFrost,
+      chromaticAberration: _domeChromaticAberration,
+      tintOpacity: _domeTintOpacity,
+      saturation: _domeSaturation,
+      highlight: _domeHighlight,
+      contour: _domeContour,
+      lightDirection: _domeLightDirection,
+    );
+  }
+
   /// Regular or clear.
   final GlassVariant variant;
+
+  /// Whether the surface refracts only at its rim, or across its whole
+  /// interior as a dome.
+  ///
+  /// Every other field keeps its meaning under both, with two exceptions.
+  /// [edgeRefraction] is still the displacement at the rim; under
+  /// [GlassProfile.dome] the interior is displaced too, falling smoothly to
+  /// nothing at the centre, which is a magnifying lens -- and the rim never
+  /// moves more than 0.35 of the shape's depth, because past that a lens
+  /// folds its own image. Under a dome [thickness] barely changes the
+  /// displacement and mostly sets the width of the lit edge.
+  /// [refractionSpread] shapes only the edge band and has no effect on a
+  /// dome, whose extent is the shape.
+  final GlassProfile profile;
 
   /// Apparent depth of the surface, in logical pixels.
   final double thickness;
@@ -148,6 +183,7 @@ class GlassMaterial {
   /// Returns a copy with the given fields replaced.
   GlassMaterial copyWith({
     GlassVariant? variant,
+    GlassProfile? profile,
     double? thickness,
     double? edgeRefraction,
     double? refractionSpread,
@@ -162,6 +198,7 @@ class GlassMaterial {
   }) {
     return GlassMaterial(
       variant: variant ?? this.variant,
+      profile: profile ?? this.profile,
       thickness: thickness ?? this.thickness,
       edgeRefraction: edgeRefraction ?? this.edgeRefraction,
       refractionSpread: refractionSpread ?? this.refractionSpread,
@@ -183,6 +220,7 @@ class GlassMaterial {
     }
     return other is GlassMaterial &&
         other.variant == variant &&
+        other.profile == profile &&
         other.thickness == thickness &&
         other.edgeRefraction == edgeRefraction &&
         other.refractionSpread == refractionSpread &&
@@ -199,6 +237,7 @@ class GlassMaterial {
   @override
   int get hashCode => Object.hash(
         variant,
+        profile,
         thickness,
         edgeRefraction,
         refractionSpread,

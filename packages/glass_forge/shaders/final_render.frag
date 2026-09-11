@@ -12,18 +12,33 @@ uniform vec4 uTint;           // rgb, variant (0 regular, 1 clear)
 uniform vec4 uLighting;       // highlight, angleX, angleY, contour
 uniform vec4 uMapBasis;       // a, b, c, d
 uniform vec2 uMapOffset;      // tx, ty
+uniform vec4 uSurface;        // profile (0 edge band, 1 dome), thickness, 0, 0
 uniform sampler2D uBackdrop;
 uniform sampler2D uMatte;
 
 out vec4 fragColor;
 
 #include "common/codec.glsl"
+#include "common/shading.glsl"
+#include "common/sampling.glsl"
 
 // Only mirror samples that leave the texture. Clamping everywhere washes out
 // Metal; leaving it alone gives GLES a black decal border.
 vec2 gfMirrorUV(vec2 uv) {
     vec2 m = mod(abs(uv), 2.0);
     return mix(m, 2.0 - m, step(1.0, m));
+}
+
+// One backdrop read. The dome takes it bilinearly: its displacement varies
+// continuously across the whole surface and magnifies what is behind it, and
+// read nearest-neighbour (flutter#186945) every edge through it came out
+// stair-stepped by a pixel or two. The edge band displaces a band at the rim
+// and leaves its interior alone, so it keeps the single tap it always had.
+vec3 gfBackdrop(vec2 uv) {
+    if (uSurface.x > 0.5) {
+        return gfSampleBilinear(uv, uSize);
+    }
+    return texture(uBackdrop, uv).rgb;
 }
 
 void main() {
@@ -88,12 +103,12 @@ void main() {
         vec2 rUV = (frag + displacement * (1.0 + spread)) / uSize;
         vec2 bUV = (frag + displacement * (1.0 - spread)) / uSize;
         refracted = vec3(
-            texture(uBackdrop, gfMirrorUV(rUV)).r,
-            texture(uBackdrop, gfMirrorUV(offsetUV)).g,
-            texture(uBackdrop, gfMirrorUV(bUV)).b
+            gfBackdrop(gfMirrorUV(rUV)).r,
+            gfBackdrop(gfMirrorUV(offsetUV)).g,
+            gfBackdrop(gfMirrorUV(bUV)).b
         );
     } else {
-        refracted = texture(uBackdrop, gfMirrorUV(offsetUV)).rgb;
+        refracted = gfBackdrop(gfMirrorUV(offsetUV));
     }
 
     // Saturation, on Rec.709 luma.
@@ -108,41 +123,11 @@ void main() {
         refracted = mix(refracted, uTint.rgb, uOptical.z);
     }
 
-    // How deep inside the surface this fragment sits. The contour and the
-    // rim both key off it, which is the whole reason the matte carries a
-    // signed distance companded toward zero.
-    float depth = max(0.0, -signedDistance);
-
-    // Contour: the darkened ring that reads as the edge of a solid object.
-    // A boundary line, so a quarter of the refraction band rather than a
-    // wash over the whole surface.
-    float contourBand = max(1.0, uOptical.x * 0.12);
-    float contourT = clamp(1.0 - depth / contourBand, 0.0, 1.0);
-    refracted *= 1.0 - uLighting.w * contourT * contourT;
-
-    // Two opposing rim highlights. The colour is incident white rather than
-    // the refracted backdrop: deriving it from the backdrop is what gives
-    // upstream its cyan/green fringing.
-    vec2 lightDir = normalize(vec2(uLighting.y, uLighting.z));
-    float facing = dot(normal, lightDir);
-    float rim = max(0.0, facing) + 0.8 * max(0.0, -facing);
-
-    // Confined to a thin strip at the boundary. Without any falloff the term
-    // ran at full strength across the entire interior, and since an SDF
-    // gradient is piecewise constant inside a rounded box it painted flat
-    // wedges of brightness meeting at the centre rather than a lit edge.
-    //
-    // A *thin* strip specifically: at the full width of the refraction band
-    // the wedges are still what you see, just with a gradient on them --
-    // the shape reads as a bevelled plastic button rather than a lit glass
-    // edge. A rim is a highlight on a boundary, not a shading of the body.
-    float rimBand = max(1.0, uOptical.x * 0.18);
-    float rimT = clamp(1.0 - depth / rimBand, 0.0, 1.0);
-    float rimFalloff = rimT * rimT * rimT;
-
-    // Guard on luminance so a truly black surface does not flicker at the rim.
-    float guard = pow(max(luma, 0.0), 0.25);
-    refracted += vec3(rim * uLighting.x * guard * 0.35 * rimFalloff);
+    // How deep inside the surface this fragment sits. The contour, the rim
+    // and the dome's lighting all key off it, which is the whole reason the
+    // matte carries a signed distance companded toward zero.
+    refracted = gfShade(refracted, normal, max(0.0, -signedDistance), luma,
+                        uOptical.x, uLighting, uSurface);
 
     // Premultiplied: this layer is composited srcOver the raw backdrop, so
     // the antialiased boundary has to carry its coverage in alpha.

@@ -42,11 +42,14 @@ uniform FragInfo {
     vec4 uOptical;
     vec4 uShapeDataBlock[MAX_SHAPES * 3];
     float uNumShapes;
+    // profile (0 edge band, 1 dome), dome thickness, unused, unused.
+    vec4 uProfile;
 } frag_info;
 
 #define uOptical frag_info.uOptical
 #define uShapeData frag_info.uShapeDataBlock
 #define uNumShapes frag_info.uNumShapes
+#define uProfile frag_info.uProfile
 
 out vec4 fragColor;
 
@@ -64,5 +67,5 @@ void main() {
     // Everything downstream lives in common/matte_pass.glsl, shared with the
     // runtime-effect producer.
     fragColor = gfBakeMatte(gl_FragCoord.xy + frag_info.uOrigin, uOptical.x,
-                            uOptical.y, uOptical.z);
+                            uOptical.y, uOptical.z, uProfile);
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:glass_forge/src/geometry/matte_generation.dart';
+import 'package:glass_forge/src/material/glass_profile.dart';
 import 'package:glass_forge/src/scene/glass_scene.dart';
 
 /// What a producer can do on this device.
@@ -29,6 +30,8 @@ class MatteRequest {
     required this.edgeRefraction,
     required this.refractionSpread,
     required this.antialiasWidth,
+    this.profile = GlassProfile.edgeBand,
+    this.thickness = 0,
   });
 
   /// Physical pixels per logical pixel.
@@ -49,6 +52,25 @@ class MatteRequest {
   /// unavailable in runtime effects even on Impeller.
   final double antialiasWidth;
 
+  /// Which surface the bake describes.
+  ///
+  /// Both profiles fill the same four channels with the same meanings --
+  /// direction, signed distance, magnitude -- so the final pass and the
+  /// codec never need to know which one produced a matte. Only how those
+  /// channels are computed differs.
+  final GlassProfile profile;
+
+  /// Slab thickness, in physical pixels. Read only by [GlassProfile.dome].
+  ///
+  /// Zero under [GlassProfile.edgeBand], whose bake does not depend on it:
+  /// a layer passes the real value only for a dome, so a thickness change on
+  /// an edge-band material does not re-bake a matte that would come out
+  /// byte-identical.
+  final double thickness;
+
+  /// [profile] as the shader reads it: 0 for the edge band, 1 for a dome.
+  double get profileCode => profile == GlassProfile.dome ? 1 : 0;
+
   /// Value equality, so a layer can tell whether a re-bake would differ.
   ///
   /// Every field here is baked *into* the matte, not applied to it
@@ -67,7 +89,9 @@ class MatteRequest {
         other.maxDisplacement == maxDisplacement &&
         other.edgeRefraction == edgeRefraction &&
         other.refractionSpread == refractionSpread &&
-        other.antialiasWidth == antialiasWidth;
+        other.antialiasWidth == antialiasWidth &&
+        other.profile == profile &&
+        other.thickness == thickness;
   }
 
   @override
@@ -77,6 +101,8 @@ class MatteRequest {
     edgeRefraction,
     refractionSpread,
     antialiasWidth,
+    profile,
+    thickness,
   );
 }
 

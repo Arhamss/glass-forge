@@ -19,6 +19,7 @@ export 'src/design/glass_tokens.dart';
 export 'src/geometry/producer_registry.dart' show GeometryTier;
 export 'src/glass_forge.dart';
 export 'src/material/glass_material.dart';
+export 'src/material/glass_profile.dart';
 export 'src/material/glass_variant.dart';
 export 'src/motion/glass_decay.dart';
 export 'src/motion/glass_jiggle.dart' show GlassJiggle;

@@ -6,6 +6,7 @@ import 'package:glass_forge/src/composition/filter_snapshot.dart';
 import 'package:glass_forge/src/debug.dart';
 import 'package:glass_forge/src/geometry/matte_generation.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
+import 'package:glass_forge/src/material/glass_profile.dart';
 import 'package:glass_forge/src/material/glass_variant.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
 
@@ -169,6 +170,12 @@ class GlassComposition {
       ..setFloat(i++, snapshot.coordinateMapping[3])
       ..setFloat(i++, snapshot.coordinateMapping[4])
       ..setFloat(i++, snapshot.coordinateMapping[5])
+      // uSurface: which profile shades this pass, and the slab thickness in
+      // matte pixels, which sizes the dome's lit edge.
+      ..setFloat(i++, material.profile == GlassProfile.dome ? 1 : 0)
+      ..setFloat(i++, material.thickness * devicePixelRatio)
+      ..setFloat(i++, 0)
+      ..setFloat(i++, 0)
       // uMatte (sampler index 1) is required: `ImageFilter.shader` demands
       // every declared sampler past index 0 be bound before construction,
       // even one the shader itself will not sample from. With no matte,

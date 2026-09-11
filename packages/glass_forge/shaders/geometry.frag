@@ -13,6 +13,9 @@ uniform vec2 uSize;
 uniform vec4 uOptical;   // maxDisplacement, edgeRefraction, spread, aaWidth
 uniform vec4 uShapeData[MAX_SHAPES * 3];
 uniform float uNumShapes;
+// profile (0 edge band, 1 dome), dome thickness, unused, unused. Declared
+// last so every uniform before it keeps the index it always had.
+uniform vec4 uProfile;
 
 out vec4 fragColor;
 
@@ -29,5 +32,5 @@ void main() {
     // layer-local, so it needs no origin fixup. Everything downstream lives
     // in common/matte_pass.glsl, shared with the Flutter GPU producer.
     fragColor = gfBakeMatte(FlutterFragCoord().xy, uOptical.x, uOptical.y,
-                            uOptical.z);
+                            uOptical.z, uProfile);
 }

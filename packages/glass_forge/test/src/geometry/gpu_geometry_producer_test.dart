@@ -8,6 +8,7 @@ import 'package:glass_forge/src/geometry/gpu_geometry_producer.dart';
 import 'package:glass_forge/src/geometry/matte_generation.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/geometry/runtime_geometry_producer.dart';
+import 'package:glass_forge/src/material/glass_profile.dart';
 import 'package:glass_forge/src/scene/glass_scene.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
@@ -205,6 +206,77 @@ void main() {
         // independently-executed GPU pipelines evaluating the same SDF;
         // anything larger means the two producers have actually diverged.
         expect(maxDelta, lessThanOrEqualTo(2));
+      },
+      tags: ['impeller'],
+    );
+
+    test(
+      'accelerated and portable tiers bake the same dome',
+      () async {
+        // The dome reaches the shader through a uniform the edge band never
+        // needed. A producer that did not write it would bake the edge band
+        // under a dome material -- and the test above, being edge band,
+        // would never notice.
+        //
+        // Registered again here: the file's tearDown resets the registry
+        // after every test, so relying on setUpAll's registration let this
+        // test fall through to the runtime producer and skip itself.
+        GpuGeometryProducer.register();
+        final accelerated = ProducerRegistry.select(
+          tier: GeometryTier.accelerated,
+        );
+        await accelerated.warmUp();
+        if (accelerated is! GpuGeometryProducer ||
+            !accelerated.capabilities.available) {
+          accelerated.dispose();
+          markTestSkipped(
+            'GeometryTier.accelerated resolved to '
+            '${accelerated.runtimeType}; the render pass never ran.',
+          );
+          return;
+        }
+        final portable = ProducerRegistry.select(tier: GeometryTier.portable);
+        await portable.warmUp();
+        addTearDown(portable.dispose);
+        addTearDown(accelerated.dispose);
+
+        const dome = MatteRequest(
+          devicePixelRatio: 1,
+          maxDisplacement: 32,
+          edgeRefraction: 30,
+          refractionSpread: 0,
+          antialiasWidth: 0.5,
+          profile: GlassProfile.dome,
+          thickness: 10,
+        );
+        final scene = _sceneWithOneShape();
+        final fromGpu = accelerated.produce(scene, dome)!;
+        final fromRuntime = portable.produce(scene, dome)!;
+        final edgeBand = portable.produce(scene, _request)!;
+        addTearDown(() => accelerated.release(fromGpu));
+        addTearDown(() => portable.release(fromRuntime));
+        addTearDown(() => portable.release(edgeBand));
+
+        final gpuBytes = await _rgbaBytes(fromGpu.texture);
+        final runtimeBytes = await _rgbaBytes(fromRuntime.texture);
+        final edgeBandBytes = await _rgbaBytes(edgeBand.texture);
+
+        var maxDelta = 0;
+        var fromEdgeBand = 0;
+        for (var i = 0; i < gpuBytes.length; i++) {
+          final delta = (gpuBytes[i] - runtimeBytes[i]).abs();
+          if (delta > maxDelta) {
+            maxDelta = delta;
+          }
+          fromEdgeBand += (runtimeBytes[i] - edgeBandBytes[i]).abs();
+        }
+        expect(maxDelta, lessThanOrEqualTo(2));
+        expect(
+          fromEdgeBand,
+          greaterThan(0),
+          reason: 'the portable dome came out as the edge band, so the '
+              'parity above compared two edge bands',
+        );
       },
       tags: ['impeller'],
     );

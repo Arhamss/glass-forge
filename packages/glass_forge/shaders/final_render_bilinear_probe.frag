@@ -22,12 +22,14 @@ uniform vec4 uTint;           // rgb, variant (0 regular, 1 clear)
 uniform vec4 uLighting;       // highlight, angleX, angleY, contour
 uniform vec4 uMapBasis;       // a, b, c, d
 uniform vec2 uMapOffset;      // tx, ty
+uniform vec4 uSurface;        // profile (0 edge band, 1 dome), thickness, 0, 0
 uniform sampler2D uBackdrop;
 uniform sampler2D uMatte;
 
 out vec4 fragColor;
 
 #include "common/codec.glsl"
+#include "common/shading.glsl"
 #include "common/sampling.glsl"
 
 // Only mirror samples that leave the texture. Clamping everywhere washes out
@@ -108,16 +110,9 @@ void main() {
         refracted = mix(refracted, uTint.rgb, uOptical.z);
     }
 
-    // Two opposing rim highlights. The colour is incident white rather than
-    // the refracted backdrop: deriving it from the backdrop is what gives
-    // upstream its cyan/green fringing.
-    vec2 lightDir = normalize(vec2(uLighting.y, uLighting.z));
-    float facing = dot(normal, lightDir);
-    float rim = max(0.0, facing) + 0.8 * max(0.0, -facing);
-
-    // Guard on luminance so a truly black surface does not flicker at the rim.
-    float guard = pow(max(luma, 0.0), 0.25);
-    refracted += vec3(rim * uLighting.x * guard * 0.35);
+    // Shaded exactly as final_render.frag shades it -- common/shading.glsl.
+    refracted = gfShade(refracted, normal, max(0.0, -signedDistance), luma,
+                        uOptical.x, uLighting, uSurface);
 
     fragColor = vec4(refracted * coverage, coverage);
 }

@@ -121,10 +121,14 @@ class RuntimeGeometryProducer implements GeometryProducer {
         }
       }
     }
-    shader.setFloat(
-      i++,
-      shapes.length.clamp(0, kMaxShapes).toDouble(),
-    );
+    shader
+      ..setFloat(i++, shapes.length.clamp(0, kMaxShapes).toDouble())
+      // uProfile, after the shape block so every earlier index is where it
+      // always was.
+      ..setFloat(i++, request.profileCode)
+      ..setFloat(i++, request.thickness)
+      ..setFloat(i++, 0)
+      ..setFloat(i++, 0);
   }
 
   @override

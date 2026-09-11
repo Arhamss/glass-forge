@@ -13,6 +13,7 @@ import 'package:glass_forge/src/geometry/matte_generation.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/geometry/runtime_geometry_producer.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
+import 'package:glass_forge/src/material/glass_profile.dart';
 import 'package:glass_forge/src/scene/glass_scene.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
 import 'package:glass_forge/src/shapes/shape_geometry.dart';
@@ -717,6 +718,10 @@ class RenderGlassLayer extends RenderProxyBox {
       edgeRefraction: material.edgeRefraction * _devicePixelRatio,
       refractionSpread: material.refractionSpread,
       antialiasWidth: 0.5,
+      profile: material.profile,
+      thickness: material.profile == GlassProfile.dome
+          ? material.thickness * _devicePixelRatio
+          : 0,
     );
     if (pass.refreshedRevision == pass.scene.revision &&
         pass.refreshedGeneration == _producerGeneration &&

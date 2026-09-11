@@ -12,14 +12,47 @@
 // Analytic gradient of the scene distance field, by central difference on the
 // SDF itself rather than screen-space derivatives. Portable everywhere,
 // artifact-free at corners, and defined even after a non-uniform early return.
-vec2 gfSceneNormal(vec2 p, float epsilon) {
-    float dx = gfSceneDistance(p + vec2(epsilon, 0.0))
-             - gfSceneDistance(p - vec2(epsilon, 0.0));
-    float dy = gfSceneDistance(p + vec2(0.0, epsilon))
-             - gfSceneDistance(p - vec2(0.0, epsilon));
-    vec2 g = vec2(dx, dy);
+//
+// `steer` picks the field, as in gfSceneSample: negative for the shapes
+// themselves, which is all the edge band ever asks for.
+//
+// The difference itself, unnormalised: its length over 2 * epsilon is the
+// field's slope, which gfNeckFade reads.
+vec2 gfSceneDifference(vec2 p, float epsilon, vec2 steer) {
+    float dx = gfSceneSample(p + vec2(epsilon, 0.0), steer).x
+             - gfSceneSample(p - vec2(epsilon, 0.0), steer).x;
+    float dy = gfSceneSample(p + vec2(0.0, epsilon), steer).x
+             - gfSceneSample(p - vec2(0.0, epsilon), steer).x;
+    return vec2(dx, dy);
+}
+
+vec2 gfUnitOrZero(vec2 g) {
     float len = length(g);
     return len < 1e-6 ? vec2(0.0) : g / len;
+}
+
+vec2 gfSceneGradient(vec2 p, float epsilon, vec2 steer) {
+    return gfUnitOrZero(gfSceneDifference(p, epsilon, steer));
+}
+
+vec2 gfSceneNormal(vec2 p, float epsilon) {
+    return gfSceneGradient(p, epsilon, vec2(-1.0));
+}
+
+// How much refraction a point may keep, given how well its surface knows
+// which way it faces. `difference` is gfSceneDifference at `epsilon`.
+//
+// Where blended shapes merge, the two sides of the neck face each other, the
+// smooth-min's gradient averages them, and along the neck's centreline it
+// collapses to nothing before turning round -- so the direction the lens
+// pushes flips from one texel to the next and the bridge tears down the
+// middle (docs/reference/shader_techniques.md s3, "union necks"). Fading the
+// refraction where the slope collapses leaves the saddle flat, as a saddle
+// is. An SDF's slope is 1; across a single shape's own seams, where the
+// stencil straddles two faces at right angles, about 0.7 -- so the fade
+// starts below that, and no single shape is touched by it.
+float gfNeckFade(vec2 difference, float epsilon) {
+    return smoothstep(0.1, 0.6, length(difference) / (2.0 * epsilon));
 }
 
 // Convex squircle: y = (1 - (1 - x)^4)^(1/4), x in 0..1 across the band.
@@ -36,4 +69,93 @@ float gfDisplacementMagnitude(float sd, float height, float amount) {
         return 0.0;   // outside the shape, or past the band: interior is flat
     }
     return gfEdgeProfile(1.0 + sd / height) * amount;
+}
+
+// Dome profile.
+//
+// The other model: a sphere cap spanning the shape's whole interior depth,
+// refracted as a single slab -- the displacement liquid_glass_renderer gives,
+// re-derived from the formulas in docs/reference/shader_techniques.md s3
+// rather than from its source.
+//
+// `x` is how far into the dome a point sits, 0 at the rim and 1 where the
+// interior is deepest; `coreDepth` is how deep that is, in pixels.
+//
+// A true cap, not a hemisphere: it meets the base at 40 degrees rather than
+// standing vertical. At the rim of a hemisphere the tilt races to 90
+// degrees, the displacement climbs faster than the rim moves outward, and
+// the lens folds its own image back on itself -- a caustic ring that, at
+// interface scale and with the backdrop sampled nearest-neighbour, reads as
+// radial streaks through every speck of the backdrop. A 40-degree cap does
+// not fold anywhere across edge refractions of 5 to 80 pixels, slabs of 1
+// to 40 and depths of 8 to 400 (the numbers are in the dome tests).
+//
+// The slab: the view ray (0,0,-1) refracts through the tilted surface --
+// index n = sqrt(1 + (E / 8t)^2), derived exactly as GlassMaterial derives
+// it -- and travels `8 * thickness` plus the local height to the backdrop.
+// That fixes the displacement's shape. Its size is then set by what the
+// caller asked for: edgeRefraction at the rim, so the knob means under a
+// dome what it means under the edge band -- but never more than 0.35 of the
+// depth, because a small shape given a large rim displacement folds just
+// the same, whatever the cap. Past that a pill is simply a thinner lens.
+const float kDomeCapSin = 0.6427876097;   // sin(40 degrees)
+const float kDomeCapCos = 0.7660444431;   // cos(40 degrees)
+const float kDomeDepthLimit = 0.35;
+
+// The in-plane displacement, in pixels, of a ray through a cap tilted to
+// `sinTilt`, before scaling.
+float gfDomeRefraction(float sinTilt, float eta, float thickness) {
+    float cosTilt = sqrt(max(0.0, 1.0 - sinTilt * sinTilt));
+    float height = (cosTilt - kDomeCapCos) / (1.0 - kDomeCapCos);
+    // Solved in the plane of the tilt: which way the surface leans is the
+    // matte's direction channel, so only the in-plane component matters.
+    vec3 ray = refract(vec3(0.0, 0.0, -1.0), vec3(sinTilt, 0.0, cosTilt), eta);
+    float travel = thickness * (8.0 + height);
+    return max(0.0, -ray.x) * travel / max(abs(ray.z), 1e-3);
+}
+
+float gfDomeDisplacement(float x, float coreDepth, float edgeRefraction,
+                         float thickness) {
+    float t = max(thickness, 1e-3);
+    float ratio = edgeRefraction / (8.0 * t);
+    float eta = inversesqrt(1.0 + ratio * ratio);
+    float rim = gfDomeRefraction(kDomeCapSin, eta, t);
+    if (rim < 1e-6) {
+        return 0.0;
+    }
+    float here = gfDomeRefraction(kDomeCapSin * (1.0 - clamp(x, 0.0, 1.0)),
+                                  eta, t);
+    float amplitude = min(edgeRefraction, kDomeDepthLimit * coreDepth);
+    return amplitude * here / rim;
+}
+
+// Which way the dome leans at p, as a unit vector pointing out of it.
+//
+// Kyant0's dome term, `normalize(gradSd + depth * radial)`: the shape's own
+// normal at the rim handing over to the direction away from its core
+// (gfShapeCore) toward the middle. Here the handover is a smoothstep that
+// completes 40% of the way in, and on its own it is not enough -- the
+// numbers are in dome_matte_test.dart. Three things together are:
+//
+//   * the gradient comes from the steering proxy (gfShapeSteeringDistance),
+//     whose corners are rounded past the displacement, so no corner's
+//     normals converge anywhere a sample is pushed to;
+//   * it is taken across a stencil that widens with depth -- exact at the
+//     rim, where the silhouette is honoured, averaging over three quarters
+//     of the point's depth further in. Across a seam of a rounded box's SDF
+//     the gradient turns a full right angle between one texel and the next,
+//     and with only the radial term to soften it that tore the backdrop
+//     apart along both diagonals by about 50 pixels;
+//   * the radial term, which owns the direction where the other two run out
+//     -- at the core, where a symmetric stencil sees no slope at all.
+vec2 gfDomeDirection(vec2 p, vec2 core, float depth, float x,
+                     float edgeRefraction) {
+    vec2 grad = gfSceneGradient(p, max(1.0, depth * 0.75),
+                                vec2(edgeRefraction, kDomeDepthLimit));
+    vec2 toCore = p - core;
+    float reach = length(toCore);
+    vec2 radial = reach > 1e-3 ? toCore / reach : grad;
+    vec2 dir = mix(grad, radial, smoothstep(0.0, 0.4, x));
+    float len = length(dir);
+    return len < 1e-6 ? vec2(0.0) : dir / len;
 }

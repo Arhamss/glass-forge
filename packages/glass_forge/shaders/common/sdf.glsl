@@ -135,6 +135,18 @@ vec2 gfToLocal(int i, vec2 p) {
     return p;
 }
 
+// One shape's distance in its own local space, by type code. Takes values,
+// not an index, so it is free of the literal-index rule above and both
+// dispatchers below can share it rather than each carrying the type switch.
+float gfLocalDistance(float type, vec2 local, vec2 extent, float radius) {
+    if (type < 1.5) {
+        return sdRoundedBox(local, extent, radius);
+    } else if (type < 2.5) {
+        return sdEllipse(local, extent);
+    }
+    return sdSuperellipse(local, extent, radius);
+}
+
 float gfShapeDistance(int i, vec2 p) {
 #define GF_CASE_SHAPE_DISTANCE(I) \
     if (i == (I)) { \
@@ -143,20 +155,52 @@ float gfShapeDistance(int i, vec2 p) {
             return 1e9; \
         } \
         vec2 local = gfToLocal(I, p); \
-        vec2 extent = GF_EXTENT(I); \
-        float radius = GF_RADIUS(I); \
-        float d; \
-        if (type < 1.5) { \
-            d = sdRoundedBox(local, extent, radius); \
-        } else if (type < 2.5) { \
-            d = sdEllipse(local, extent); \
-        } else { \
-            d = sdSuperellipse(local, extent, radius); \
-        } \
+        float d = gfLocalDistance(type, local, GF_EXTENT(I), GF_RADIUS(I)); \
         return d * GF_DISTSCALE(I); \
     }
     GF_SHAPE_CASES(GF_CASE_SHAPE_DISTANCE)
 #undef GF_CASE_SHAPE_DISTANCE
+    return 1e9;
+}
+
+// The same shape with its corners rounded further, for steering a dome.
+//
+// Only the dome reads this, and only for which way to push -- never for
+// where the shape is. Near a rounded corner the SDF's normals all point at
+// the corner arc's centre, one corner radius in; a dome displacing inward by
+// more than that carries samples across that point, and the image there
+// turns inside out -- a star of streaks on each diagonal. Steering by a
+// shape whose corners are rounded to 3x the displacement keeps every
+// convergence point well beyond anything pushed toward it. Kyant0 does the
+// same with 1.5x the corner radius; this sizes it to the displacement, which
+// is what the fold depends on. 1.5x the displacement stopped the fold but
+// still stretched the backdrop tenfold beside each corner; 3x holds the
+// worst local stretch anywhere on the dome to about 2x.
+//
+// `edgeRefraction` and `depthLimit` are the dome's own (see
+// gfDomeDisplacement): the displacement never exceeds either. An oval is
+// steered as the capsule it inscribes, for the same reason at its ends,
+// where an elongated ellipse curves tighter than the displacement.
+float gfShapeSteeringDistance(int i, vec2 p, float edgeRefraction,
+                              float depthLimit) {
+#define GF_CASE_STEER(I) \
+    if (i == (I)) { \
+        float type = GF_TYPE(I); \
+        if (type < 0.5) { \
+            return 1e9; \
+        } \
+        vec2 extent = GF_EXTENT(I); \
+        float inradius = min(extent.x, extent.y); \
+        float scale = max(GF_DISTSCALE(I), 1e-6); \
+        float reach = 3.0 * min(edgeRefraction / scale, \
+                                depthLimit * inradius); \
+        float radius = type > 1.5 && type < 2.5 \
+            ? inradius \
+            : min(max(GF_RADIUS(I), reach), inradius); \
+        return sdRoundedBox(gfToLocal(I, p), extent, radius) * scale; \
+    }
+    GF_SHAPE_CASES(GF_CASE_STEER)
+#undef GF_CASE_STEER
     return 1e9;
 }
 
@@ -176,4 +220,38 @@ float gfBoundLowerBound(int i, vec2 p) {
     GF_SHAPE_CASES(GF_CASE_BOUND)
 #undef GF_CASE_BOUND
     return 1e9;
+}
+
+// Where the shape's interior is deepest, nearest to p.
+//
+// A dome needs to know which way is "toward the middle" at every point, and
+// the SDF gradient cannot say: inside a rounded box it is piecewise constant,
+// and every seam between two of its pieces runs from a corner to the centre.
+// Displacement or light driven by it alone paints flat wedges meeting in an
+// X. The direction from p to the shape's core is the continuous alternative.
+//
+// The core is the shape shrunk by its own inradius, which is a point for a
+// square or circle and a segment for anything longer than it is wide -- so a
+// pill domes across its short axis along its whole straight run, as a real
+// capsule does, rather than everything leaning toward the pill's centre.
+//
+// Returns the core point nearest p, in layer space.
+vec2 gfShapeCore(int i, vec2 p) {
+#define GF_CASE_CORE(I) \
+    if (i == (I)) { \
+        vec2 extent = GF_EXTENT(I); \
+        float inradius = min(extent.x, extent.y); \
+        vec2 coreHalf = extent - vec2(inradius); \
+        vec2 nearest = clamp(gfToLocal(I, p), -coreHalf, coreHalf); \
+        vec4 m = GF_BASIS(I); \
+        float det = m.x * m.w - m.y * m.z; \
+        float invertible = step(1e-12, abs(det)); \
+        vec2 layer = vec2(m.w * nearest.x - m.y * nearest.y, \
+                          -m.z * nearest.x + m.x * nearest.y) \
+            * invertible / mix(1.0, det, invertible); \
+        return GF_ORIGIN(I) + layer; \
+    }
+    GF_SHAPE_CASES(GF_CASE_CORE)
+#undef GF_CASE_CORE
+    return p;
 }

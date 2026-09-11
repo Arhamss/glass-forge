@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
+import 'package:glass_forge/src/material/glass_profile.dart';
 import 'package:glass_forge/src/material/glass_variant.dart';
 
 void main() {
@@ -102,6 +103,16 @@ void main() {
         base.copyWith(variant: GlassVariant.clear).revision,
         isNot(base.revision),
       );
+    });
+
+    test('profile', () {
+      // A cached filter reused across a profile switch would keep shading
+      // the old surface over the new matte.
+      expect(
+        base.copyWith(profile: GlassProfile.dome).revision,
+        isNot(base.revision),
+      );
+      expect(base.copyWith(profile: GlassProfile.dome), isNot(base));
     });
 
     test('thickness', () {
@@ -207,5 +218,30 @@ void main() {
     final clear = GlassMaterial.clear();
     expect(clear.variant, GlassVariant.clear);
     expect(clear.tintOpacity, 0);
+  });
+
+  test('everything that is not asked to be a dome is the edge band', () {
+    // The fitted presets are fitted against the edge band; a default that
+    // drifted to the dome would re-skin every existing surface.
+    expect(const GlassMaterial().profile, GlassProfile.edgeBand);
+    expect(
+      GlassMaterial.regular(brightness: Brightness.dark).profile,
+      GlassProfile.edgeBand,
+    );
+    expect(
+      GlassMaterial.regular(brightness: Brightness.light).profile,
+      GlassProfile.edgeBand,
+    );
+    expect(GlassMaterial.clear().profile, GlassProfile.edgeBand);
+  });
+
+  test('the dome preset is a dome, and a clear one', () {
+    // Frost is what turns a lens into a frosted pane, and the Apple
+    // presets carry 5 to 7. The dome exists to not be that.
+    final dome = GlassMaterial.dome();
+    expect(dome.profile, GlassProfile.dome);
+    expect(dome.frost, lessThan(1));
+    expect(dome.rendersAnything, isTrue);
+    expect(dome.copyWith(profile: GlassProfile.edgeBand), isNot(dome));
   });
 }

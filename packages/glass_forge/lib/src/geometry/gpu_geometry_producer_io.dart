@@ -362,6 +362,11 @@ class GpuGeometryProducer implements GeometryProducer {
       Endian.host,
     );
 
+    final profileOffset = offsetOf('uProfile');
+    bytes
+      ..setFloat32(profileOffset, request.profileCode, Endian.host)
+      ..setFloat32(profileOffset + 4, request.thickness, Endian.host);
+
     final hostBuffer = gpu.gpuContext.createHostBuffer();
     renderPass.bindUniform(slot, hostBuffer.emplace(bytes));
   }

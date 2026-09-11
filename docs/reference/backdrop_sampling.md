@@ -296,6 +296,18 @@ enough that the shape is visibly refracting at all. At that point, wiring
 engine exists — behind a real tier check and re-running this exact probe
 would close the loop this task could not.
 
+**Update, 2026-09-11 — the dome profile now reads bilinearly by default.**
+`GlassProfile.dome` displaces the whole surface by a continuously varying
+amount and magnifies what is behind it, which is exactly the case this doc
+predicted would show. On the iOS Simulator, over the workbench's
+checkerboard, every edge seen through the dome came out stair-stepped by a
+pixel or two, and over the Photographic backdrop the magnified 1-pixel
+gradient dither turned into moiré arcs. `final_render.frag` now takes the
+backdrop through `gfSampleBilinear` when the pass is a dome
+(`uSurface.x`), and keeps the single nearest tap for the edge band, whose
+flat interior never needed it. Cost: 4 taps instead of 1 (12 instead of 3
+under chromatic aberration), on dome surfaces only.
+
 ## flutter#186945 and the upstream issue
 
 flutter#186945: `ImageFilter.shader`'s backdrop sampler is nearest-neighbour
