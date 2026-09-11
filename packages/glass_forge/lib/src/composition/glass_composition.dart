@@ -9,13 +9,19 @@ import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/material/glass_variant.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
 
-/// Builds the single image filter a glass layer paints through.
+/// Builds the single image filter one backdrop pass paints through.
 ///
-/// Exactly one `BackdropFilter` per layer. Blur and the glass shader compose
-/// into one filter rather than stacking: a shader filter above another
-/// backdrop filter reads a stale previous-frame backdrop — including its own
-/// output — on physical iPhones (flutter#187820), which is a progressive
-/// white-wash. Upstream stacks two, so it is exposed to exactly this.
+/// Blur and the glass shader compose into one filter rather than stacking: a
+/// shader filter above another backdrop filter reads a stale previous-frame
+/// backdrop — including its own output — on physical iPhones
+/// (flutter#187820), which is a progressive white-wash. Upstream stacks two,
+/// so it is exposed to exactly this.
+///
+/// A layer owns one of these per *distinct material* among its shapes, and
+/// pushes those passes as siblings under one clip — never nested, which is
+/// the arrangement flutter#187820 is about. One material, which is the
+/// common case, is still exactly one `BackdropFilter`. See
+/// `RenderGlassLayer`.
 class GlassComposition {
   ui.ImageFilter? _filter;
   ui.FragmentShader? _shader;
@@ -26,6 +32,34 @@ class GlassComposition {
   /// How many native filters have been built. Test-only.
   @visibleForTesting
   int get debugFilterBuildCount => _buildCount;
+
+  /// Whether [material] can put anything on screen on this backend.
+  ///
+  /// Answerable without a matte, and that is the whole point: a
+  /// `BackdropFilterLayer` is pushed *before* the subtree paints (so the
+  /// matte can be baked from the transforms that paint registers rather than
+  /// from last frame's), and a pushed backdrop filter costs a saveLayer and
+  /// a full backdrop read whether or not a filter ever lands on it. So the
+  /// "push nothing at all" decision has to be made from what is known
+  /// beforehand. Every input here — the material, and the backend — is.
+  ///
+  /// A null matte is deliberately *not* one of those inputs. It does not
+  /// mean "nothing to draw": the shader binds a transparent placeholder and
+  /// early-outs per fragment, which still leaves the frost, and on the
+  /// degraded path the frost is all there ever was. What a null matte costs
+  /// is the refraction, not the pass.
+  ///
+  /// Kept in step with [build] by construction: this returns false for
+  /// exactly the two cases [build] returns null for.
+  static bool willRender(GlassMaterial material) {
+    if (!material.rendersAnything) {
+      return false;
+    }
+    if (!ui.ImageFilter.isShaderFilterSupported) {
+      return material.frost > 0;
+    }
+    return true;
+  }
 
   /// Returns the filter for this frame, or null if nothing should be painted.
   ui.ImageFilter? build({

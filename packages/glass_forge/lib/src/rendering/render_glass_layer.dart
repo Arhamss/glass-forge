@@ -15,6 +15,7 @@ import 'package:glass_forge/src/geometry/runtime_geometry_producer.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/scene/glass_scene.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
+import 'package:glass_forge/src/shapes/shape_geometry.dart';
 
 /// Un-does the registry's "register the shipped accelerated producers once"
 /// guard, so a test can observe registration happening fresh, paired with
@@ -29,18 +30,75 @@ void debugResetAcceleratedProducerRegistration() {
   ProducerRegistry.debugReset();
 }
 
-/// Owns one backdrop capture and the scene it is shaped by.
+/// One backdrop pass: every shape in this layer that renders with the same
+/// material, and the single filter they share.
+///
+/// Grouping is by material rather than by shape because a backdrop filter is
+/// the expensive thing, not a shape. N materials cost N passes; the common
+/// case of one material still costs exactly one, which is what the
+/// `GlassComposition` invariant is really about.
+class _GlassPass {
+  _GlassPass(this.material);
+
+  /// The material every shape in [scene] renders with.
+  final GlassMaterial material;
+
+  /// Just this pass's shapes, in registration order.
+  ///
+  /// Deliberately separate from [RenderGlassLayer.scene], which stays the
+  /// whole layer's registry: the matte a pass bakes has to contain its own
+  /// shapes and nothing else. The geometry shader folds whatever array it is
+  /// handed with a smooth-min, so a foreign shape in that array is a foreign
+  /// bulge in this pass's surface -- and its coverage would then be filled
+  /// with the wrong material.
+  final GlassScene scene = GlassScene();
+
+  final GlassComposition composition = GlassComposition();
+
+  /// The matte baked for [scene], if any.
+  MatteGeneration? matte;
+
+  /// The `(revision, generation, request)` triple [matte] was last asked
+  /// for under. See [RenderGlassLayer._refreshMatte].
+  int? refreshedRevision;
+  int? refreshedGeneration;
+  MatteRequest? refreshedRequest;
+}
+
+/// What one registered shape asked for, and which pass it currently sits in.
+class _ShapeRecord {
+  _ShapeRecord({
+    required this.geometry,
+    required this.declared,
+    required this.group,
+  });
+
+  ShapeGeometry geometry;
+
+  /// The material this shape declared, or null to inherit the layer's.
+  GlassMaterial? declared;
+
+  /// The blend group this shape joined, held only for identity.
+  Object? group;
+
+  /// The pass this shape is currently registered into.
+  GlassMaterial? assigned;
+}
+
+/// Owns one backdrop capture per distinct material, and the scene they are
+/// shaped by.
 ///
 /// Always built as soon as a `GlassLayer` widget is, regardless of whether
 /// its shaders have finished loading — unlike upstream, which withholds its
 /// whole layer (and therefore every descendant's registration point) until
-/// then. [paint] simply skips the backdrop pass while
+/// then. [paint] simply skips the backdrop passes while
 /// [ShaderLibrary.isReady] is false, painting the subtree unglassed; the
 /// warm-up callback started in the constructor repaints once shaders land.
 /// A geometry producer not yet ready for other reasons (an accelerated
-/// producer's own shader bundle still loading) degrades the same way, for
-/// the same reason: [_refreshMatte] just gets back a null matte, and
-/// [GlassComposition.build] treats a null matte as nothing to render.
+/// producer's own shader bundle still loading) degrades differently and more
+/// mildly: [_refreshMatte] gets back a null matte, the shader binds a
+/// transparent placeholder for it, and the pass renders its frost with no
+/// refraction until the producer catches up.
 class RenderGlassLayer extends RenderProxyBox {
   /// Creates a glass layer.
   RenderGlassLayer({
@@ -63,7 +121,11 @@ class RenderGlassLayer extends RenderProxyBox {
     return ProducerRegistry.select(tier: tier);
   }
 
-  /// The shapes belonging to this layer.
+  /// Every shape belonging to this layer, in registration order.
+  ///
+  /// The whole layer's set, not one pass's: this is what the clip-chain walk
+  /// anchors on and what diagnostics read. The per-pass subsets live in
+  /// [_GlassPass.scene].
   final GlassScene scene = GlassScene();
 
   final RetainedClipChain _clipChain = RetainedClipChain();
@@ -72,27 +134,35 @@ class RenderGlassLayer extends RenderProxyBox {
   @visibleForTesting
   List<RetainedClip> get debugClipChain => _clipChain.clips;
 
-  final GlassComposition _composition = GlassComposition();
-  GeometryProducer _producer;
-  MatteGeneration? _matte;
+  /// What every registered shape declared, in registration order.
+  final Map<Object, _ShapeRecord> _records = <Object, _ShapeRecord>{};
 
-  /// The `(scene.revision, _producerGeneration)` pair [_refreshMatte] last
-  /// asked [_producer] about, regardless of what it got back. See
-  /// [_refreshMatte]'s own comment.
-  int? _refreshedRevision;
-  int? _refreshedGeneration;
+  /// One pass per distinct material among [_records], in the order each
+  /// material's first shape registered.
+  final Map<GlassMaterial, _GlassPass> _passes =
+      <GlassMaterial, _GlassPass>{};
 
-  /// The request [_refreshMatte] last handed [_producer].
+  /// Whether [_reassignPasses] has work to do.
   ///
-  /// The third thing that invalidates a matte, alongside the scene and the
-  /// producer's readiness: the material itself. `edgeRefraction`,
-  /// `refractionSpread` and `maxDisplacement` are baked *into* the matte by
-  /// the geometry pass -- the band's width and profile are pixels in a
-  /// texture, not uniforms applied afterwards -- so changing them without
-  /// re-baking leaves the displacement frozen wherever it was when the
-  /// shapes were last registered. That is precisely what made the
-  /// edge-refraction and refraction-spread sliders appear inert.
-  MatteRequest? _refreshedRequest;
+  /// Set only when something that decides *which* pass a shape belongs to
+  /// moves — a shape appearing or leaving, its declared material, its blend
+  /// group, or this layer's own material. A shape re-registering a moved
+  /// transform, which happens on every animating frame, deliberately does
+  /// not set it: that is the hot path, and its pass is already known.
+  bool _assignmentsDirty = false;
+
+  /// Whether [paint] is inside the call that paints this layer's subtree.
+  ///
+  /// Read by `RenderGlassShape` to tell a repaint it is nested inside — where
+  /// the matte is still ahead of it and will pick up whatever it registers —
+  /// from one triggered below an intervening repaint boundary, where this
+  /// layer is not painting at all and has to be asked for a later frame.
+  bool _paintingSubtree = false;
+
+  /// Whether this layer is currently painting its own subtree.
+  bool get isPaintingSubtree => _paintingSubtree;
+
+  GeometryProducer _producer;
 
   GlassMaterial _material;
   GeometryTier _tier;
@@ -177,13 +247,19 @@ class RenderGlassLayer extends RenderProxyBox {
     markNeedsPaint();
   }
 
-  /// How this layer's glass looks.
+  /// How this layer's glass looks by default.
+  ///
+  /// The material every shape that declared none of its own renders with. A
+  /// shape that did declare one is unaffected by changes here, which is why
+  /// this only marks the pass assignment dirty rather than invalidating any
+  /// matte directly.
   GlassMaterial get material => _material;
   set material(GlassMaterial value) {
     if (_material == value) {
       return;
     }
     _material = value;
+    _assignmentsDirty = true;
     markNeedsPaint();
   }
 
@@ -208,11 +284,13 @@ class RenderGlassLayer extends RenderProxyBox {
     }
     _tier = value;
     final retiring = _producer;
-    final matte = _matte;
-    if (matte != null) {
-      retiring.release(matte);
+    for (final pass in _passes.values) {
+      final matte = pass.matte;
+      if (matte != null) {
+        retiring.release(matte);
+      }
+      pass.matte = null;
     }
-    _matte = null;
     _producer = _selectProducer(value);
     retiring.dispose();
     // The new producer has not warmed up, so _refreshMatte must ask it again
@@ -222,6 +300,137 @@ class RenderGlassLayer extends RenderProxyBox {
     _producerGeneration++;
     unawaited(_warmUp());
     markNeedsPaint();
+  }
+
+  /// Registers [key]'s geometry, and what it asked to render with.
+  ///
+  /// [material] null means "whatever this layer's is"; [group] is the blend
+  /// group the shape joined, held only for identity.
+  void registerShape(
+    Object key,
+    ShapeGeometry geometry,
+    GlassMaterial? material,
+    Object? group,
+  ) {
+    scene.register(key, geometry);
+
+    final existing = _records[key];
+    if (existing == null) {
+      _records[key] = _ShapeRecord(
+        geometry: geometry,
+        declared: material,
+        group: group,
+      );
+      _assignmentsDirty = true;
+      return;
+    }
+
+    existing.geometry = geometry;
+    if (existing.declared != material || !identical(existing.group, group)) {
+      existing
+        ..declared = material
+        ..group = group;
+      _assignmentsDirty = true;
+      return;
+    }
+
+    // The hot path: a shape that only moved. Its pass is already decided, so
+    // the new geometry goes straight in -- this runs for every shape on
+    // every animating frame, from inside this layer's own subtree paint.
+    final assigned = existing.assigned;
+    if (assigned != null) {
+      _passes[assigned]?.scene.register(key, geometry);
+    }
+  }
+
+  /// Removes [key] from this layer.
+  void unregisterShape(Object key) {
+    scene.unregister(key);
+    final record = _records.remove(key);
+    if (record == null) {
+      return;
+    }
+    final assigned = record.assigned;
+    if (assigned != null) {
+      _passes[assigned]?.scene.unregister(key);
+    }
+    // A pass whose last shape just left still holds a matte and a shader.
+    _assignmentsDirty = true;
+  }
+
+  /// Sorts every registered shape into the pass that will render it.
+  ///
+  /// A blend group is one continuous surface, and one surface has one
+  /// material: the smooth-min in `common/scene.glsl` only reaches shapes
+  /// folded into the same matte, so a group split across two passes would
+  /// not merge at all -- the members would simply overlap, with a hard seam
+  /// where the caller asked for a join. So a group takes the material its
+  /// first-registered member asked for and the rest follow it, honouring the
+  /// blend (the thing the caller wrote down and can see) over an override
+  /// that cannot be honoured alongside it.
+  ///
+  /// Keeping the group whole is also what keeps each pass's shape array
+  /// well-formed. The fold reads a per-shape marker saying "opens a group"
+  /// or "continues the one in progress" (see `blend_group_link.dart`), and
+  /// a continuation whose opener was sorted into a different pass would
+  /// silently merge into whatever unrelated shape happened to precede it
+  /// there, at that shape's blend width.
+  void _reassignPasses() {
+    _assignmentsDirty = false;
+
+    final groupMaterials = <Object, GlassMaterial>{};
+    for (final record in _records.values) {
+      final group = record.group;
+      if (group != null) {
+        groupMaterials.putIfAbsent(group, () => record.declared ?? _material);
+      }
+    }
+
+    for (final entry in _records.entries) {
+      final record = entry.value;
+      final group = record.group;
+      final target = group == null
+          ? record.declared ?? _material
+          : groupMaterials[group]!;
+      assert(() {
+        if (record.declared != null && record.declared != target) {
+          debugPrint(
+            'glass_forge: a Glass inside a GlassBlendGroup asked for its '
+            'own material, but the group already renders with the one its '
+            'first shape asked for. Shapes that blend into one another are '
+            'one surface and take one material; move it out of the group '
+            'to give it its own.',
+          );
+        }
+        return true;
+      }(), 'debug-only warning; always true');
+      final assigned = record.assigned;
+      if (assigned != null && assigned != target) {
+        _passes[assigned]?.scene.unregister(entry.key);
+      }
+      record.assigned = target;
+      (_passes[target] ??= _GlassPass(target)).scene.register(
+        entry.key,
+        record.geometry,
+      );
+    }
+
+    _passes.removeWhere((material, pass) {
+      if (pass.scene.shapes.isNotEmpty) {
+        return false;
+      }
+      _retirePass(pass);
+      return true;
+    });
+  }
+
+  void _retirePass(_GlassPass pass) {
+    final matte = pass.matte;
+    if (matte != null) {
+      _producer.release(matte);
+    }
+    pass.matte = null;
+    pass.composition.dispose();
   }
 
   @override
@@ -235,34 +444,44 @@ class RenderGlassLayer extends RenderProxyBox {
       // and the constructor's warm-up callback repaints once loading
       // finishes. Upstream instead makes every shape's paint a no-op until
       // its shaders load, so children are invisible until then.
-      super.paint(context, offset);
+      _paintSubtree(context, offset);
       return;
     }
 
-    _refreshMatte();
+    if (_assignmentsDirty) {
+      _reassignPasses();
+    }
 
-    final filter = _composition.build(
-      matte: _matte,
-      material: _material,
-      snapshot: FilterSnapshot.of(
-        matte: _matte,
-        devicePixelRatio: _devicePixelRatio,
-        materialRevision: _material.revision,
-        coordinateMapping: _coordinateMapping(offset),
-      ),
-      devicePixelRatio: _devicePixelRatio,
-    );
-
-    if (filter == null) {
-      // Nothing to render, so no backdrop pass at all. Upstream pushes a
-      // full backdrop even when its blur is zero.
-      super.paint(context, offset);
+    // Everything that decides whether a pass renders at all has to be known
+    // *now*, before anything is pushed: a `BackdropFilterLayer` forces a
+    // saveLayer and a full backdrop read the moment it exists, so pushing
+    // one and then discovering there is nothing to put in it is worse than
+    // not pushing it. Which shapes exist, which material each renders with
+    // and which blend group each joined are all settled by the time paint
+    // begins — registration happens in `attach` and `performLayout` — and
+    // none of them can move while the subtree below paints. What *can* move
+    // there, and the whole reason the filters are built afterwards, is where
+    // each shape is.
+    final passes = <_GlassPass>[
+      for (final pass in _passes.values)
+        if (GlassComposition.willRender(pass.material)) pass,
+    ];
+    if (passes.isEmpty) {
+      // No shapes, or nothing any of their materials would draw. Upstream
+      // pushes a full backdrop even when its blur is zero.
+      _paintSubtree(context, offset);
       return;
     }
 
     // Collected fresh every paint: an ancestor's position relative to this
     // layer can change (most commonly by scrolling) without this layer's
     // own scene ever changing, so nothing else would tell us to re-walk.
+    //
+    // Unlike the scene, this is not stale at this point in the frame and so
+    // does not move after the subtree paints. It is read straight off the
+    // render tree -- `getTransformTo` and the ancestors' own clip rects --
+    // which layout has already settled. The scene lags only because it is a
+    // cache that the shapes themselves write into as they paint.
     final firstShape = scene.firstShapeOwner;
     if (firstShape == null) {
       _clipChain.clear();
@@ -270,7 +489,18 @@ class RenderGlassLayer extends RenderProxyBox {
       _clipChain.collect(firstShape, this);
     }
 
-    _pushGlassLayers(context, offset, filter);
+    _pushGlassLayers(context, offset, passes);
+  }
+
+  /// Paints the subtree, flagged so a descendant shape can tell that this
+  /// layer is the thing painting it.
+  void _paintSubtree(PaintingContext context, Offset offset) {
+    _paintingSubtree = true;
+    try {
+      super.paint(context, offset);
+    } finally {
+      _paintingSubtree = false;
+    }
   }
 
   /// Pushes the backdrop pass wrapped in every retained ancestor clip,
@@ -292,13 +522,16 @@ class RenderGlassLayer extends RenderProxyBox {
   /// far a retained clip sat from the layer -- see
   /// `retained_clip_chain_test.dart`'s "a clip offset from the layer does
   /// not displace the content it clips" for the regression this guards.
+  ///
+  /// [offset] is this layer's own paint offset throughout, and is what the
+  /// filters' coordinate mapping is derived from — never the offset an inner
+  /// context hands back, which `pushClipRect` and `pushTransform` zero out
+  /// whenever they composite rather than clip on the canvas.
   void _pushGlassLayers(
     PaintingContext context,
     Offset offset,
-    ui.ImageFilter filter,
+    List<_GlassPass> passes,
   ) {
-    GlassRenderCounters.instance.recordBackdropPush();
-
     void pushBackdrop(PaintingContext innerContext, Offset innerOffset) {
       // The clip is computed in this layer's own local space — the offset
       // is folded in once, by pushClipRect itself, rather than here too;
@@ -308,11 +541,7 @@ class RenderGlassLayer extends RenderProxyBox {
         clippedContext,
         clippedOffset,
       ) {
-        clippedContext.pushLayer(
-          BackdropFilterLayer()..filter = filter,
-          super.paint,
-          clippedOffset,
-        );
+        _pushBackdropPasses(clippedContext, clippedOffset, offset, passes);
       });
     }
 
@@ -387,38 +616,124 @@ class RenderGlassLayer extends RenderProxyBox {
     paint(context, offset);
   }
 
-  void _refreshMatte() {
+  /// Pushes one backdrop pass per material as siblings, paints the subtree
+  /// inside the last of them, and only then builds each pass's filter.
+  ///
+  /// The ordering is the point. A shape re-reads its own transform and
+  /// re-registers it from inside its `paint` (see
+  /// `RenderGlassShape._syncGeometryIfTransformChanged`), which is *this*
+  /// layer's `super.paint`. Baking the matte before that call — as this did
+  /// until the passes were split out — bakes the scene as the previous
+  /// frame's paint left it, so every moving surface refracted one frame
+  /// behind its own pixels. Filling the filters in afterwards is legal
+  /// because a layer tree is not handed to the compositor until the end of
+  /// the frame: `BackdropFilterLayer.filter` is nullable and documented as
+  /// needing a value only "before the compositing phase of the pipeline",
+  /// and assigning it calls `markNeedsAddToScene` for exactly this.
+  ///
+  /// Siblings, never nested. Nesting is what flutter#187820 is about (see
+  /// [GlassComposition]); siblings are the ordinary arrangement of two
+  /// `BackdropFilter`s side by side. A pass writes transparent black outside
+  /// its own shapes' coverage and composites srcOver, so what a later pass
+  /// reads as backdrop is the untouched original everywhere the earlier
+  /// passes did not draw. Where two materials' shapes genuinely overlap the
+  /// later one samples the earlier one's glass — glass sampling glass, which
+  /// Apple's own guidance says not to do, and which is the reason to put
+  /// overlapping surfaces in one material or one blend group.
+  void _pushBackdropPasses(
+    PaintingContext context,
+    Offset offset,
+    Offset layerOffset,
+    List<_GlassPass> passes,
+  ) {
+    final pushed = <BackdropFilterLayer>[];
+    for (var i = 0; i < passes.length; i++) {
+      GlassRenderCounters.instance.recordBackdropPush();
+      final backdrop = BackdropFilterLayer();
+      pushed.add(backdrop);
+      context.pushLayer(
+        backdrop,
+        // The subtree paints once, above every pass. Putting it in the last
+        // one keeps a single-material layer byte-for-byte the arrangement it
+        // had before there were passes at all.
+        i == passes.length - 1 ? _paintSubtree : _paintNothing,
+        offset,
+      );
+    }
+
+    // The subtree has painted, so every shape has registered the transform
+    // it actually painted at. Only now does the scene describe this frame.
+    final mapping = _coordinateMapping(layerOffset);
+    for (var i = 0; i < passes.length; i++) {
+      pushed[i].filter = _buildFilter(passes[i], mapping);
+    }
+  }
+
+  static void _paintNothing(PaintingContext context, Offset offset) {}
+
+  ui.ImageFilter _buildFilter(_GlassPass pass, Float32List mapping) {
+    _refreshMatte(pass);
+    final filter = pass.composition.build(
+      matte: pass.matte,
+      material: pass.material,
+      snapshot: FilterSnapshot.of(
+        matte: pass.matte,
+        devicePixelRatio: _devicePixelRatio,
+        materialRevision: pass.material.revision,
+        coordinateMapping: mapping,
+      ),
+      devicePixelRatio: _devicePixelRatio,
+    );
+    if (filter != null) {
+      return filter;
+    }
+    // Unreachable while `willRender` and `build` agree, and they are written
+    // to. But a `BackdropFilterLayer` with no filter asserts in debug and
+    // throws in release at compositing time, and the saveLayer was already
+    // paid for the moment it was pushed, so the cheapest honest recovery is
+    // an identity rather than a crashed frame.
+    assert(false, 'willRender() accepted a material build() then refused');
+    return ui.ImageFilter.matrix(Matrix4.identity().storage);
+  }
+
+  void _refreshMatte(_GlassPass pass) {
     // Two independent reasons a fresh attempt might be worth making: the
-    // scene actually changed, or [_producer]'s own readiness changed (its
-    // warm-up just settled, or it was just swapped for the runtime
+    // pass's scene actually changed, or [_producer]'s own readiness changed
+    // (its warm-up just settled, or it was just swapped for the runtime
     // fallback in [_warmUp]) since the last time this was asked. Checking
-    // only `_matte?.sceneRevision`, as before Task 18, conflates "nothing
-    // to bake" with "producer was not ready yet" -- both leave `_matte`
+    // only `matte?.sceneRevision`, as before Task 18, conflates "nothing
+    // to bake" with "producer was not ready yet" -- both leave `matte`
     // null -- so an accelerated producer not yet ready on an early paint
     // caused a fresh, wasted `produce()` call on every single subsequent
     // paint before its warm-up settled, not just the one that mattered.
+    //
+    // Per pass, not per layer, so that moving a shape of one material does
+    // not re-bake every other material's matte. Each pass's scene is its
+    // own registry and bumps its own revision only when its own shapes move.
+    final material = pass.material;
     final request = MatteRequest(
       devicePixelRatio: _devicePixelRatio,
-      maxDisplacement: _material.maxDisplacement * _devicePixelRatio,
-      edgeRefraction: _material.edgeRefraction * _devicePixelRatio,
-      refractionSpread: _material.refractionSpread,
+      maxDisplacement: material.maxDisplacement * _devicePixelRatio,
+      edgeRefraction: material.edgeRefraction * _devicePixelRatio,
+      refractionSpread: material.refractionSpread,
       antialiasWidth: 0.5,
     );
-    if (_refreshedRevision == scene.revision &&
-        _refreshedGeneration == _producerGeneration &&
-        _refreshedRequest == request) {
+    if (pass.refreshedRevision == pass.scene.revision &&
+        pass.refreshedGeneration == _producerGeneration &&
+        pass.refreshedRequest == request) {
       return;
     }
-    final existing = _matte;
-    final next = _producer.produce(scene, request);
+    final existing = pass.matte;
+    final next = _producer.produce(pass.scene, request);
     GlassRenderCounters.instance.recordMatteProduce();
     if (existing != null) {
       _producer.release(existing);
     }
-    _matte = next;
-    _refreshedRevision = scene.revision;
-    _refreshedGeneration = _producerGeneration;
-    _refreshedRequest = request;
+    pass
+      ..matte = next
+      ..refreshedRevision = pass.scene.revision
+      ..refreshedGeneration = _producerGeneration
+      ..refreshedRequest = request;
   }
 
   Float32List _coordinateMapping(Offset offset) {
@@ -435,13 +750,10 @@ class RenderGlassLayer extends RenderProxyBox {
   @override
   void dispose() {
     _disposed = true;
-    final matte = _matte;
-    if (matte != null) {
-      _producer.release(matte);
-    }
-    _matte = null;
+    _passes.values.forEach(_retirePass);
+    _passes.clear();
+    _records.clear();
     _producer.dispose();
-    _composition.dispose();
     super.dispose();
   }
 }

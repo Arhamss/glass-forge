@@ -1,5 +1,6 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/rendering/render_glass_layer.dart';
 import 'package:glass_forge/src/scene/blend_group_link.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
@@ -14,10 +15,15 @@ import 'package:glass_forge/src/shapes/shape_geometry.dart';
 /// and refract one frame behind their own content.
 class RenderGlassShape extends RenderProxyBox {
   /// Creates a glass shape render object.
-  RenderGlassShape({required this._shape, required this._group});
+  RenderGlassShape({
+    required this._shape,
+    required this._group,
+    this._material,
+  });
 
   GlassShape _shape;
   BlendGroupLink? _group;
+  GlassMaterial? _material;
   RenderGlassLayer? _layer;
 
   /// The transform-to-layer [_syncGeometryIfTransformChanged] last observed
@@ -52,6 +58,25 @@ class RenderGlassShape extends RenderProxyBox {
       return;
     }
     _shape = value;
+    _syncGeometry();
+    markNeedsPaint();
+  }
+
+  /// The material this shape renders with, or null to inherit the layer's.
+  ///
+  /// An override does not get its own `BackdropFilter`: the layer groups its
+  /// shapes by material and pushes one pass per distinct one, so N materials
+  /// cost N passes rather than one per shape. A shape inside a blend group
+  /// cannot have its own material at all — see
+  /// `RenderGlassLayer._reassignPasses`.
+  GlassMaterial? get material => _material;
+  set material(GlassMaterial? value) {
+    if (_material == value) {
+      return;
+    }
+    _material = value;
+    // The group's opening marker does not move with this: a group renders
+    // with one material regardless, so its members' markers are unaffected.
     _syncGeometry();
     markNeedsPaint();
   }
@@ -118,7 +143,7 @@ class RenderGlassShape extends RenderProxyBox {
 
   @override
   void detach() {
-    _layer?.scene.unregister(this);
+    _layer?.unregisterShape(this);
     _layer?.markNeedsPaint();
     _layer = null;
     _lastSyncedTransform = null;
@@ -161,7 +186,7 @@ class RenderGlassShape extends RenderProxyBox {
   }
 
   void _registerGeometry(RenderGlassLayer target, Matrix4 transform) {
-    target.scene.register(
+    target.registerShape(
       this,
       ShapeGeometry.resolve(
         shape: _shape,
@@ -170,6 +195,8 @@ class RenderGlassShape extends RenderProxyBox {
         devicePixelRatio: target.devicePixelRatio,
         blendMarker: _blendMarker,
       ),
+      _material,
+      _group,
     );
   }
 
@@ -218,13 +245,24 @@ class RenderGlassShape extends RenderProxyBox {
   /// runs in, so a genuine correction cannot repaint [_layer] synchronously
   /// either — [_scheduleLayerRepaint] defers that to the next frame, so the
   /// layer's matte catches up one frame late rather than never.
+  ///
+  /// That deferral is now the exception rather than the rule. The layer
+  /// bakes its mattes *after* painting its subtree, so a shape painting
+  /// inside that call has already been seen by the time the matte is baked
+  /// and needs nothing extra — which is what
+  /// `RenderGlassLayer.isPaintingSubtree` reports. It is still reachable,
+  /// and still required, when a repaint boundary sits between the layer and
+  /// this shape: the boundary repaints its own subtree without the layer
+  /// painting at all, so this shape can move with nothing upstream of it
+  /// running. Without the deferral that move would never reach a matte.
   void _syncGeometryIfTransformChanged() {
     final target = _layer;
     if (target == null || !hasSize || !attached) {
       return;
     }
     final transform = getTransformTo(target);
-    final needsExtraRepaint = !_justSyncedFromLayout;
+    final needsExtraRepaint =
+        !_justSyncedFromLayout && !target.isPaintingSubtree;
     _justSyncedFromLayout = false;
     if (_lastSyncedTransform == transform) {
       return;

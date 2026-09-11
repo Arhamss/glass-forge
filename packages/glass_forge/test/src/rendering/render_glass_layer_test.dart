@@ -7,8 +7,10 @@ import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/geometry/runtime_geometry_producer.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/rendering/render_glass_layer.dart';
+import 'package:glass_forge/src/rendering/render_glass_shape.dart';
 import 'package:glass_forge/src/scene/glass_scene.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
+import 'package:glass_forge/src/shapes/glass_shape.dart';
 
 /// A fake accelerated producer that reports itself available immediately,
 /// but flips to unavailable only once [warmUp] has actually run -- mirroring
@@ -127,6 +129,13 @@ void main() {
         tier: GeometryTier.none,
         devicePixelRatio: 1,
       );
+      // A real shape between the layer and the spy, not just the spy: a
+      // layer with nothing registered in it now pushes no backdrop at all,
+      // which would leave this taking the plain `super.paint` branch and
+      // asserting nothing about the pushClipRect/pushLayer path it exists
+      // to guard.
+      final shape = RenderGlassShape(shape: const GlassOval(), group: null)
+        ..child = spy;
 
       // Attached before the child is adopted, so `adoptChild`'s
       // `markNeedsCompositingBitsUpdate()` call registers with a real
@@ -136,9 +145,14 @@ void main() {
       final owner = PipelineOwner();
       layer
         ..attach(owner)
-        ..child = spy;
+        ..child = shape;
       owner.flushCompositingBits();
       layer.layout(const BoxConstraints.tightFor(width: 40, height: 40));
+      expect(
+        layer.scene.shapes, hasLength(1),
+        reason: 'without a registered shape there is no backdrop pass, and '
+            'the offset below would be checked on the wrong code path',
+      );
 
       final rootLayer = ContainerLayer();
       final context = PaintingContext(rootLayer, Rect.largest);
