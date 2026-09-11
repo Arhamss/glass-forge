@@ -59,13 +59,25 @@ class BlendStage extends StatelessWidget {
             ],
           ),
         ),
+        // The stage runs edge to edge under the status bar so the glass
+        // can sit beneath it, which means anything pinned to its top has to
+        // inset itself. Without this the caption printed straight through
+        // the clock.
         const PositionedDirectional(
-          top: 12,
+          top: 0,
           start: 16,
           end: 16,
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: StageCaption(text: 'Drag sideways to spread'),
+          child: SafeArea(
+            bottom: false,
+            left: false,
+            right: false,
+            child: Padding(
+              padding: EdgeInsetsDirectional.only(top: 12),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: StageCaption(text: 'Drag sideways to spread'),
+              ),
+            ),
           ),
         ),
         Align(

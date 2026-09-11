@@ -33,7 +33,7 @@ class SpecimenView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => SpecimenCubit()..init(),
+      create: (_) => SpecimenCubit(),
       child: Scaffold(
         backgroundColor: AppColors.stageGround,
         body: Column(

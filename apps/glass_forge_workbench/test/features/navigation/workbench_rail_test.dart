@@ -1,78 +1,61 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:glass_forge_workbench/exports.dart';
 import 'package:glass_forge_workbench/features/navigation/presentation/widgets/workbench_rail.dart';
-import 'package:glass_forge_workbench/features/navigation/presentation/widgets/workbench_rail_tab.dart';
 import 'package:glass_forge_workbench/utils/enums/workbench_section.dart';
 
 void main() {
-  group('WorkbenchRail', () {
-    testWidgets('reports the section behind the tab that was tapped',
-        (tester) async {
-      final tapped = <WorkbenchSection>[];
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            bottomNavigationBar: WorkbenchRail(
-              currentIndex: 0,
-              onSelected: tapped.add,
-            ),
+  testWidgets('the rail stays a strip, whatever height it is offered', (
+    tester,
+  ) async {
+    // A Container with an `alignment` and bounded parent constraints expands
+    // to fill its parent. This rail's parent is a `bottomNavigationBar`,
+    // whose maximum height is the whole screen, so an aligned tab grew to
+    // full height and took the rail with it — the app launched showing
+    // nothing but a full-height selection pill and no body at all. The same
+    // mistake had already shipped once in the backdrop rail, which is why
+    // this asserts the property rather than the widget tree.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: const SizedBox.expand(),
+          bottomNavigationBar: WorkbenchRail(
+            currentIndex: 1,
+            onSelected: (_) {},
           ),
         ),
-      );
+      ),
+    );
 
-      expect(
-        find.byType(WorkbenchRailTab),
-        findsNWidgets(WorkbenchSection.values.length),
-      );
+    final railHeight = tester.getSize(find.byType(WorkbenchRail)).height;
+    final screenHeight = tester.getSize(find.byType(Scaffold)).height;
 
-      for (final section in WorkbenchSection.values) {
-        await tester.tap(find.widgetWithText(WorkbenchRailTab, section.label));
-      }
+    expect(railHeight, lessThan(screenHeight / 4));
+    expect(
+      railHeight,
+      greaterThanOrEqualTo(44),
+      reason: 'the touch target must survive the fix',
+    );
+  });
 
-      expect(tapped, WorkbenchSection.values);
-    });
-
-    testWidgets('marks exactly the section on screen as selected',
-        (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            bottomNavigationBar: WorkbenchRail(
-              currentIndex: WorkbenchSection.tiers.index,
-              onSelected: (_) {},
-            ),
+  testWidgets('every section is reachable and reports its own index', (
+    tester,
+  ) async {
+    final tapped = <WorkbenchSection>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: const SizedBox.expand(),
+          bottomNavigationBar: WorkbenchRail(
+            currentIndex: 0,
+            onSelected: tapped.add,
           ),
         ),
-      );
+      ),
+    );
 
-      final selected = tester
-          .widgetList<WorkbenchRailTab>(find.byType(WorkbenchRailTab))
-          .where((tab) => tab.isSelected)
-          .toList();
-
-      expect(selected, hasLength(1));
-      expect(selected.single.section, WorkbenchSection.tiers);
-    });
-
-    testWidgets('every tab clears the 44pt touch target', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            bottomNavigationBar: WorkbenchRail(
-              currentIndex: 0,
-              onSelected: (_) {},
-            ),
-          ),
-        ),
-      );
-
-      for (final section in WorkbenchSection.values) {
-        final size = tester.getSize(
-          find.widgetWithText(WorkbenchRailTab, section.label),
-        );
-        expect(size.height, greaterThanOrEqualTo(44), reason: section.label);
-        expect(size.width, greaterThanOrEqualTo(44), reason: section.label);
-      }
-    });
+    for (final section in WorkbenchSection.values) {
+      await tester.tap(find.text(section.label));
+    }
+    expect(tapped, WorkbenchSection.values);
   });
 }

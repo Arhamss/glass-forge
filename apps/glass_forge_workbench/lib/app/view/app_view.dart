@@ -5,6 +5,7 @@ import 'package:device_preview/device_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:glass_forge_workbench/constants/app_colors.dart';
 import 'package:glass_forge_workbench/core/locale/cubit/locale_cubit.dart';
 import 'package:glass_forge_workbench/go_router/exports.dart';
@@ -31,6 +32,17 @@ class _AppViewState extends State<AppView> {
   void initState() {
     super.initState();
     _checkSafeArea();
+    // Lift the native splash once the app has a frame to show, here rather
+    // than from a feature's cubit. It used to be `SpecimenCubit.init`, on
+    // the reasoning that Specimen is the initial destination — but every
+    // section is a real route, so a cold start into any other one (a deep
+    // link, state restoration, or simply changing the initial location)
+    // left the splash preserved forever and the app showed a blank white
+    // screen. Whose job it is to remove it should not depend on where the
+    // user happened to land.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => FlutterNativeSplash.remove(),
+    );
   }
 
   Future<void> _checkSafeArea() async {

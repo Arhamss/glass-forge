@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_workbench/features/showcase/presentation/cubit/specimen_state.dart';
 import 'package:glass_forge_workbench/utils/enums/glass_backdrop.dart';
@@ -17,9 +16,6 @@ class SpecimenCubit extends Cubit<SpecimenState> {
   SpecimenCubit()
     : super(SpecimenState(material: demonstrationGlassMaterial()));
 
-  /// Removes the native splash overlay. This screen is the app's landing
-  /// destination, so nothing else calls [FlutterNativeSplash.remove].
-  void init() => FlutterNativeSplash.remove();
 
   /// Picks the specimen's silhouette.
   void setShape(ShowcaseShape shape) => emit(state.copyWith(shape: shape));
