@@ -42,4 +42,33 @@ abstract class AppColors {
   static const overlayText = Color(0xFFFFFFFF);
   static const overlayTextMuted = Color(0xB3FFFFFF);
   static const overlayScrim = Color(0xFF000000);
+
+  // ── Stage (showcase dark ground) ──
+  // Everything above this line is the app's light theme, used by the rest
+  // of the shell. Glass has nothing to refract against a flat light
+  // surface, so the showcase screens (docs/design/workbench-design.md) run
+  // on a dedicated dark ground instead. These tokens are additive and
+  // scoped to `features/showcase` — no existing screen should reference
+  // them.
+  //
+  // Contrast measured with the WCAG 2.1 relative-luminance formula, not
+  // eyeballed:
+  //   stageForegroundMuted (#AEB4C2) on stageGround (#0A0E17)  = 9.29:1
+  //   stageForegroundMuted (#AEB4C2) on stageRaised (#131A28)  = 8.38:1
+  // Body text on the stage uses stageForegroundMuted, so it clears the
+  // 4.5:1 AA floor with more than double the required margin on both
+  // surfaces.
+  static const stageGround = Color(0xFF0A0E17);
+  static const stageRaised = Color(0xFF131A28);
+
+  // The one functional accent. Reserved for active/running state only —
+  // never used decoratively (e.g. as a slider's active track colour).
+  static const stageAccent = Color(0xFF22C55E);
+
+  static const stageForeground = Color(0xFFF4F6F8);
+  static const stageForegroundMuted = Color(0xFFAEB4C2);
+  static const stageForegroundSubtle = Color(0xFF7B8496);
+
+  static const stageBorder = Color(0xFF232B3D);
+  static const stageDivider = Color(0xFF1C2333);
 }
