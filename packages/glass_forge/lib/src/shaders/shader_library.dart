@@ -27,6 +27,19 @@ enum GlassShaderId {
   finalRenderBilinearProbe(
     'packages/glass_forge/shaders/final_render_bilinear_probe.frag',
     core: false,
+  ),
+
+  /// Reports whether the Impeller GLES backend compiled it.
+  ///
+  /// Read once by the tier engine's capability probe, which renders it 1x1
+  /// offscreen and reads the pixel back — see `backend_probe.frag` for why
+  /// a pixel is the only channel that answer travels down. [core] is false:
+  /// the probe loads it on demand and nothing else ever binds it, so an app
+  /// that never builds a tier scope does not compile a fifth shader at
+  /// startup for a question it did not ask.
+  backendProbe(
+    'packages/glass_forge/shaders/backend_probe.frag',
+    core: false,
   );
 
   const GlassShaderId(this.assetKey, {required this.core});

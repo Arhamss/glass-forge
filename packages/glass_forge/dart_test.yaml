@@ -2,8 +2,10 @@
 # Impeller backend is active, and `flutter_tester`'s default software
 # backend does not enable it. Tests tagged `impeller` (currently
 # glass_composition_test.dart and glass_widgets_test.dart, each via
-# `@Tags(['impeller'])`, plus one individual test in
-# render_glass_layer_test.dart via `test(..., tags: ['impeller'])`) are
+# `@Tags(['impeller'])`, plus individual tests in
+# render_glass_layer_test.dart and tier/render_capabilities_test.dart via
+# `test(..., tags: ['impeller'])` -- the latter because the GLES backend
+# probe needs a real Impeller backend to report anything but Skia) are
 # marked skipped here so a bare `flutter test` — the invocation every other
 # suite in this package, and CI's default step, uses — passes on the default
 # backend and reports them as skipped instead of failing on an
