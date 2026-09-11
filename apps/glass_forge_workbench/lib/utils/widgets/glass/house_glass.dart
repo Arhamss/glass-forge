@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/glass_forge.dart';
 
@@ -13,6 +15,19 @@ class HouseGlass extends InheritedWidget {
   static GlassMaterial of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<HouseGlass>()?.material ??
       GlassMaterial.dome();
+
+  /// The house material with a legibility floor, for glass that carries
+  /// words to read: sheets, menus, toasts.
+  ///
+  /// A clear dome over a busy feed magnifies the feed straight through a
+  /// sheet's own text. Frost is what separates the two, so an overlay keeps
+  /// at least [overlayFrost] of it whatever the house material says.
+  static GlassMaterial overlayOf(BuildContext context) {
+    final house = of(context);
+    return house.copyWith(frost: math.max(house.frost, overlayFrost));
+  }
+
+  static const double overlayFrost = 18;
 
   @override
   bool updateShouldNotify(HouseGlass oldWidget) =>

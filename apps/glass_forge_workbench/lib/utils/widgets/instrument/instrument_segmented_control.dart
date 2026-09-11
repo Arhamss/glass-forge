@@ -1,12 +1,9 @@
 import 'package:glass_forge_workbench/exports.dart';
+import 'package:glass_forge_workbench/utils/widgets/primitives/pressable_scale.dart';
 
-/// A labelled pill-segmented control for the instrument panel.
-///
-/// Colour-only selection fails the same way `BackdropRail` documents, so
-/// the selected option always carries a text label and a background fill,
-/// never colour alone.
+/// A solid segmented control for the tinker sheets. The selected option
+/// carries a fill and a brighter label, never colour alone.
 class InstrumentSegmentedControl<T> extends StatelessWidget {
-  /// Creates the control.
   const InstrumentSegmentedControl({
     required this.values,
     required this.labels,
@@ -15,59 +12,71 @@ class InstrumentSegmentedControl<T> extends StatelessWidget {
     super.key,
   });
 
-  /// The selectable values, in display order.
   final List<T> values;
 
-  /// The label shown for each entry in [values], by index.
+  /// The label for each entry in [values], by index.
   final List<String> labels;
-
-  /// The currently selected value.
   final T selected;
-
-  /// Called with the newly picked value.
   final ValueChanged<T> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.stageGround,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.stageBorder),
+        color: AppColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(AppRadius.r12),
+        border: Border.all(color: AppColors.hairline),
       ),
-      child: Row(
-        children: [
-          for (var i = 0; i < values.length; i++)
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onChanged(values[i]),
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 44),
-                  alignment: Alignment.center,
-                  padding: const EdgeInsetsDirectional.symmetric(
-                    horizontal: 8,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: values[i] == selected
-                        ? AppColors.stageForeground.withValues(alpha: 0.12)
-                        : AppColors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    labels[i],
-                    textAlign: TextAlign.center,
-                    style: context.captionMedium.copyWith(
+      child: Padding(
+        padding: const EdgeInsetsDirectional.all(3),
+        child: Row(
+          children: [
+            for (var i = 0; i < values.length; i++)
+              Expanded(
+                child: PressableScale(
+                  onTap: values[i] == selected
+                      ? () {}
+                      : () => onChanged(values[i]),
+                  haptic: values[i] != selected,
+                  pressedScale: 0.96,
+                  isSelected: values[i] == selected,
+                  semanticLabel: labels[i],
+                  child: AnimatedContainer(
+                    duration: AppMotion.select,
+                    curve: AppMotion.selectCurve,
+                    constraints: const BoxConstraints(minHeight: 38),
+                    alignment: Alignment.center,
+                    padding: const EdgeInsetsDirectional.symmetric(
+                      horizontal: AppSpacing.s8,
+                      vertical: AppSpacing.s8,
+                    ),
+                    decoration: BoxDecoration(
                       color: values[i] == selected
-                          ? AppColors.stageForeground
-                          : AppColors.stageForegroundMuted,
+                          ? AppColors.selectedFill
+                          : AppColors.transparent,
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(
+                        color: values[i] == selected
+                            ? AppColors.hairlineStrong
+                            : AppColors.transparent,
+                      ),
+                    ),
+                    child: Text(
+                      labels[i],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: context.callout.copyWith(
+                        color: values[i] == selected
+                            ? AppColors.textPrimary
+                            : AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -21,6 +21,25 @@ abstract class AppColors {
   static const onAccent = Color(0xFF0B0C0F);
   static const accentSoft = Color(0x29D4F25A);
 
+  // A lit glass edge: brightest where the light lands, top-start, fading out
+  // toward the far corner. Shared by the static glass stand-in and the tab
+  // selector, which are both paint pretending to be glass.
+  static const glassRimLight = Color(0x47FFFFFF);
+  static const glassRimFade = Color(0x0FFFFFFF);
+  static const glassSheen = Color(0x1AFFFFFF);
+
+  /// Painted inside chrome glass, under its icons and labels, so they stay
+  /// legible over a bright photo without changing the material itself.
+  static const glassChromeScrim = Color(0x4D0B0C0F);
+  static const glassShadow = Color(0x47000000);
+
+  /// A message has to be read at a glance, over whatever it lands on, so a
+  /// toast's glass carries a heavier ground than chrome does.
+  static const glassMessageScrim = Color(0x8C0B0C0F);
+
+  /// The fill behind a selected option on solid chrome.
+  static const selectedFill = Color(0x1AFFFFFF);
+
   static const danger = Color(0xFFFF6B5E);
   static const scrim = Color(0xE60B0C0F);
 

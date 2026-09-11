@@ -1,5 +1,6 @@
 import 'package:glass_forge_workbench/exports.dart';
 import 'package:glass_forge_workbench/utils/helpers/haptic_helper.dart';
+import 'package:glass_forge_workbench/utils/helpers/reduce_motion.dart';
 
 /// Press feedback for anything tappable: a slight scale while the finger is
 /// down, and a light haptic when the tap lands.
@@ -51,14 +52,19 @@ class _PressableScaleState extends State<PressableScale> {
 
   @override
   Widget build(BuildContext context) {
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final reduceMotion = context.reduceMotion;
     return Semantics(
       button: true,
       enabled: _enabled ? null : false,
       selected: widget.isSelected,
       label: widget.semanticLabel,
       excludeSemantics: widget.semanticLabel != null,
+      // The tap action lives on this node, not on the gesture detector below:
+      // excluding the child's semantics would otherwise take the action with
+      // it, and a screen reader could find the control but not press it.
+      onTap: _enabled ? _handleTap : null,
       child: GestureDetector(
+        excludeFromSemantics: true,
         behavior: widget.behavior,
         onTapDown: _enabled ? (_) => _pressed.value = true : null,
         onTapUp: _enabled ? (_) => _pressed.value = false : null,

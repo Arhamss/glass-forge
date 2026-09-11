@@ -41,6 +41,10 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_driver:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
   very_good_analysis: ^10.2.0
 
 flutter:
@@ -49,6 +53,7 @@ flutter:
 
   assets:
     - assets/vectors/icons/
+    - assets/images/photos/
     - assets/licenses/
 
   fonts:

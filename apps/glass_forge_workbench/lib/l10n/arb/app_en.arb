@@ -35,5 +35,805 @@
   "presetDemonstration": "Demo",
   "@presetDemonstration": {
     "description": "Material preset name"
+  },
+  "tabShowcase": "Showcase",
+  "@tabShowcase": {
+    "description": "Tab bar label"
+  },
+  "tabComponents": "Components",
+  "@tabComponents": {
+    "description": "Tab bar label"
+  },
+  "tabMaterial": "Material",
+  "@tabMaterial": {
+    "description": "Tab bar label"
+  },
+  "tabLab": "Lab",
+  "@tabLab": {
+    "description": "Tab bar label"
+  },
+  "labTitle": "Lab",
+  "@labTitle": {
+    "description": "Lab screen title"
+  },
+  "labSubtitle": "The instruments behind the kit",
+  "@labSubtitle": {
+    "description": "Lab screen subtitle"
+  },
+  "labToolTiers": "Tiers",
+  "@labToolTiers": {
+    "description": "Lab tool title"
+  },
+  "labToolTiersSummary": "Which tier this device renders, and the signals behind it",
+  "@labToolTiersSummary": {
+    "description": "Lab tool summary"
+  },
+  "labToolBlend": "Blend",
+  "@labToolBlend": {
+    "description": "Lab tool title"
+  },
+  "labToolBlendSummary": "Shapes that pool into one another as they meet",
+  "@labToolBlendSummary": {
+    "description": "Lab tool summary"
+  },
+  "labToolMotion": "Motion",
+  "@labToolMotion": {
+    "description": "Lab tool title"
+  },
+  "labToolMotionSummary": "Springs, drag and squash, with every constant live",
+  "@labToolMotionSummary": {
+    "description": "Lab tool summary"
+  },
+  "labToolSurfaces": "Surfaces",
+  "@labToolSurfaces": {
+    "description": "Lab tool title"
+  },
+  "labToolSurfacesSummary": "The five semantic roles, in a light app and a dark one",
+  "@labToolSurfacesSummary": {
+    "description": "Lab tool summary"
+  },
+  "labToolProbe": "Sampling probe",
+  "@labToolProbe": {
+    "description": "Lab tool title"
+  },
+  "labToolProbeSummary": "Bilinear against shipped sampling, frame by frame",
+  "@labToolProbeSummary": {
+    "description": "Lab tool summary"
+  },
+  "showcaseTitle": "Discover",
+  "@showcaseTitle": {
+    "description": "Showcase screen title"
+  },
+  "showcaseSearchHint": "Search places",
+  "@showcaseSearchHint": {
+    "description": "Search field hint"
+  },
+  "clearSearch": "Clear search",
+  "@clearSearch": {
+    "description": "Clear button label"
+  },
+  "categoryForYou": "For you",
+  "@categoryForYou": {
+    "description": "Feed filter"
+  },
+  "categoryNearby": "Nearby",
+  "@categoryNearby": {
+    "description": "Feed filter"
+  },
+  "categorySaved": "Saved",
+  "@categorySaved": {
+    "description": "Feed filter"
+  },
+  "yourTrips": "Your trips",
+  "@yourTrips": {
+    "description": "Profile button label and sheet title"
+  },
+  "notifications": "Notifications",
+  "@notifications": {
+    "description": "Bell button label and sheet title"
+  },
+  "placeSubtitle": "{region} · {distance} km",
+  "@placeSubtitle": {
+    "description": "Card subtitle: region and distance",
+    "placeholders": {
+      "region": {
+        "type": "String"
+      },
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "placeDistance": "{distance} km",
+  "@placeDistance": {
+    "description": "Distance readout",
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "savePlace": "Save to list",
+  "@savePlace": {
+    "description": "Button that saves a place"
+  },
+  "unsavePlace": "Remove from list",
+  "@unsavePlace": {
+    "description": "Button that removes a saved place"
+  },
+  "bookmarkPlace": "Save {place}",
+  "@bookmarkPlace": {
+    "description": "Accessibility label of the bookmark button",
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "unbookmarkPlace": "Remove {place} from saved",
+  "@unbookmarkPlace": {
+    "description": "Accessibility label of the filled bookmark button",
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "placeSavedToast": "Saved to your list",
+  "@placeSavedToast": {
+    "description": "Toast after saving"
+  },
+  "placeRemovedToast": "Removed from your list",
+  "@placeRemovedToast": {
+    "description": "Toast after removing"
+  },
+  "copyName": "Copy name",
+  "@copyName": {
+    "description": "Context menu action"
+  },
+  "nameCopiedToast": "Name copied",
+  "@nameCopiedToast": {
+    "description": "Toast after copying"
+  },
+  "emptySavedTitle": "Nothing saved yet",
+  "@emptySavedTitle": {
+    "description": "Empty state title"
+  },
+  "emptySavedBody": "Tap the bookmark on any place and it will wait for you here.",
+  "@emptySavedBody": {
+    "description": "Empty state body"
+  },
+  "emptySearchTitle": "No places match",
+  "@emptySearchTitle": {
+    "description": "Empty state title"
+  },
+  "emptySearchBody": "Try another name, or a region.",
+  "@emptySearchBody": {
+    "description": "Empty state body"
+  },
+  "showAllPlaces": "Show all places",
+  "@showAllPlaces": {
+    "description": "Empty state action"
+  },
+  "play": "Play",
+  "@play": {
+    "description": "Media button"
+  },
+  "pause": "Pause",
+  "@pause": {
+    "description": "Media button"
+  },
+  "statSaved": "Saved",
+  "@statSaved": {
+    "description": "Stat card label"
+  },
+  "statSavedUnit": "places",
+  "@statSavedUnit": {
+    "description": "Stat card unit"
+  },
+  "statNearest": "Nearest",
+  "@statNearest": {
+    "description": "Stat card label"
+  },
+  "statNearestUnit": "km",
+  "@statNearestUnit": {
+    "description": "Stat card unit"
+  },
+  "tripsEmpty": "Places you save show up here, nearest first.",
+  "@tripsEmpty": {
+    "description": "Trips sheet empty text"
+  },
+  "notificationsAllRead": "You're all caught up.",
+  "@notificationsAllRead": {
+    "description": "Notifications sheet footer"
+  },
+  "componentsTitle": "Components",
+  "@componentsTitle": {
+    "description": "Catalog title"
+  },
+  "componentsSubtitle": "{count} glass parts, all live",
+  "@componentsSubtitle": {
+    "description": "Catalog subtitle",
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "componentsSearchHint": "Search components",
+  "@componentsSearchHint": {
+    "description": "Catalog search hint"
+  },
+  "componentsEmptyTitle": "No parts match",
+  "@componentsEmptyTitle": {
+    "description": "Catalog empty title"
+  },
+  "componentsEmptyBody": "Try a family, like cards or overlays.",
+  "@componentsEmptyBody": {
+    "description": "Catalog empty body"
+  },
+  "familyNavigation": "Navigation",
+  "@familyNavigation": {
+    "description": "Component family"
+  },
+  "familyControls": "Buttons & controls",
+  "@familyControls": {
+    "description": "Component family"
+  },
+  "familyContent": "Cards & content",
+  "@familyContent": {
+    "description": "Component family"
+  },
+  "familyOverlays": "Overlays",
+  "@familyOverlays": {
+    "description": "Component family"
+  },
+  "componentTabBar": "Tab bar",
+  "@componentTabBar": {
+    "description": "Component name"
+  },
+  "componentTabBarSummary": "Floating capsule with a liquid selector",
+  "@componentTabBarSummary": {
+    "description": "Component summary"
+  },
+  "componentTopBar": "Top bar",
+  "@componentTopBar": {
+    "description": "Component name"
+  },
+  "componentTopBarSummary": "A title between glass circle buttons",
+  "@componentTopBarSummary": {
+    "description": "Component summary"
+  },
+  "componentCircleButton": "Circle button",
+  "@componentCircleButton": {
+    "description": "Component name"
+  },
+  "componentCircleButtonSummary": "One icon on a glass disc",
+  "@componentCircleButtonSummary": {
+    "description": "Component summary"
+  },
+  "componentSegmented": "Segmented control",
+  "@componentSegmented": {
+    "description": "Component name"
+  },
+  "componentSegmentedSummary": "A sliding selector you can scrub",
+  "@componentSegmentedSummary": {
+    "description": "Component summary"
+  },
+  "componentButton": "Button",
+  "@componentButton": {
+    "description": "Component name"
+  },
+  "componentButtonSummary": "Primary and secondary capsules",
+  "@componentButtonSummary": {
+    "description": "Component summary"
+  },
+  "componentSwitch": "Switch",
+  "@componentSwitch": {
+    "description": "Component name"
+  },
+  "componentSwitchSummary": "A glass knob on a lit track",
+  "@componentSwitchSummary": {
+    "description": "Component summary"
+  },
+  "componentSlider": "Slider",
+  "@componentSlider": {
+    "description": "Component name"
+  },
+  "componentSliderSummary": "A lens that magnifies its track",
+  "@componentSliderSummary": {
+    "description": "Component summary"
+  },
+  "componentStepper": "Stepper",
+  "@componentStepper": {
+    "description": "Component name"
+  },
+  "componentStepperSummary": "Minus, a value, plus",
+  "@componentStepperSummary": {
+    "description": "Component summary"
+  },
+  "componentMediaCard": "Media card",
+  "@componentMediaCard": {
+    "description": "Component name"
+  },
+  "componentMediaCardSummary": "A photo with a glass caption",
+  "@componentMediaCardSummary": {
+    "description": "Component summary"
+  },
+  "componentStatCard": "Stat card",
+  "@componentStatCard": {
+    "description": "Component name"
+  },
+  "componentStatCardSummary": "The number first, then the words",
+  "@componentStatCardSummary": {
+    "description": "Component summary"
+  },
+  "componentToast": "Toast",
+  "@componentToast": {
+    "description": "Component name"
+  },
+  "componentToastSummary": "A capsule that drops in and leaves",
+  "@componentToastSummary": {
+    "description": "Component summary"
+  },
+  "componentSheet": "Bottom sheet",
+  "@componentSheet": {
+    "description": "Component name"
+  },
+  "componentSheetSummary": "A floating glass sheet with detents",
+  "@componentSheetSummary": {
+    "description": "Component summary"
+  },
+  "componentContextMenu": "Context menu",
+  "@componentContextMenu": {
+    "description": "Component name"
+  },
+  "componentContextMenuSummary": "Long-press actions on glass",
+  "@componentContextMenuSummary": {
+    "description": "Component summary"
+  },
+  "componentMiniPlayer": "Mini player",
+  "@componentMiniPlayer": {
+    "description": "Component name"
+  },
+  "componentMiniPlayerSummary": "What is playing, in one capsule",
+  "@componentMiniPlayerSummary": {
+    "description": "Component summary"
+  },
+  "componentSearchBar": "Search bar",
+  "@componentSearchBar": {
+    "description": "Component name"
+  },
+  "componentSearchBarSummary": "A glass field with a clear button",
+  "@componentSearchBarSummary": {
+    "description": "Component summary"
+  },
+  "backdropPhoto": "Photo",
+  "@backdropPhoto": {
+    "description": "Playground backdrop"
+  },
+  "backdropCity": "City",
+  "@backdropCity": {
+    "description": "Playground backdrop"
+  },
+  "backdropMesh": "Mesh",
+  "@backdropMesh": {
+    "description": "Playground backdrop"
+  },
+  "backdropChecker": "Checker",
+  "@backdropChecker": {
+    "description": "Playground backdrop"
+  },
+  "backdropBlack": "Black",
+  "@backdropBlack": {
+    "description": "Playground backdrop"
+  },
+  "paneVariants": "Variants",
+  "@paneVariants": {
+    "description": "Playground pane"
+  },
+  "paneMaterial": "Material",
+  "@paneMaterial": {
+    "description": "Playground pane"
+  },
+  "paneCode": "Code",
+  "@paneCode": {
+    "description": "Playground pane"
+  },
+  "knobTabs": "Tabs",
+  "@knobTabs": {
+    "description": "Knob"
+  },
+  "knobLabels": "Labels",
+  "@knobLabels": {
+    "description": "Knob"
+  },
+  "knobBadge": "Badge",
+  "@knobBadge": {
+    "description": "Knob"
+  },
+  "knobSquash": "Squash",
+  "@knobSquash": {
+    "description": "Knob"
+  },
+  "knobSpring": "Selector spring",
+  "@knobSpring": {
+    "description": "Knob"
+  },
+  "knobLeading": "Leading",
+  "@knobLeading": {
+    "description": "Knob"
+  },
+  "knobTrailing": "Trailing",
+  "@knobTrailing": {
+    "description": "Knob"
+  },
+  "knobIcon": "Icon",
+  "@knobIcon": {
+    "description": "Knob"
+  },
+  "knobOptions": "Options",
+  "@knobOptions": {
+    "description": "Knob"
+  },
+  "knobStyle": "Style",
+  "@knobStyle": {
+    "description": "Knob"
+  },
+  "knobLoading": "Loading",
+  "@knobLoading": {
+    "description": "Knob"
+  },
+  "knobDisabled": "Disabled",
+  "@knobDisabled": {
+    "description": "Knob"
+  },
+  "knobFullWidth": "Full width",
+  "@knobFullWidth": {
+    "description": "Knob"
+  },
+  "knobPhoto": "Photo",
+  "@knobPhoto": {
+    "description": "Knob"
+  },
+  "knobChip": "Corner chip",
+  "@knobChip": {
+    "description": "Knob"
+  },
+  "knobAction": "Action button",
+  "@knobAction": {
+    "description": "Knob"
+  },
+  "knobAspect": "Aspect",
+  "@knobAspect": {
+    "description": "Knob"
+  },
+  "knobDelta": "Change",
+  "@knobDelta": {
+    "description": "Knob"
+  },
+  "knobDestructive": "Destructive action",
+  "@knobDestructive": {
+    "description": "Knob"
+  },
+  "knobMax": "Maximum",
+  "@knobMax": {
+    "description": "Knob"
+  },
+  "optionNone": "None",
+  "@optionNone": {
+    "description": "Knob option"
+  },
+  "optionBack": "Back",
+  "@optionBack": {
+    "description": "Knob option"
+  },
+  "optionProfile": "Profile",
+  "@optionProfile": {
+    "description": "Knob option"
+  },
+  "optionShare": "Share",
+  "@optionShare": {
+    "description": "Knob option"
+  },
+  "optionMore": "More",
+  "@optionMore": {
+    "description": "Knob option"
+  },
+  "optionHeart": "Heart",
+  "@optionHeart": {
+    "description": "Knob option"
+  },
+  "optionBell": "Bell",
+  "@optionBell": {
+    "description": "Knob option"
+  },
+  "optionPlus": "Plus",
+  "@optionPlus": {
+    "description": "Knob option"
+  },
+  "optionPrimary": "Primary",
+  "@optionPrimary": {
+    "description": "Knob option"
+  },
+  "optionSecondary": "Secondary",
+  "@optionSecondary": {
+    "description": "Knob option"
+  },
+  "optionLake": "Lake",
+  "@optionLake": {
+    "description": "Knob option"
+  },
+  "optionCity": "City",
+  "@optionCity": {
+    "description": "Knob option"
+  },
+  "optionCliffs": "Cliffs",
+  "@optionCliffs": {
+    "description": "Knob option"
+  },
+  "optionUp": "Up",
+  "@optionUp": {
+    "description": "Knob option"
+  },
+  "optionDown": "Down",
+  "@optionDown": {
+    "description": "Knob option"
+  },
+  "demoHome": "Home",
+  "@demoHome": {
+    "description": "Demo tab"
+  },
+  "demoExplore": "Explore",
+  "@demoExplore": {
+    "description": "Demo tab"
+  },
+  "demoSaved": "Saved",
+  "@demoSaved": {
+    "description": "Demo tab"
+  },
+  "demoProfile": "Profile",
+  "@demoProfile": {
+    "description": "Demo tab"
+  },
+  "demoInbox": "Inbox",
+  "@demoInbox": {
+    "description": "Demo tab"
+  },
+  "demoDay": "Day",
+  "@demoDay": {
+    "description": "Demo segment"
+  },
+  "demoWeek": "Week",
+  "@demoWeek": {
+    "description": "Demo segment"
+  },
+  "demoMonth": "Month",
+  "@demoMonth": {
+    "description": "Demo segment"
+  },
+  "demoYear": "Year",
+  "@demoYear": {
+    "description": "Demo segment"
+  },
+  "demoTitle": "Trips",
+  "@demoTitle": {
+    "description": "Demo top bar title"
+  },
+  "demoContinue": "Continue",
+  "@demoContinue": {
+    "description": "Demo button"
+  },
+  "demoGuests": "Guests",
+  "@demoGuests": {
+    "description": "Demo stepper label"
+  },
+  "demoBrightness": "Brightness",
+  "@demoBrightness": {
+    "description": "Demo slider label"
+  },
+  "demoWifi": "Wi-Fi",
+  "@demoWifi": {
+    "description": "Demo switch"
+  },
+  "demoAirplane": "Airplane mode",
+  "@demoAirplane": {
+    "description": "Demo switch"
+  },
+  "demoSteps": "Steps",
+  "@demoSteps": {
+    "description": "Demo stat"
+  },
+  "demoStepsUnit": "today",
+  "@demoStepsUnit": {
+    "description": "Demo stat unit"
+  },
+  "demoShowToast": "Show a toast",
+  "@demoShowToast": {
+    "description": "Demo trigger"
+  },
+  "demoToastMessage": "Saved to your list",
+  "@demoToastMessage": {
+    "description": "Demo toast"
+  },
+  "demoOpenSheet": "Open the sheet",
+  "@demoOpenSheet": {
+    "description": "Demo trigger"
+  },
+  "demoSheetTitle": "A sheet of glass",
+  "@demoSheetTitle": {
+    "description": "Demo sheet"
+  },
+  "demoSheetBody": "It floats above the screen and bends whatever is behind it. Drag it down to close.",
+  "@demoSheetBody": {
+    "description": "Demo sheet"
+  },
+  "demoLongPress": "Long-press the card",
+  "@demoLongPress": {
+    "description": "Demo hint"
+  },
+  "demoDelete": "Delete",
+  "@demoDelete": {
+    "description": "Demo destructive action"
+  },
+  "demoTapHint": "Tap it",
+  "@demoTapHint": {
+    "description": "Demo hint"
+  },
+  "decrease": "Decrease",
+  "@decrease": {
+    "description": "Stepper minus label"
+  },
+  "increase": "Increase",
+  "@increase": {
+    "description": "Stepper plus label"
+  },
+  "useHouseMaterial": "Use the house material",
+  "@useHouseMaterial": {
+    "description": "Playground material pane switch"
+  },
+  "useHouseMaterialNote": "Off gives this playground its own material, starting from the house one.",
+  "@useHouseMaterialNote": {
+    "description": "Playground material pane note"
+  },
+  "copyCode": "Copy code",
+  "@copyCode": {
+    "description": "Code pane button"
+  },
+  "codeCopiedToast": "Code copied",
+  "@codeCopiedToast": {
+    "description": "Toast after copying code"
+  },
+  "noKnobs": "Nothing to tune here. Try the Material pane, or a different backdrop.",
+  "@noKnobs": {
+    "description": "Variants pane empty text"
+  },
+  "presets": "Presets",
+  "@presets": {
+    "description": "Label above material presets"
+  },
+  "backdrop": "Backdrop",
+  "@backdrop": {
+    "description": "Label above backdrop choices"
+  },
+  "groupGeometry": "Geometry",
+  "@groupGeometry": {
+    "description": "Material knob group"
+  },
+  "groupOptics": "Optics",
+  "@groupOptics": {
+    "description": "Material knob group"
+  },
+  "groupLight": "Light",
+  "@groupLight": {
+    "description": "Material knob group"
+  },
+  "groupTint": "Tint",
+  "@groupTint": {
+    "description": "Material knob group"
+  },
+  "groupModel": "Model",
+  "@groupModel": {
+    "description": "Material knob group"
+  },
+  "groupShape": "Shape",
+  "@groupShape": {
+    "description": "Material knob group tab"
+  },
+  "knobThickness": "Thickness",
+  "@knobThickness": {
+    "description": "Material knob"
+  },
+  "knobEdgeRefraction": "Edge refraction",
+  "@knobEdgeRefraction": {
+    "description": "Material knob"
+  },
+  "knobRefractionSpread": "Refraction spread",
+  "@knobRefractionSpread": {
+    "description": "Material knob"
+  },
+  "knobHighlight": "Highlight",
+  "@knobHighlight": {
+    "description": "Material knob"
+  },
+  "knobContour": "Contour",
+  "@knobContour": {
+    "description": "Material knob"
+  },
+  "knobFrost": "Frost",
+  "@knobFrost": {
+    "description": "Material knob"
+  },
+  "knobChromatic": "Chromatic aberration",
+  "@knobChromatic": {
+    "description": "Material knob"
+  },
+  "knobSaturation": "Saturation",
+  "@knobSaturation": {
+    "description": "Material knob"
+  },
+  "knobTintOpacity": "Tint opacity",
+  "@knobTintOpacity": {
+    "description": "Material knob"
+  },
+  "knobProfile": "Profile",
+  "@knobProfile": {
+    "description": "Material knob"
+  },
+  "knobVariant": "Variant",
+  "@knobVariant": {
+    "description": "Material knob"
+  },
+  "profileEdgeBand": "Edge band",
+  "@profileEdgeBand": {
+    "description": "Glass profile"
+  },
+  "profileDome": "Dome",
+  "@profileDome": {
+    "description": "Glass profile"
+  },
+  "variantRegular": "Regular",
+  "@variantRegular": {
+    "description": "Glass variant"
+  },
+  "variantClear": "Clear",
+  "@variantClear": {
+    "description": "Glass variant"
+  },
+  "materialTitle": "Material",
+  "@materialTitle": {
+    "description": "Material studio title"
+  },
+  "materialSubtitle": "One glass, worn by every screen",
+  "@materialSubtitle": {
+    "description": "Material studio subtitle"
+  },
+  "copyAsDart": "Copy as Dart",
+  "@copyAsDart": {
+    "description": "Button"
+  },
+  "copiedAsDartToast": "Material copied as Dart",
+  "@copiedAsDartToast": {
+    "description": "Toast"
+  },
+  "stageInContext": "In context",
+  "@stageInContext": {
+    "description": "Stage mode"
+  },
+  "stageShape": "Shape",
+  "@stageShape": {
+    "description": "Stage mode"
+  },
+  "demoCardTitle": "Glass card",
+  "@demoCardTitle": {
+    "description": "Sample card title"
+  },
+  "demoCardBody": "Tune it here and every screen follows.",
+  "@demoCardBody": {
+    "description": "Sample card body"
+  },
+  "domeSpreadNote": "A dome bends across its whole face, so spread has nothing to do.",
+  "@domeSpreadNote": {
+    "description": "Note under geometry for domes"
   }
 }

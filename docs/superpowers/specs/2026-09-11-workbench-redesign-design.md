@@ -138,6 +138,33 @@ layer's whole clip.
    scrolled, a sheet opened and the tab bar scrubbed on a physical iPhone with
    no white-wash.
 
+### Decisions made while building (2026-09-12)
+
+- **Nesting degrades, it does not assert.** `KitGlassLayer` marks its
+  subtree; a kit layer that finds the mark above it paints a
+  `GlassInsetSurface` (sheen, lit rim, optional tint) instead of opening a
+  pass. So a `GlassButton` in a glass sheet, the bookmark circle on a media
+  card's caption and the play button on the mini-player all stay glass-looking
+  with one pass under them — the rule enforces itself.
+- **Zones track per rendered frame, never force one.** Each kit layer
+  re-arms a post-frame callback and reports its global rect only when it
+  changes; layers under a disabled `TickerMode` (inactive tabs, covered
+  routes) withdraw, so an off-screen tab's chrome can never force a visible
+  screen static.
+- **No opacity or clip layers around glass.** Tab fade-through fades a
+  ground-coloured overlay away rather than fading the tab; list entrances rise
+  by translation only; a media card clips its photo, not its caption.
+  Exception, pending the device gate: Flutter's modal sheet wraps its content
+  in a `ClipRect`.
+- **Controlled inputs.** `GlassSearchBar` takes the query as `value`, so an
+  empty state's "show everything" clears the field as well as the filter.
+- **Legibility scrim.** Chrome glass paints `glassChromeScrim` (30 % ground)
+  inside the shape, under its icons and labels. Measured against the red
+  lantern photo, 18 % was not enough.
+- **Presets morph app-wide.** `GlassKitRoot` tweens `HouseGlass` between
+  materials over 280 ms when a preset is applied, and applies slider edits
+  at once.
+
 ## 5. Playgrounds
 
 One generic playground renders every component. A component contributes one

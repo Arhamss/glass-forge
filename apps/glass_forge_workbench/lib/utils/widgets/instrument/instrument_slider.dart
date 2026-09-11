@@ -68,6 +68,9 @@ class InstrumentSlider extends StatelessWidget {
         SliderTheme(
           data: SliderThemeData(
             trackHeight: 3,
+            // Material pads a slider by 24 pt on each side by default, which
+            // pushed the track in from the label and value it belongs to.
+            padding: EdgeInsets.zero,
             activeTrackColor: AppColors.stageForeground,
             inactiveTrackColor: AppColors.stageDivider,
             thumbColor: AppColors.stageForeground,

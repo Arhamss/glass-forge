@@ -19,12 +19,17 @@ class GlassBackdropSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return switch (backdrop) {
-      GlassBackdrop.checkerboard => const CheckerboardBackdrop(),
-      GlassBackdrop.diagonals => const DiagonalsBackdrop(),
-      GlassBackdrop.photographic => const PhotographicBackdrop(),
-      GlassBackdrop.gradientMesh => const GradientMeshBackdrop(),
-      GlassBackdrop.pureBlack => const VoidBackdrop(),
-    };
+    // Painters draw whole tiles and rotated squares, which run well past
+    // the stage's edge; a CustomPaint does not clip them on its own. This
+    // clips the backdrop only — never the glass drawn over it.
+    return ClipRect(
+      child: switch (backdrop) {
+        GlassBackdrop.checkerboard => const CheckerboardBackdrop(),
+        GlassBackdrop.diagonals => const DiagonalsBackdrop(),
+        GlassBackdrop.photographic => const PhotographicBackdrop(),
+        GlassBackdrop.gradientMesh => const GradientMeshBackdrop(),
+        GlassBackdrop.pureBlack => const VoidBackdrop(),
+      },
+    );
   }
 }
