@@ -12,6 +12,22 @@ and why" explains the specific, reproducible blocker. What follows is a
 source-level analysis plus partial live evidence, not a clean device capture.
 The decision at the bottom is made under that honesty, not around it.
 
+**A limitation of the probe's own design, not a renderer defect**: the
+stress backdrop's 1-physical-pixel checkerboard averages to flat grey at any
+viewing distance beyond exact 1:1 pixel inspection — that is the whole point
+of choosing it, it sits at the display's Nyquist limit. But *displacing* a
+pattern that already reads as flat grey produces the same flat grey, shifted
+by an amount nobody can see. The stress backdrop can demonstrate texel
+*snapping* under zoomed, pixel-level inspection (which this document does
+elsewhere), but it has no macro structure — no edge, no gradient a human eye
+can track — for refraction to visibly "bend." A screenshot of the probe that
+looks like an undisturbed checkerboard is not evidence the glass isn't
+refracting; it is close to what a correctly-refracting probe against *this
+specific backdrop* would look like too, at anything other than pixel zoom.
+This is why the probe's `SamplingProbeBackdropStyle.realistic` mode (a
+smooth gradient) exists — read section "Fix round" in the task report for
+its status.
+
 ## The probe
 
 `apps/glass_forge_workbench/lib/features/sampling_probe/presentation/views/sampling_probe_view.dart`
@@ -93,10 +109,15 @@ continuously-varying displacement range is not in question.
   numbers are real captures from the probe's own `SchedulerBinding` timings
   callback, not invented — but see the caveat immediately below before
   reading anything into the ~2.5 ms gap.
-- **A real SkSL-legality bug, found and fixed.** The first version of
-  `gfSampleBilinear` took `sampler2D tex` as a function parameter (matching
-  the brief's own GLSL snippet). `ShaderLibrary.instance.warmUp()` in the
-  package's own test suite caught it immediately:
+- **A known SkSL constraint, re-hit via the brief's own snippet.**
+  `shaders/common/sdf.glsl` already documents this, from Task 9: "No
+  sampler2D parameters anywhere. SkSL rejects those too." This was not a
+  novel discovery — the first version of `gfSampleBilinear` took
+  `sampler2D tex` as a function parameter (matching the brief's own GLSL
+  snippet, which does the same), inheriting a mistake the codebase had
+  already named rather than finding an unknown platform quirk.
+  `ShaderLibrary.instance.warmUp()` in the package's own test suite caught
+  it immediately:
   `Exception: Asset '.../final_render_bilinear_probe.frag' does not contain
   appropriate runtime stage data for current backend (SkSL). Found stages:
   Vulkan`. spirv-cross compiles the Vulkan/Metal stage fine but silently
@@ -112,6 +133,21 @@ continuously-varying displacement range is not in question.
   compiles as SkSL in CI" gate exists to catch, and it would have shipped
   silently broken (compiling for every native target, failing only the web
   SkSL CI job) had the probe not exercised it.
+- **The bilinear shader is not loaded by every consumer.** An earlier version
+  of this document claimed zero behaviour change on the strength of the
+  debug flag defaulting `false` — true for the flag, but `GlassShaderId
+  .finalRenderBilinearProbe` was still part of `ShaderLibrary.warmUp()`'s
+  eager load, so every app depending on `glass_forge` compiled and loaded a
+  fourth shader at startup regardless of whether the flag was ever touched,
+  and a load failure for that shader on some backend would have broken
+  `ShaderLibrary.isReady` for every consumer (`_loadAll` propagates any
+  core shader's failure). Fixed: `GlassShaderId` now carries a `core` flag;
+  `warmUp()` only loads shaders where it is true, and
+  `finalRenderBilinearProbe` is `core: false`. It loads on demand via
+  `ShaderLibrary.ensureLoaded()` / the new
+  `debugWarmUpBilinearBackdropSampling()`, called from the probe's own
+  `SamplingProbeCubit.setMode()` only when switching *to* bilinear. Nothing
+  outside the probe ever calls it.
 
 ## What could not be measured, and why
 
@@ -135,26 +171,48 @@ either shader. Three independent pieces of evidence:
    checkerboard-tone / stripe-tone split with no shape-shaped anomaly
    anywhere, in either mode.
 
-The most likely explanation, based on reading `RenderGlassShape` (packages
-`glass_forge/lib/src/rendering/render_glass_shape.dart`): its geometry is
-registered into the layer's `GlassScene` from `attach()` and `performLayout()`
-only. `Align` repositions a child at *paint* time without changing its
-incoming `BoxConstraints`, so `performLayout()` — and the `_syncGeometry()`
-call inside it — never runs again after the first frame; the same is true of
-`Positioned` inside a `Stack`, because a parent-data-only change (new
-left/top, same tight width/height) does not, by itself, force Flutter to
-re-run a child's `performLayout()`. The probe was rewritten from `Align` to
-`Positioned` specifically to test this hypothesis
-(`sampling_probe_animated_glass.dart`'s doc comment explains why); the
-symptom was unchanged, consistent with the geometry staying frozen at
-whatever position the shape was first laid out at, regardless of how it is
-later repositioned. **This is not confirmed as the root cause** — the debug
-instrumentation that would have proven it conclusively kept getting reverted
-by the live-reload tooling mid-session, and re-diagnosing it from scratch
-was not a good trade against the time this task had left. It is recorded
-here because it would affect any consumer animating a `Glass` shape's
-*position* (not just this probe), independent of the sampling-quality
-question, and is worth a follow-up task of its own.
+**Update, later in this task: confirmed, and fixed twice.** `RenderGlassShape`
+(`packages/glass_forge/lib/src/rendering/render_glass_shape.dart`) only
+registered its geometry from `attach()`/`performLayout()`. For a `Positioned`
+child inside `Stack`, `RenderStack.performLayout` assigns
+`childParentData.offset` for the current pass *after* calling
+`child.layout(...)` — so the transform read from inside the child's own
+`performLayout` is stale, missing that pass's offset entirely (confirmed via
+instrumentation: the very first registration read `origin = (0, 0)`,
+missing the widget's own position outright). A first fix added a paint-time
+check but special-cased the first post-layout paint to record a baseline
+without re-registering, to avoid breaking a retained-clip-chain test — which
+left the *first*, offset-less registration as the one that stuck for any
+shape that did not move a second time, worse than not checking at all for
+the general case. Corrected to always register the paint-time-authoritative
+transform, and use the "just laid out" flag only to decide whether to
+schedule an extra deferred repaint, not whether to register. See
+`RenderGlassShape._syncGeometryIfTransformChanged` and its doc comment.
+Regression test: `test/src/widgets/glass_widgets_test.dart`, the
+`Positioned`-inside-`Stack` test, now asserts the *absolute* registered
+origin after the very first paint, not just that it changes after a second
+one — verified red against the original bug, and again red against the
+first, incomplete fix, before landing green.
+
+**A second, independent bug surfaced while chasing why the shape still
+wasn't visually correct after that fix**: `ShapeGeometry.resolve`
+(`packages/glass_forge/lib/src/shapes/shape_geometry.dart`) computed
+`origin` from this `RenderBox`'s own top-left corner
+(`MatrixUtils.transformPoint(toLayer, Offset.zero)`), but
+`shaders/common/sdf.glsl` evaluates every shape as `abs(local) -
+GF_EXTENT(i)` — a centred-box SDF that requires `local` to be zero at the
+shape's *centre* — and `GlassScene._boundsOf` independently computes a
+shape's corners as `origin ± halfExtent`, the same centre convention.
+`ShapeGeometry.resolve` disagreed with both, by exactly half the shape's own
+size. Fixed by transforming the shape's centre instead of `Offset.zero`.
+**This fix was not re-verified against a device screenshot before this task
+was told to stop** — `flutter analyze` and the bare + a targeted impeller
+subset (retained-clip-chain, glass widgets, glass composition — 19 tests,
+including pixel-exact positioning assertions) all pass, but the full
+`--tags impeller --run-skipped --enable-impeller` suite was still running
+at handover, and no fresh capture confirms the shape now renders vertically
+centred on device. See `.superpowers/sdd/2026-09-10-renderer-core/
+task-19-report.md`'s "Fix round" section for the full handover.
 
 Also not obtained:
 

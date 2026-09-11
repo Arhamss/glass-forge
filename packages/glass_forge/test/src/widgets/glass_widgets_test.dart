@@ -193,4 +193,85 @@ void main() {
     },
   );
 
+  testWidgets(
+    'a Glass positioned via Positioned inside a fixed-size Stack registers '
+    'geometry matching that position on its very first paint, and follows '
+    'a later move with no intervening relayout '
+    '(regression: RenderGlassShape.performLayout runs before RenderStack '
+    "assigns this pass's Positioned offset, so the transform read from "
+    'inside performLayout is stale on the very first layout -- trusting '
+    'that stale value as a paint-time baseline, instead of registering '
+    'the transform paint actually reads, left a never-moved-again shape '
+    'permanently wrong; a shape that does move again only looked correct '
+    'because the next move happened to overwrite it)',
+    (tester) async {
+      Widget buildTree(double left, double top) {
+        return MaterialApp(
+          home: GlassLayer(
+            child: SizedBox(
+              width: 200,
+              height: 200,
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: left,
+                    top: top,
+                    width: 20,
+                    height: 20,
+                    child: const Glass(
+                      shape: GlassRoundedRectangle(radius: BorderRadius.zero),
+                      child: SizedBox.expand(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+
+      // Non-zero on both axes: a stale, offset-less first-layout transform
+      // and a correct one both read as `Offset.zero`-derived only by
+      // coincidence when left and top start at zero, which would let that
+      // bug pass silently.
+      await tester.pumpWidget(buildTree(20, 30));
+      final layer = tester.renderObject<RenderGlassLayer>(
+        find.byType(GlassLayer),
+      );
+      final dpr = tester.view.devicePixelRatio;
+      final initialOrigin = layer.scene.shapes.single.origin;
+
+      // ShapeGeometry.origin is the shape's centre, not its top-left corner
+      // (the SDF evaluates `abs(local) - halfExtent`, see
+      // shape_geometry.dart) -- the 20x20 Positioned's centre sits 10
+      // logical px past its own left/top.
+      expect(
+        initialOrigin,
+        offsetMoreOrLessEquals(const Offset(30, 40) * dpr, epsilon: 0.5),
+        reason: 'the geometry registered on the very first paint does not '
+            "match this Positioned's own offset -- performLayout's stale "
+            'transform is what stuck',
+      );
+
+      final initialRevision = layer.scene.revision;
+
+      // Same width/height as before, only left changed -- Stack relayouts
+      // (its own parent data changed) and repositions the child at paint
+      // time, but the child's own incoming constraints are identical, so
+      // Flutter skips its performLayout unless something else forces it.
+      await tester.pumpWidget(buildTree(100, 30));
+
+      expect(
+        layer.scene.revision,
+        greaterThan(initialRevision),
+        reason: 'moving the shape did not register as a scene change',
+      );
+      expect(
+        layer.scene.shapes.single.origin,
+        isNot(equals(initialOrigin)),
+        reason: "the registered geometry did not follow the shape's new "
+            'Positioned offset',
+      );
+    },
+  );
 }

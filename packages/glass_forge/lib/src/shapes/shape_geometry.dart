@@ -39,12 +39,23 @@ class ShapeGeometry {
       size.height * devicePixelRatio,
     );
 
-    // Read the basis by transforming the origin and both unit axes, which
-    // captures rotation, scale and skew without assuming the matrix is affine
-    // in any particular arrangement.
-    final o = MatrixUtils.transformPoint(toLayer, Offset.zero);
-    final x = MatrixUtils.transformPoint(toLayer, const Offset(1, 0)) - o;
-    final y = MatrixUtils.transformPoint(toLayer, const Offset(0, 1)) - o;
+    // Read the basis by transforming the shape's centre and both unit axes,
+    // which captures rotation, scale and skew without assuming the matrix
+    // is affine in any particular arrangement. The centre, not
+    // `Offset.zero` (this `RenderBox`'s own top-left corner): the SDF
+    // evaluates every shape as `abs(local) - halfExtent`
+    // (`common/sdf.glsl`), which only describes the right silhouette when
+    // `local == 0` at the shape's middle -- anchoring at the top-left
+    // instead shifts every shape by half its own size toward its origin
+    // corner, which is invisible in any test that only checks a shape moved
+    // by the *delta* it should have, rather than checking its *absolute*
+    // position after a single layout.
+    final center = Offset(size.width / 2, size.height / 2);
+    final o = MatrixUtils.transformPoint(toLayer, center);
+    final x =
+        MatrixUtils.transformPoint(toLayer, center + const Offset(1, 0)) - o;
+    final y =
+        MatrixUtils.transformPoint(toLayer, center + const Offset(0, 1)) - o;
 
     final determinant = x.dx * y.dy - x.dy * y.dx;
     final invertible = determinant.abs() > 1e-9;

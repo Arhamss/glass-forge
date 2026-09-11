@@ -118,7 +118,9 @@ class _SlidingTabState extends State<SlidingTab> {
                     child: Text(
                       widget.labels[index],
                       textAlign: TextAlign.center,
-                      style: context.captionMedium,
+                      style: context.captionMedium.copyWith(
+                        color: AppColors.textOnPrimary,
+                      ),
                     ),
                   ),
                 ),

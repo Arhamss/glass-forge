@@ -2,6 +2,7 @@ import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_workbench/exports.dart';
 import 'package:glass_forge_workbench/features/sampling_probe/presentation/widgets/sampling_probe_animated_glass.dart';
 import 'package:glass_forge_workbench/features/sampling_probe/presentation/widgets/sampling_probe_backdrop.dart';
+import 'package:glass_forge_workbench/utils/enums/sampling_probe_backdrop_style.dart';
 import 'package:glass_forge_workbench/utils/enums/sampling_probe_mode.dart';
 
 /// The probe surface: the high-frequency backdrop, captured by one
@@ -21,12 +22,16 @@ class SamplingProbeCanvas extends StatelessWidget {
   /// Creates the probe surface.
   const SamplingProbeCanvas({
     required this.mode,
+    required this.backdropStyle,
     required this.edgeRefraction,
     super.key,
   });
 
   /// Which backdrop-sampling shader the glass layer renders through.
   final SamplingProbeMode mode;
+
+  /// Which backdrop is painted behind the glass shape.
+  final SamplingProbeBackdropStyle backdropStyle;
 
   /// Peak edge displacement fed to the glass material, in logical pixels.
   final double edgeRefraction;
@@ -36,11 +41,12 @@ class SamplingProbeCanvas extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        const SamplingProbeBackdrop(),
+        SamplingProbeBackdrop(style: backdropStyle),
         GlassLayer(
           key: ValueKey(mode),
-          material: GlassMaterial.regular(brightness: Brightness.light)
-              .copyWith(edgeRefraction: edgeRefraction, frost: 0),
+          material: GlassMaterial.regular(
+            brightness: Brightness.light,
+          ).copyWith(edgeRefraction: edgeRefraction, frost: 0),
           child: const SamplingProbeAnimatedGlass(),
         ),
       ],

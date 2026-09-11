@@ -6,6 +6,8 @@
 /// own tests reach other `src/` files.
 library;
 
+import 'package:glass_forge/src/shaders/shader_library.dart';
+
 /// Forces the composition to bind the bilinear backdrop-reconstruction
 /// shader (`final_render_bilinear_probe.frag`) instead of the shipped
 /// nearest-neighbour default (`final_render.frag`).
@@ -18,5 +20,18 @@ library;
 /// screen for the toggle that flips it.
 ///
 /// Defaults to `false`. Nothing in production code ever sets it; it only
-/// matters while the sampling probe is on screen.
+/// matters while the sampling probe is on screen. Setting it `true` before
+/// [debugWarmUpBilinearBackdropSampling] has completed throws — the shader
+/// it selects is not loaded eagerly (see [GlassShaderId.core]), precisely so
+/// no other consumer pays to load it.
 bool debugBilinearBackdropSampling = false;
+
+/// Loads the shader [debugBilinearBackdropSampling] selects.
+///
+/// `ShaderLibrary.warmUp()` never loads
+/// [GlassShaderId.finalRenderBilinearProbe] — it is not a core shader, so no
+/// consumer of this package compiles or loads it at startup just because it
+/// exists. Await this once before setting [debugBilinearBackdropSampling]
+/// to `true` for the first time; safe to call more than once.
+Future<void> debugWarmUpBilinearBackdropSampling() =>
+    ShaderLibrary.instance.ensureLoaded(GlassShaderId.finalRenderBilinearProbe);

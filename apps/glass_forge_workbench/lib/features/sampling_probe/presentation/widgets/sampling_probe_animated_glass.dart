@@ -22,8 +22,7 @@ class SamplingProbeAnimatedGlass extends StatefulWidget {
       _SamplingProbeAnimatedGlassState();
 }
 
-class _SamplingProbeAnimatedGlassState
-    extends State<SamplingProbeAnimatedGlass>
+class _SamplingProbeAnimatedGlassState extends State<SamplingProbeAnimatedGlass>
     with SingleTickerProviderStateMixin {
   static const _shapeExtent = 180.0;
   static const _sweepDuration = Duration(seconds: 7);

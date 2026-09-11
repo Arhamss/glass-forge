@@ -21,12 +21,9 @@ class SamplingProbeModeToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return SlidingTab(
       initialIndex: SamplingProbeMode.values.indexOf(mode),
-      labels: [
-        for (final value in SamplingProbeMode.values) value.label,
-      ],
+      labels: [for (final value in SamplingProbeMode.values) value.label],
       onTapCallbacks: [
-        for (final value in SamplingProbeMode.values)
-          () => onChanged(value),
+        for (final value in SamplingProbeMode.values) () => onChanged(value),
       ],
     );
   }

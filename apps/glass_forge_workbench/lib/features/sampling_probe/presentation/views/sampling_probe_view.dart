@@ -1,6 +1,7 @@
 import 'package:glass_forge_workbench/exports.dart';
 import 'package:glass_forge_workbench/features/sampling_probe/presentation/cubit/sampling_probe_cubit.dart';
 import 'package:glass_forge_workbench/features/sampling_probe/presentation/cubit/sampling_probe_state.dart';
+import 'package:glass_forge_workbench/features/sampling_probe/presentation/widgets/sampling_probe_backdrop_style_toggle.dart';
 import 'package:glass_forge_workbench/features/sampling_probe/presentation/widgets/sampling_probe_canvas.dart';
 import 'package:glass_forge_workbench/features/sampling_probe/presentation/widgets/sampling_probe_displacement_slider.dart';
 import 'package:glass_forge_workbench/features/sampling_probe/presentation/widgets/sampling_probe_frame_readout.dart';
@@ -9,7 +10,8 @@ import 'package:glass_forge_workbench/features/sampling_probe/presentation/widge
 /// Task 19's measurement screen: a high-frequency backdrop under an
 /// animating glass shape, with a toggle between the shipped
 /// nearest-neighbour backdrop sampler and a bilinear-reconstruction
-/// candidate, a displacement slider, and a live frame-time readout.
+/// candidate, a backdrop-style toggle, a displacement slider, and a live
+/// frame-time readout.
 ///
 /// See `docs/reference/backdrop_sampling.md` for what this measured and the
 /// decision it produced.
@@ -34,11 +36,13 @@ class SamplingProbeView extends StatelessWidget {
                   child: BlocBuilder<SamplingProbeCubit, SamplingProbeState>(
                     buildWhen: (previous, current) =>
                         previous.mode != current.mode ||
+                        previous.backdropStyle != current.backdropStyle ||
                         previous.edgeRefraction != current.edgeRefraction,
                     builder: (context, state) => ClipRRect(
                       borderRadius: BorderRadius.circular(20),
                       child: SamplingProbeCanvas(
                         mode: state.mode,
+                        backdropStyle: state.backdropStyle,
                         edgeRefraction: state.edgeRefraction,
                       ),
                     ),
@@ -56,10 +60,23 @@ class SamplingProbeView extends StatelessWidget {
                 const SizedBox(height: 16),
                 BlocBuilder<SamplingProbeCubit, SamplingProbeState>(
                   buildWhen: (previous, current) =>
+                      previous.backdropStyle != current.backdropStyle,
+                  builder: (context, state) => SamplingProbeBackdropStyleToggle(
+                    style: state.backdropStyle,
+                    onChanged: context
+                        .read<SamplingProbeCubit>()
+                        .setBackdropStyle,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                BlocBuilder<SamplingProbeCubit, SamplingProbeState>(
+                  buildWhen: (previous, current) =>
                       previous.edgeRefraction != current.edgeRefraction,
                   builder: (context, state) => SamplingProbeDisplacementSlider(
                     edgeRefraction: state.edgeRefraction,
-                    onChanged: context.read<SamplingProbeCubit>().setEdgeRefraction,
+                    onChanged: context
+                        .read<SamplingProbeCubit>()
+                        .setEdgeRefraction,
                   ),
                 ),
                 const SizedBox(height: 8),
