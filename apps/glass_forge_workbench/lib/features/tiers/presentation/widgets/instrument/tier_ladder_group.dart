@@ -45,7 +45,8 @@ class TierLadderGroup extends StatelessWidget {
       cells: [
         TierLadderRung(
           label: 'Automatic',
-          effect: 'Let capability, heat, frame health and the accessibility '
+          effect:
+              'Let capability, heat, frame health and the accessibility '
               'settings decide, and re-decide, on their own.',
           status: state.requested == null ? 'in force' : '',
           isSelected: state.requested == null,
@@ -63,7 +64,8 @@ class TierLadderGroup extends StatelessWidget {
           ),
         if (state.isPinHeld)
           InstrumentNote(
-            text: 'Pinned to '
+            text:
+                'Pinned to '
                 '${state.requested!.label.toLowerCase()}, rendering '
                 '${state.resolved.tier.label.toLowerCase()}. A pin beats '
                 'capability, heat and frame health. It does not beat the '

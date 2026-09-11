@@ -44,9 +44,7 @@ class MotionSpringGroup extends StatelessWidget {
       cells: [
         InstrumentSegmentedControl<MotionSpringChannel>(
           values: MotionSpringChannel.values,
-          labels: [
-            for (final value in MotionSpringChannel.values) value.label,
-          ],
+          labels: [for (final value in MotionSpringChannel.values) value.label],
           selected: channel,
           onChanged: onChannelChanged,
         ),
@@ -70,7 +68,8 @@ class MotionSpringGroup extends StatelessWidget {
         ),
         InstrumentNote(text: channel.blurb),
         const InstrumentNote(
-          text: 'Duration is the spring period, not how long it takes to '
+          text:
+              'Duration is the spring period, not how long it takes to '
               'stop. Bounce runs from -1, heavily overdamped, through 0, '
               'no overshoot, to 1. Retuning a spring re-seats the surface, '
               'so tune it first and throw it after.',

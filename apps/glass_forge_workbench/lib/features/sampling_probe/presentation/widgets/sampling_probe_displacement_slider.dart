@@ -32,16 +32,16 @@ class SamplingProbeDisplacementSlider extends StatelessWidget {
           'Edge displacement: ${edgeRefraction.toStringAsFixed(1)} lpx '
           '(${physicalDisplacement.toStringAsFixed(1)} px at '
           '${devicePixelRatio.toStringAsFixed(1)}x)',
-          style: context.p2Medium.copyWith(color: AppColors.textSecondary),
+          style: context.callout.copyWith(color: AppColors.textSecondary),
         ),
         SliderTheme(
           data: SliderThemeData(
             thumbSize: WidgetStateProperty.all(const Size(13, 13)),
-            activeTrackColor: AppColors.primary,
+            activeTrackColor: AppColors.textPrimary,
             trackHeight: 4,
-            inactiveTrackColor: AppColors.surfaceMuted,
-            thumbColor: AppColors.primary,
-            overlayColor: AppColors.primary.withValues(alpha: 0.1),
+            inactiveTrackColor: AppColors.hairlineStrong,
+            thumbColor: AppColors.textPrimary,
+            overlayColor: AppColors.accentSoft,
           ),
           child: Slider(
             value: edgeRefraction,

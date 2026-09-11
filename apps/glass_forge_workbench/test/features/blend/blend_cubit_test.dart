@@ -34,8 +34,7 @@ void main() {
   });
 
   group('BlendState', () {
-    test('the merge is expected exactly while the gap is under the blend',
-        () {
+    test('the merge is expected exactly while the gap is under the blend', () {
       const gapOf40 = BlendState(
         separation: BlendState.nodeDiameter + 40,
         blend: 40,

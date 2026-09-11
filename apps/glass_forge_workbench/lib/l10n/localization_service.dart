@@ -23,12 +23,13 @@ class Localization {
     _instance = localizations;
   }
 
-  // ── General ──────────────────────────────────────────────
-
   static String get appName => _instance.appName;
-  static String get login => _instance.login;
-  static String get logout => _instance.logout;
-  static String get home => _instance.home;
-  static String get loginToContinue => _instance.loginToContinue;
-  static String get somethingWentWrong => _instance.somethingWentWrong;
+  static String get back => _instance.back;
+  static String get samplingProbe => _instance.samplingProbe;
+  static String get resetToDefaults => _instance.resetToDefaults;
+  static String get presetDome => _instance.presetDome;
+  static String get presetRegular => _instance.presetRegular;
+  static String get presetClear => _instance.presetClear;
+  static String get presetTinted => _instance.presetTinted;
+  static String get presetDemonstration => _instance.presetDemonstration;
 }

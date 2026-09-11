@@ -37,21 +37,24 @@ void main() {
       addTearDown(cubit.close);
     });
 
-    test('retuning a spring keeps the settle thresholds it was carrying',
-        () {
+    test('retuning a spring keeps the settle thresholds it was carrying', () {
       // Dropping these would quietly put the spring back on a tolerance
       // measured in thousandths of a pixel, which is hundreds of frames of
       // invisible creep on something driving a shader. Started off the
       // defaults on purpose: with the defaults in place, losing them and
       // keeping them look identical.
-      final cubit = MotionCubit(
-        initialState: const MotionState(
-          settle: GlassMotion.bouncy(settleDistance: 2, settleVelocity: 40),
-        ),
-      )
-        ..setChannel(MotionSpringChannel.settle)
-        ..setDuration(300)
-        ..setBounce(0.1);
+      final cubit =
+          MotionCubit(
+              initialState: const MotionState(
+                settle: GlassMotion.bouncy(
+                  settleDistance: 2,
+                  settleVelocity: 40,
+                ),
+              ),
+            )
+            ..setChannel(MotionSpringChannel.settle)
+            ..setDuration(300)
+            ..setBounce(0.1);
 
       expect(cubit.state.settle.settleDistance, 2);
       expect(cubit.state.settle.settleVelocity, 40);
@@ -80,8 +83,7 @@ void main() {
       addTearDown(cubit.close);
     });
 
-    test('the deformation knobs build the jiggle the surface is handed',
-        () {
+    test('the deformation knobs build the jiggle the surface is handed', () {
       final cubit = MotionCubit()
         ..setMaxStretch(1.3)
         ..setHalfSpeed(900);

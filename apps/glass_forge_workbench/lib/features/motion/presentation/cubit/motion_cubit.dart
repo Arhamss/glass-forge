@@ -38,8 +38,7 @@ class MotionCubit extends Cubit<MotionState> {
       _editSpring((spring) => _rebuild(spring, bounce: bounce));
 
   /// Sets what a fully pressed surface scales to.
-  void setPressScale(double value) =>
-      emit(state.copyWith(pressScale: value));
+  void setPressScale(double value) => emit(state.copyWith(pressScale: value));
 
   /// Sets how far past rest the surface may be dragged.
   void setOverdragLimit(double value) =>
@@ -57,8 +56,7 @@ class MotionCubit extends Cubit<MotionState> {
   void setDecayDrag(double value) => emit(state.copyWith(decayDrag: value));
 
   /// Sets the stretch ratio approached at infinite speed.
-  void setMaxStretch(double value) =>
-      emit(state.copyWith(maxStretch: value));
+  void setMaxStretch(double value) => emit(state.copyWith(maxStretch: value));
 
   /// Sets the speed at which half the available stretch is reached.
   void setHalfSpeed(double value) => emit(state.copyWith(halfSpeed: value));
@@ -69,9 +67,8 @@ class MotionCubit extends Cubit<MotionState> {
 
   /// Puts every knob back where `InteractiveGlass` starts, keeping the
   /// backdrop and the spring you were editing.
-  void resetToDefaults() => emit(
-    MotionState(channel: state.channel, backdrop: state.backdrop),
-  );
+  void resetToDefaults() =>
+      emit(MotionState(channel: state.channel, backdrop: state.backdrop));
 
   /// Rebuilds a spring, keeping the settle thresholds it was carrying.
   ///
@@ -94,12 +91,10 @@ class MotionCubit extends Cubit<MotionState> {
 
   void _editSpring(GlassMotion Function(GlassMotion spring) transform) {
     final next = transform(state.editedSpring);
-    emit(
-      switch (state.channel) {
-        MotionSpringChannel.follow => state.copyWith(follow: next),
-        MotionSpringChannel.settle => state.copyWith(settle: next),
-        MotionSpringChannel.press => state.copyWith(press: next),
-      },
-    );
+    emit(switch (state.channel) {
+      MotionSpringChannel.follow => state.copyWith(follow: next),
+      MotionSpringChannel.settle => state.copyWith(settle: next),
+      MotionSpringChannel.press => state.copyWith(press: next),
+    });
   }
 }

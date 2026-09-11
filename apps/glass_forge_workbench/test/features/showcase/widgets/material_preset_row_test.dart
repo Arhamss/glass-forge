@@ -5,9 +5,11 @@ import 'package:glass_forge_workbench/features/showcase/presentation/widgets/ins
 import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument/material_preset_row.dart';
 import 'package:glass_forge_workbench/utils/helpers/demonstration_glass_material.dart';
 
+import '../../../helpers/test_app.dart';
+
 Widget _row(GlassMaterial material, ValueChanged<GlassMaterial> onPicked) {
-  return MaterialApp(
-    home: Scaffold(
+  return testApp(
+    Scaffold(
       body: Padding(
         padding: const EdgeInsetsDirectional.all(16),
         child: MaterialPresetRow(

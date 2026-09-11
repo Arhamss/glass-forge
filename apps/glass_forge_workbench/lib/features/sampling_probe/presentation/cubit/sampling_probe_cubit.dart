@@ -1,6 +1,5 @@
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:glass_forge/debug.dart' as glass_forge_debug;
 import 'package:glass_forge_workbench/features/sampling_probe/presentation/cubit/sampling_probe_state.dart';
 import 'package:glass_forge_workbench/utils/enums/sampling_probe_backdrop_style.dart';
@@ -23,7 +22,6 @@ class SamplingProbeCubit extends Cubit<SamplingProbeState> {
 
   /// Starts recording frame timings for the readout.
   void init() {
-    FlutterNativeSplash.remove();
     SchedulerBinding.instance.addTimingsCallback(_recordFrameTimings);
   }
 

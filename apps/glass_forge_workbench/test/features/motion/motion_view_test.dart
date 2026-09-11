@@ -6,6 +6,8 @@ import 'package:glass_forge_workbench/features/motion/presentation/views/motion_
 import 'package:glass_forge_workbench/features/motion/presentation/widgets/motion_stage.dart';
 import 'package:glass_forge_workbench/utils/enums/motion_spring_channel.dart';
 
+import '../../helpers/test_app.dart';
+
 MotionCubit _cubitOf(WidgetTester tester) =>
     tester.element(find.byType(MotionStage)).read<MotionCubit>();
 
@@ -27,16 +29,17 @@ void main() {
       // The screen where the glass should feel like a lens in hand: the
       // Apple edge band's flat interior reads as a frosted pane here.
       _useAPhone(tester);
-      await tester.pumpWidget(const MaterialApp(home: MotionView()));
+      await tester.pumpWidget(testApp(const MotionView()));
       final layer = tester.widget<GlassLayer>(find.byType(GlassLayer));
       expect(layer.material, GlassMaterial.dome());
       expect(layer.material.profile, GlassProfile.dome);
     });
 
-    testWidgets('the spring sliders reach the surface that springs',
-        (tester) async {
+    testWidgets('the spring sliders reach the surface that springs', (
+      tester,
+    ) async {
       _useAPhone(tester);
-      await tester.pumpWidget(const MaterialApp(home: MotionView()));
+      await tester.pumpWidget(testApp(const MotionView()));
       expect(_specimen(tester).settleMotion.duration.inMilliseconds, 500);
 
       _cubitOf(tester)
@@ -54,10 +57,11 @@ void main() {
       );
     });
 
-    testWidgets('the resistance and deformation knobs reach the surface',
-        (tester) async {
+    testWidgets('the resistance and deformation knobs reach the surface', (
+      tester,
+    ) async {
       _useAPhone(tester);
-      await tester.pumpWidget(const MaterialApp(home: MotionView()));
+      await tester.pumpWidget(testApp(const MotionView()));
 
       _cubitOf(tester)
         ..setOverdragLimit(140)
@@ -70,10 +74,11 @@ void main() {
       expect(_specimen(tester).jiggle.maxStretch, 1.05);
     });
 
-    testWidgets('the specimen follows a finger and springs home after it',
-        (tester) async {
+    testWidgets('the specimen follows a finger and springs home after it', (
+      tester,
+    ) async {
       _useAPhone(tester);
-      await tester.pumpWidget(const MaterialApp(home: MotionView()));
+      await tester.pumpWidget(testApp(const MotionView()));
       final glass = find.byType(Glass);
       final home = tester.getCenter(glass);
 

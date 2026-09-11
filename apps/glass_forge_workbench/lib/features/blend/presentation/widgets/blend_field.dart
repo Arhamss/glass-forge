@@ -8,11 +8,7 @@ import 'package:glass_forge_workbench/exports.dart';
 /// what the gap readout claims are the same geometry.
 class BlendField extends StatelessWidget {
   /// Creates the field.
-  const BlendField({
-    required this.centres,
-    required this.diameter,
-    super.key,
-  });
+  const BlendField({required this.centres, required this.diameter, super.key});
 
   /// Each shape's centre, relative to the middle of the field.
   final List<Offset> centres;

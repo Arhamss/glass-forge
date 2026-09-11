@@ -15,17 +15,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appName => 'Glass Forge Workbench';
 
   @override
-  String get login => 'Login';
+  String get back => 'Back';
 
   @override
-  String get logout => 'Logout';
+  String get samplingProbe => 'Sampling probe';
 
   @override
-  String get home => 'Home';
+  String get resetToDefaults => 'Reset to defaults';
 
   @override
-  String get loginToContinue => 'Log in to Continue';
+  String get presetDome => 'Dome';
 
   @override
-  String get somethingWentWrong => 'Something went wrong. Please try again later.';
+  String get presetRegular => 'Regular';
+
+  @override
+  String get presetClear => 'Clear';
+
+  @override
+  String get presetTinted => 'Tinted';
+
+  @override
+  String get presetDemonstration => 'Demo';
 }

@@ -4,24 +4,36 @@
   "@appName": {
     "description": "The name of the application"
   },
-  "login": "Login",
-  "@login": {
-    "description": "Login button text"
+  "back": "Back",
+  "@back": {
+    "description": "Accessibility label for a back button"
   },
-  "logout": "Logout",
-  "@logout": {
-    "description": "Logout button text"
+  "samplingProbe": "Sampling probe",
+  "@samplingProbe": {
+    "description": "Title of the backdrop sampling diagnostic screen"
   },
-  "home": "Home",
-  "@home": {
-    "description": "Home screen title"
+  "resetToDefaults": "Reset to defaults",
+  "@resetToDefaults": {
+    "description": "Button that restores every control on a screen"
   },
-  "loginToContinue": "Log in to Continue",
-  "@loginToContinue": {
-    "description": "Login screen title"
+  "presetDome": "Dome",
+  "@presetDome": {
+    "description": "Material preset name"
   },
-  "somethingWentWrong": "Something went wrong. Please try again later.",
-  "@somethingWentWrong": {
-    "description": "Generic error message"
+  "presetRegular": "Regular",
+  "@presetRegular": {
+    "description": "Material preset name"
+  },
+  "presetClear": "Clear",
+  "@presetClear": {
+    "description": "Material preset name"
+  },
+  "presetTinted": "Tinted",
+  "@presetTinted": {
+    "description": "Material preset name"
+  },
+  "presetDemonstration": "Demo",
+  "@presetDemonstration": {
+    "description": "Material preset name"
   }
 }

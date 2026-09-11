@@ -6,6 +6,8 @@ import 'package:glass_forge_workbench/features/blend/presentation/views/blend_vi
 import 'package:glass_forge_workbench/features/blend/presentation/widgets/blend_stage.dart';
 import 'package:glass_forge_workbench/utils/enums/blend_arrangement.dart';
 
+import '../../helpers/test_app.dart';
+
 BlendCubit _cubitOf(WidgetTester tester) =>
     tester.element(find.byType(BlendStage)).read<BlendCubit>();
 
@@ -27,16 +29,17 @@ void main() {
       // The merge is the thing this screen shows, and two flat panes fusing
       // at the rim read as frosted plastic over a soft backdrop.
       _useAPhone(tester);
-      await tester.pumpWidget(const MaterialApp(home: BlendView()));
+      await tester.pumpWidget(testApp(const BlendView()));
       final layer = tester.widget<GlassLayer>(find.byType(GlassLayer));
       expect(layer.material, GlassMaterial.dome());
       expect(layer.material.profile, GlassProfile.dome);
     });
 
-    testWidgets('the blend slider reaches the group that does the folding',
-        (tester) async {
+    testWidgets('the blend slider reaches the group that does the folding', (
+      tester,
+    ) async {
       _useAPhone(tester);
-      await tester.pumpWidget(const MaterialApp(home: BlendView()));
+      await tester.pumpWidget(testApp(const BlendView()));
       expect(_blendInScene(tester), 20);
 
       _cubitOf(tester).setBlend(48);
@@ -45,10 +48,11 @@ void main() {
       expect(_blendInScene(tester), 48);
     });
 
-    testWidgets('the arrangement decides how many shapes are in the group',
-        (tester) async {
+    testWidgets('the arrangement decides how many shapes are in the group', (
+      tester,
+    ) async {
       _useAPhone(tester);
-      await tester.pumpWidget(const MaterialApp(home: BlendView()));
+      await tester.pumpWidget(testApp(const BlendView()));
       expect(find.byType(Glass), findsNWidgets(2));
 
       _cubitOf(tester).setArrangement(BlendArrangement.triad);
@@ -57,10 +61,11 @@ void main() {
       expect(find.byType(Glass), findsNWidgets(3));
     });
 
-    testWidgets('the stage states what it expects before you look at it',
-        (tester) async {
+    testWidgets('the stage states what it expects before you look at it', (
+      tester,
+    ) async {
       _useAPhone(tester);
-      await tester.pumpWidget(const MaterialApp(home: BlendView()));
+      await tester.pumpWidget(testApp(const BlendView()));
 
       // Default scene: 148 apart, 96 across, so a 52 px gap against a
       // 20 px fold.
@@ -88,7 +93,7 @@ void main() {
 
     testWidgets('dragging the stage spreads the shapes', (tester) async {
       _useAPhone(tester);
-      await tester.pumpWidget(const MaterialApp(home: BlendView()));
+      await tester.pumpWidget(testApp(const BlendView()));
       final before = _cubitOf(tester).state.separation;
 
       await tester.drag(find.byType(BlendStage), const Offset(30, 0));

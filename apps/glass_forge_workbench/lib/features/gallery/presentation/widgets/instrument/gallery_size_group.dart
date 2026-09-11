@@ -39,9 +39,11 @@ class GallerySizeGroup extends StatelessWidget {
         ),
         InstrumentValueRow(
           label: 'Flip gate',
-          value: '${GalleryState.tokens.flipMaxShortSide.toStringAsFixed(0)}'
+          value:
+              '${GalleryState.tokens.flipMaxShortSide.toStringAsFixed(0)}'
               ' px',
-          note: 'The tallest bar iOS ships is a large-title navigation bar '
+          note:
+              'The tallest bar iOS ships is a large-title navigation bar '
               'at 96. Thinner than that and a surface is chrome over one '
               'strip of backdrop, so one flip decision covers all of it. '
               'Thicker and it is carrying content, so it only adapts.',

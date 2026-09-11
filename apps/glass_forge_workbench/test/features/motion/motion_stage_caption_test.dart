@@ -4,6 +4,8 @@ import 'package:glass_forge_workbench/features/motion/presentation/cubit/motion_
 import 'package:glass_forge_workbench/features/motion/presentation/widgets/motion_stage.dart';
 import 'package:glass_forge_workbench/utils/widgets/stage/stage_caption.dart';
 
+import '../../helpers/test_app.dart';
+
 void main() {
   testWidgets('the stage caption clears the status bar', (tester) async {
     // The stage runs edge to edge under the status bar so the glass can sit
@@ -12,11 +14,9 @@ void main() {
     const statusBar = 59.0;
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: MediaQuery(
-          data: const MediaQueryData(
-            padding: EdgeInsets.only(top: statusBar),
-          ),
+      testApp(
+        MediaQuery(
+          data: const MediaQueryData(padding: EdgeInsets.only(top: statusBar)),
           child: MotionStage(
             state: const MotionState(),
             onBackdropChanged: (_) {},

@@ -56,7 +56,8 @@ class MotionDeformationGroup extends StatelessWidget {
           onChanged: onHalfSpeedChanged,
         ),
         const InstrumentNote(
-          text: 'The surface stretches along the direction it is moving '
+          text:
+              'The surface stretches along the direction it is moving '
               'and squashes across it by the reciprocal, so its area never '
               'changes. That is what stops a fast one from also looking '
               'like it grew. Take Most stretch to 1.00 and the deformation '

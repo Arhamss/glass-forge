@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge_workbench/features/navigation/presentation/widgets/workbench_rail.dart';
 import 'package:glass_forge_workbench/utils/enums/workbench_section.dart';
 
+import '../../helpers/test_app.dart';
+
 void main() {
   testWidgets('the rail stays a strip, whatever height it is offered', (
     tester,
@@ -15,8 +17,8 @@ void main() {
     // mistake had already shipped once in the backdrop rail, which is why
     // this asserts the property rather than the widget tree.
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      testApp(
+        Scaffold(
           body: const SizedBox.expand(),
           bottomNavigationBar: WorkbenchRail(
             currentIndex: 1,
@@ -42,8 +44,8 @@ void main() {
   ) async {
     final tapped = <WorkbenchSection>[];
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      testApp(
+        Scaffold(
           body: const SizedBox.expand(),
           bottomNavigationBar: WorkbenchRail(
             currentIndex: 0,

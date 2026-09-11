@@ -78,10 +78,7 @@ class TierStage extends StatelessWidget {
                 isLive: isForced,
               ),
               const SizedBox(height: 12),
-              BackdropRail(
-                selected: backdrop,
-                onChanged: onBackdropChanged,
-              ),
+              BackdropRail(selected: backdrop, onChanged: onBackdropChanged),
             ],
           ),
         ),

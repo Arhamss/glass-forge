@@ -10,7 +10,9 @@ import 'package:glass_forge_workbench/features/showcase/presentation/widgets/ins
 import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument/groups/shape_variant_group.dart';
 import 'package:glass_forge_workbench/features/showcase/presentation/widgets/instrument/groups/tint_group.dart';
 import 'package:glass_forge_workbench/features/showcase/presentation/widgets/specimen_stage.dart';
+import 'package:glass_forge_workbench/l10n/l10n.dart';
 import 'package:glass_forge_workbench/utils/enums/showcase_shape.dart';
+import 'package:glass_forge_workbench/utils/widgets/primitives/solid_button.dart';
 
 /// The workbench's landing screen: a live glass specimen on a stage with a
 /// real backdrop, and a solid instrument panel exposing every material
@@ -169,18 +171,13 @@ class SpecimenView extends StatelessWidget {
                         },
                       ),
                       const SizedBox(height: 16),
-                      CustomButton(
-                        text: 'Sampling probe',
-                        onPressed: () =>
-                            context.pushNamed(AppRouteNames.samplingProbe),
-                        backgroundColor: AppColors.transparent,
-                        textColor: AppColors.stageForegroundMuted,
-                        splashColor: AppColors.transparent,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        padding: EdgeInsetsDirectional.zero,
-                        outsidePadding: EdgeInsetsDirectional.zero,
-                        centerContent: true,
+                      Align(
+                        child: SolidButton.secondary(
+                          label: context.l10n.samplingProbe,
+                          icon: AssetPaths.caretRight,
+                          onPressed: () =>
+                              context.pushNamed(AppRouteNames.samplingProbe),
+                        ),
                       ),
                     ],
                   ),

@@ -6,6 +6,8 @@ import 'package:glass_forge_workbench/features/motion/presentation/widgets/instr
 import 'package:glass_forge_workbench/features/motion/presentation/widgets/instrument/motion_spring_group.dart';
 import 'package:glass_forge_workbench/features/motion/presentation/widgets/instrument/motion_touch_group.dart';
 import 'package:glass_forge_workbench/features/motion/presentation/widgets/motion_stage.dart';
+import 'package:glass_forge_workbench/l10n/l10n.dart';
+import 'package:glass_forge_workbench/utils/widgets/primitives/solid_button.dart';
 
 /// A surface you can grab, with every spring behind it live.
 ///
@@ -33,8 +35,7 @@ class MotionView extends StatelessWidget {
                     previous.press != current.press ||
                     previous.pressScale != current.pressScale ||
                     previous.overdragLimit != current.overdragLimit ||
-                    previous.overdragResistance !=
-                        current.overdragResistance ||
+                    previous.overdragResistance != current.overdragResistance ||
                     previous.release != current.release ||
                     previous.decayDrag != current.decayDrag ||
                     previous.maxStretch != current.maxStretch ||
@@ -42,9 +43,7 @@ class MotionView extends StatelessWidget {
                     previous.backdrop != current.backdrop,
                 builder: (context, state) => MotionStage(
                   state: state,
-                  onBackdropChanged: context
-                      .read<MotionCubit>()
-                      .setBackdrop,
+                  onBackdropChanged: context.read<MotionCubit>().setBackdrop,
                 ),
               ),
             ),
@@ -122,23 +121,14 @@ class MotionView extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
                     Builder(
-                      builder: (context) => CustomButton(
-                        text: 'Put everything back',
-                        onPressed: context
-                            .read<MotionCubit>()
-                            .resetToDefaults,
-                        backgroundColor: AppColors.transparent,
-                        textColor: AppColors.stageForegroundMuted,
-                        borderColor: AppColors.stageBorder,
-                        splashColor: AppColors.transparent,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        padding: const EdgeInsetsDirectional.symmetric(
-                          vertical: 14,
-                          horizontal: 24,
+                      builder: (context) => Align(
+                        child: SolidButton.secondary(
+                          label: context.l10n.resetToDefaults,
+                          icon: AssetPaths.arrowCounterClockwise,
+                          onPressed: context
+                              .read<MotionCubit>()
+                              .resetToDefaults,
                         ),
-                        outsidePadding: EdgeInsetsDirectional.zero,
-                        centerContent: true,
                       ),
                     ),
                   ],

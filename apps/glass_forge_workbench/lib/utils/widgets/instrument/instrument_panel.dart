@@ -1,5 +1,5 @@
 import 'package:glass_forge_workbench/exports.dart';
-import 'package:glass_forge_workbench/utils/widgets/instrument/instrument_grid_texture.dart';
+import 'package:glass_forge_workbench/utils/widgets/primitives/section_label.dart';
 
 /// The solid, never-glass control sheet beneath every stage.
 ///
@@ -21,40 +21,33 @@ class InstrumentPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(color: AppColors.stageRaised),
-      child: Stack(
-        children: [
-          const Positioned.fill(child: InstrumentGridTexture()),
-          Padding(
-            padding: const EdgeInsetsDirectional.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title.toUpperCase(),
-                  style: context.overline.copyWith(
-                    color: AppColors.stageForegroundSubtle,
-                    letterSpacing: 1.2,
-                  ),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.r16),
+        border: Border.all(color: AppColors.hairline),
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.all(AppSpacing.s20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SectionLabel(title),
+            const SizedBox(height: AppSpacing.s16),
+            for (var i = 0; i < cells.length; i++) ...[
+              cells[i],
+              if (i != cells.length - 1) ...[
+                const SizedBox(height: AppSpacing.s16),
+                const Divider(
+                  color: AppColors.hairline,
+                  height: 1,
+                  thickness: 1,
                 ),
-                const SizedBox(height: 16),
-                for (var i = 0; i < cells.length; i++) ...[
-                  cells[i],
-                  if (i != cells.length - 1) ...[
-                    const SizedBox(height: 16),
-                    const Divider(
-                      color: AppColors.stageDivider,
-                      height: 1,
-                      thickness: 1,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ],
+                const SizedBox(height: AppSpacing.s16),
               ],
-            ),
-          ),
-        ],
+            ],
+          ],
+        ),
       ),
     );
   }

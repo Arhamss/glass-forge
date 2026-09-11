@@ -68,10 +68,7 @@ class BlendState extends Equatable {
   List<Offset> get nodeCentres {
     final half = separation / 2;
     return switch (arrangement) {
-      BlendArrangement.pair => <Offset>[
-        Offset(-half, 0),
-        Offset(half, 0),
-      ],
+      BlendArrangement.pair => <Offset>[Offset(-half, 0), Offset(half, 0)],
       BlendArrangement.triad => <Offset>[
         Offset(-half, -separation / (2 * math.sqrt(3))),
         Offset(half, -separation / (2 * math.sqrt(3))),

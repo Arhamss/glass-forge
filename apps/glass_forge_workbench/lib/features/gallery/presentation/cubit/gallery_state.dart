@@ -72,11 +72,13 @@ class GalleryState extends Equatable {
   /// [other], resolved against the current size and backdrop, in an app
   /// running [ambient].
   GlassSurfaceStyle styleOf(GlassSurfaceRole other, Brightness ambient) =>
-      surfaces.of(other).resolve(
-        size: sizeOf(other),
-        platformBrightness: ambient,
-        backdrop: backdropColor,
-      );
+      surfaces
+          .of(other)
+          .resolve(
+            size: sizeOf(other),
+            platformBrightness: ambient,
+            backdrop: backdropColor,
+          );
 
   /// The selected role, resolved in an app running [ambient].
   GlassSurfaceStyle styleFor(Brightness ambient) => styleOf(role, ambient);

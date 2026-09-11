@@ -19,10 +19,10 @@ class SamplingProbeFrameReadout extends StatelessWidget {
     final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     final fps = averageFrameMs > 0 ? 1000 / averageFrameMs : 0;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsetsDirectional.all(AppSpacing.s12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(AppRadius.r12),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -30,11 +30,11 @@ class SamplingProbeFrameReadout extends StatelessWidget {
           Text(
             '${averageFrameMs.toStringAsFixed(2)} ms/frame '
             '(~${fps.toStringAsFixed(0)} fps)',
-            style: context.p2Medium.copyWith(color: AppColors.textPrimary),
+            style: context.callout.copyWith(color: AppColors.textPrimary),
           ),
           Text(
             '${devicePixelRatio.toStringAsFixed(1)}x DPR',
-            style: context.p2Medium.copyWith(color: AppColors.textSecondary),
+            style: context.callout.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),

@@ -8,6 +8,8 @@ import 'package:glass_forge_workbench/features/gallery/presentation/widgets/inst
 import 'package:glass_forge_workbench/features/gallery/presentation/widgets/instrument/gallery_roster_row.dart';
 import 'package:glass_forge_workbench/utils/extensions/glass_surface_role_extensions.dart';
 
+import '../../helpers/test_app.dart';
+
 GalleryCubit _cubitOf(WidgetTester tester) =>
     tester.element(find.byType(GalleryStage)).read<GalleryCubit>();
 
@@ -28,7 +30,7 @@ void main() {
   group('GalleryView', () {
     testWidgets('draws every semantic role, in both schemes', (tester) async {
       _useAPhone(tester);
-      await tester.pumpWidget(const MaterialApp(home: GalleryView()));
+      await tester.pumpWidget(testApp(const GalleryView()));
 
       for (final role in GlassSurfaceRole.values) {
         _cubitOf(tester).setRole(role);
@@ -43,10 +45,11 @@ void main() {
       }
     });
 
-    testWidgets('the verdict follows the size across the flip gate',
-        (tester) async {
+    testWidgets('the verdict follows the size across the flip gate', (
+      tester,
+    ) async {
       _useAPhone(tester);
-      await tester.pumpWidget(const MaterialApp(home: GalleryView()));
+      await tester.pumpWidget(testApp(const GalleryView()));
       final resolution = find.byType(GalleryResolutionGroup);
 
       _cubitOf(tester).setShortSide(52);
@@ -65,10 +68,11 @@ void main() {
       );
     });
 
-    testWidgets('a selected row drops the grey that fails on its own fill',
-        (tester) async {
+    testWidgets('a selected row drops the grey that fails on its own fill', (
+      tester,
+    ) async {
       _useAPhone(tester);
-      await tester.pumpWidget(const MaterialApp(home: GalleryView()));
+      await tester.pumpWidget(testApp(const GalleryView()));
 
       Color? schemeLineColour(GlassSurfaceRole role) => tester
           .widget<Text>(
@@ -93,10 +97,11 @@ void main() {
       );
     });
 
-    testWidgets('the roster puts the role it names on the stage',
-        (tester) async {
+    testWidgets('the roster puts the role it names on the stage', (
+      tester,
+    ) async {
       _useAPhone(tester);
-      await tester.pumpWidget(const MaterialApp(home: GalleryView()));
+      await tester.pumpWidget(testApp(const GalleryView()));
 
       final row = find.widgetWithText(GalleryRosterRow, 'Control');
       await tester.ensureVisible(row);

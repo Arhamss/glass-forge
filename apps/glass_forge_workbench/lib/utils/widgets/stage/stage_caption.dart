@@ -33,11 +33,10 @@ class StageCaption extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: context.caption.copyWith(
+        style: context.monoSmall.copyWith(
           color: isLive
               ? AppColors.stageAccent
               : AppColors.stageForegroundMuted,
-          fontFeatures: const [FontFeature.tabularFigures()],
         ),
       ),
     );

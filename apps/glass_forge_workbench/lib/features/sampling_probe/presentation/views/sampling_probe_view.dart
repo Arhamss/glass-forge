@@ -6,6 +6,8 @@ import 'package:glass_forge_workbench/features/sampling_probe/presentation/widge
 import 'package:glass_forge_workbench/features/sampling_probe/presentation/widgets/sampling_probe_displacement_slider.dart';
 import 'package:glass_forge_workbench/features/sampling_probe/presentation/widgets/sampling_probe_frame_readout.dart';
 import 'package:glass_forge_workbench/features/sampling_probe/presentation/widgets/sampling_probe_mode_toggle.dart';
+import 'package:glass_forge_workbench/l10n/l10n.dart';
+import 'package:glass_forge_workbench/utils/widgets/tool/tool_top_bar.dart';
 
 /// Task 19's measurement screen: a high-frequency backdrop under an
 /// animating glass shape, with a toggle between the shipped
@@ -24,72 +26,84 @@ class SamplingProbeView extends StatelessWidget {
     return BlocProvider(
       create: (_) => SamplingProbeCubit()..init(),
       child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: customAppBar(context: context, title: 'Sampling probe'),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                SizedBox(
-                  height: 360,
-                  child: BlocBuilder<SamplingProbeCubit, SamplingProbeState>(
-                    buildWhen: (previous, current) =>
-                        previous.mode != current.mode ||
-                        previous.backdropStyle != current.backdropStyle ||
-                        previous.edgeRefraction != current.edgeRefraction,
-                    builder: (context, state) => ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: SamplingProbeCanvas(
-                        mode: state.mode,
-                        backdropStyle: state.backdropStyle,
-                        edgeRefraction: state.edgeRefraction,
+        backgroundColor: AppColors.ground,
+        body: Column(
+          children: [
+            ToolTopBar(title: context.l10n.samplingProbe),
+            Expanded(
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsetsDirectional.all(AppSpacing.s16),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 360,
+                        child:
+                            BlocBuilder<SamplingProbeCubit, SamplingProbeState>(
+                              buildWhen: (previous, current) =>
+                                  previous.mode != current.mode ||
+                                  previous.backdropStyle !=
+                                      current.backdropStyle ||
+                                  previous.edgeRefraction !=
+                                      current.edgeRefraction,
+                              builder: (context, state) => ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: SamplingProbeCanvas(
+                                  mode: state.mode,
+                                  backdropStyle: state.backdropStyle,
+                                  edgeRefraction: state.edgeRefraction,
+                                ),
+                              ),
+                            ),
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      BlocBuilder<SamplingProbeCubit, SamplingProbeState>(
+                        buildWhen: (previous, current) =>
+                            previous.mode != current.mode,
+                        builder: (context, state) => SamplingProbeModeToggle(
+                          mode: state.mode,
+                          onChanged: context.read<SamplingProbeCubit>().setMode,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      BlocBuilder<SamplingProbeCubit, SamplingProbeState>(
+                        buildWhen: (previous, current) =>
+                            previous.backdropStyle != current.backdropStyle,
+                        builder: (context, state) =>
+                            SamplingProbeBackdropStyleToggle(
+                              style: state.backdropStyle,
+                              onChanged: context
+                                  .read<SamplingProbeCubit>()
+                                  .setBackdropStyle,
+                            ),
+                      ),
+                      const SizedBox(height: 16),
+                      BlocBuilder<SamplingProbeCubit, SamplingProbeState>(
+                        buildWhen: (previous, current) =>
+                            previous.edgeRefraction != current.edgeRefraction,
+                        builder: (context, state) =>
+                            SamplingProbeDisplacementSlider(
+                              edgeRefraction: state.edgeRefraction,
+                              onChanged: context
+                                  .read<SamplingProbeCubit>()
+                                  .setEdgeRefraction,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      BlocBuilder<SamplingProbeCubit, SamplingProbeState>(
+                        buildWhen: (previous, current) =>
+                            previous.averageFrameMs != current.averageFrameMs,
+                        builder: (context, state) => SamplingProbeFrameReadout(
+                          averageFrameMs: state.averageFrameMs,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                BlocBuilder<SamplingProbeCubit, SamplingProbeState>(
-                  buildWhen: (previous, current) =>
-                      previous.mode != current.mode,
-                  builder: (context, state) => SamplingProbeModeToggle(
-                    mode: state.mode,
-                    onChanged: context.read<SamplingProbeCubit>().setMode,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                BlocBuilder<SamplingProbeCubit, SamplingProbeState>(
-                  buildWhen: (previous, current) =>
-                      previous.backdropStyle != current.backdropStyle,
-                  builder: (context, state) => SamplingProbeBackdropStyleToggle(
-                    style: state.backdropStyle,
-                    onChanged: context
-                        .read<SamplingProbeCubit>()
-                        .setBackdropStyle,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                BlocBuilder<SamplingProbeCubit, SamplingProbeState>(
-                  buildWhen: (previous, current) =>
-                      previous.edgeRefraction != current.edgeRefraction,
-                  builder: (context, state) => SamplingProbeDisplacementSlider(
-                    edgeRefraction: state.edgeRefraction,
-                    onChanged: context
-                        .read<SamplingProbeCubit>()
-                        .setEdgeRefraction,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                BlocBuilder<SamplingProbeCubit, SamplingProbeState>(
-                  buildWhen: (previous, current) =>
-                      previous.averageFrameMs != current.averageFrameMs,
-                  builder: (context, state) => SamplingProbeFrameReadout(
-                    averageFrameMs: state.averageFrameMs,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

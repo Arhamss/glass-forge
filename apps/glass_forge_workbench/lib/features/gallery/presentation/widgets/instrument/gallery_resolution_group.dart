@@ -58,10 +58,7 @@ class GalleryResolutionGroup extends StatelessWidget {
         ),
         InstrumentValueRow(
           label: 'Scheme',
-          value: _pair(
-            lightStyle.brightness.name,
-            darkStyle.brightness.name,
-          ),
+          value: _pair(lightStyle.brightness.name, darkStyle.brightness.name),
           note: 'In a light app, then a dark one.',
         ),
         InstrumentValueRow(
@@ -80,7 +77,8 @@ class GalleryResolutionGroup extends StatelessWidget {
         ),
         InstrumentValueRow(
           label: 'Corner radius',
-          value: '${lightStyle.shape.resolveRadius(size).toStringAsFixed(1)}'
+          value:
+              '${lightStyle.shape.resolveRadius(size).toStringAsFixed(1)}'
               ' px',
         ),
         InstrumentValueRow(
@@ -89,12 +87,14 @@ class GalleryResolutionGroup extends StatelessWidget {
             _contrast(lightStyle.labelContrast),
             _contrast(darkStyle.labelContrast),
           ),
-          note: 'Against a target of '
+          note:
+              'Against a target of '
               '${minimumContrast.toStringAsFixed(1)}:1. '
               '${role.blurb}',
         ),
         const InstrumentNote(
-          text: 'All five backdrops here are dark, because the stage is. '
+          text:
+              'All five backdrops here are dark, because the stage is. '
               'So a flipping surface settles on the dark scheme over every '
               'one of them. What you are looking for is that it settles on '
               'the same scheme in both columns, not which scheme it picked.',

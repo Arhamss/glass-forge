@@ -58,7 +58,7 @@ class LightGroup extends StatelessWidget {
           children: [
             Text(
               'Direction',
-              style: context.p2Medium.copyWith(
+              style: context.callout.copyWith(
                 color: AppColors.stageForegroundMuted,
               ),
             ),

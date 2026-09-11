@@ -1,5 +1,6 @@
 import 'package:glass_forge_workbench/exports.dart';
 import 'package:glass_forge_workbench/utils/enums/sampling_probe_mode.dart';
+import 'package:glass_forge_workbench/utils/widgets/instrument/instrument_segmented_control.dart';
 
 /// Switches the probe between the shipped shader and the bilinear
 /// reconstruction candidate.
@@ -19,12 +20,11 @@ class SamplingProbeModeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlidingTab(
-      initialIndex: SamplingProbeMode.values.indexOf(mode),
+    return InstrumentSegmentedControl<SamplingProbeMode>(
+      values: SamplingProbeMode.values,
       labels: [for (final value in SamplingProbeMode.values) value.label],
-      onTapCallbacks: [
-        for (final value in SamplingProbeMode.values) () => onChanged(value),
-      ],
+      selected: mode,
+      onChanged: onChanged,
     );
   }
 }

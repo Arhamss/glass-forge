@@ -73,16 +73,13 @@ class GalleryRosterRow extends StatelessWidget {
                   Expanded(
                     child: Text(
                       role.label,
-                      style: context.p2Medium.copyWith(color: foreground),
+                      style: context.callout.copyWith(color: foreground),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Text(
                     adaptation.verb,
-                    style: context.p2Medium.copyWith(
-                      color: foreground,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
+                    style: context.callout.copyWith(color: foreground),
                   ),
                 ],
               ),

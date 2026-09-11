@@ -33,8 +33,7 @@ class TiersView extends StatelessWidget {
               child: BlocBuilder<TierCubit, TierState>(
                 buildWhen: (previous, current) =>
                     previous.resolved.tier != current.resolved.tier ||
-                    previous.resolved.requested !=
-                        current.resolved.requested ||
+                    previous.resolved.requested != current.resolved.requested ||
                     previous.backdrop != current.backdrop,
                 builder: (context, state) {
                   return GlassTierScope(
@@ -43,9 +42,7 @@ class TiersView extends StatelessWidget {
                       backdrop: state.backdrop,
                       tierName: state.resolved.tier.label.toLowerCase(),
                       isForced: state.requested != null,
-                      onBackdropChanged: context
-                          .read<TierCubit>()
-                          .setBackdrop,
+                      onBackdropChanged: context.read<TierCubit>().setBackdrop,
                     ),
                   );
                 },
@@ -76,16 +73,14 @@ class TiersView extends StatelessWidget {
                     const SizedBox(height: 16),
                     BlocBuilder<TierCubit, TierState>(
                       buildWhen: (previous, current) =>
-                          previous.resolved.profile !=
-                          current.resolved.profile,
+                          previous.resolved.profile != current.resolved.profile,
                       builder: (context, state) =>
                           TierProfileGroup(profile: state.resolved.profile),
                     ),
                     const SizedBox(height: 16),
                     BlocBuilder<TierCubit, TierState>(
                       buildWhen: (previous, current) =>
-                          previous.resolved.profile !=
-                          current.resolved.profile,
+                          previous.resolved.profile != current.resolved.profile,
                       builder: (context, state) =>
                           TierMaterialGroup(resolved: state.resolved),
                     ),

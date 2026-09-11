@@ -41,7 +41,7 @@ class InstrumentValueRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: context.p2Medium.copyWith(
+                style: context.callout.copyWith(
                   color: AppColors.stageForegroundMuted,
                 ),
               ),
@@ -50,11 +50,10 @@ class InstrumentValueRow extends StatelessWidget {
             Text(
               value,
               textAlign: TextAlign.end,
-              style: context.p2Medium.copyWith(
+              style: context.mono.copyWith(
                 color: isLive
                     ? AppColors.stageAccent
                     : AppColors.stageForeground,
-                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ],

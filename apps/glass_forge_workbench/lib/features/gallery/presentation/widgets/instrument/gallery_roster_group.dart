@@ -36,7 +36,8 @@ class GalleryRosterGroup extends StatelessWidget {
             onTap: () => onRoleChanged(role),
           ),
         const InstrumentNote(
-          text: 'Two schemes that match mean the surface stopped listening '
+          text:
+              'Two schemes that match mean the surface stopped listening '
               'to the app and started listening to its backdrop. Two that '
               'differ mean it kept the app scheme and paid for legibility '
               'in tint instead.',

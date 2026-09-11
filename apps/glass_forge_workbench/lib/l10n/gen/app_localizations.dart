@@ -8,7 +8,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'app_localizations_en.dart';
-import 'app_localizations_es.dart';
 
 // ignore_for_file: type=lint
 
@@ -93,8 +92,7 @@ abstract class AppLocalizations {
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
-    Locale('en'),
-    Locale('es')
+    Locale('en')
   ];
 
   /// The name of the application
@@ -103,35 +101,53 @@ abstract class AppLocalizations {
   /// **'Glass Forge Workbench'**
   String get appName;
 
-  /// Login button text
+  /// Accessibility label for a back button
   ///
   /// In en, this message translates to:
-  /// **'Login'**
-  String get login;
+  /// **'Back'**
+  String get back;
 
-  /// Logout button text
+  /// Title of the backdrop sampling diagnostic screen
   ///
   /// In en, this message translates to:
-  /// **'Logout'**
-  String get logout;
+  /// **'Sampling probe'**
+  String get samplingProbe;
 
-  /// Home screen title
+  /// Button that restores every control on a screen
   ///
   /// In en, this message translates to:
-  /// **'Home'**
-  String get home;
+  /// **'Reset to defaults'**
+  String get resetToDefaults;
 
-  /// Login screen title
+  /// Material preset name
   ///
   /// In en, this message translates to:
-  /// **'Log in to Continue'**
-  String get loginToContinue;
+  /// **'Dome'**
+  String get presetDome;
 
-  /// Generic error message
+  /// Material preset name
   ///
   /// In en, this message translates to:
-  /// **'Something went wrong. Please try again later.'**
-  String get somethingWentWrong;
+  /// **'Regular'**
+  String get presetRegular;
+
+  /// Material preset name
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get presetClear;
+
+  /// Material preset name
+  ///
+  /// In en, this message translates to:
+  /// **'Tinted'**
+  String get presetTinted;
+
+  /// Material preset name
+  ///
+  /// In en, this message translates to:
+  /// **'Demo'**
+  String get presetDemonstration;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
@@ -143,7 +159,7 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   }
 
   @override
-  bool isSupported(Locale locale) => <String>['en', 'es'].contains(locale.languageCode);
+  bool isSupported(Locale locale) => <String>['en'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
@@ -155,7 +171,6 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
     case 'en': return AppLocalizationsEn();
-    case 'es': return AppLocalizationsEs();
   }
 
   throw FlutterError(

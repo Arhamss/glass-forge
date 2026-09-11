@@ -15,7 +15,7 @@ enum SamplingProbeBackdropStyle {
 extension SamplingProbeBackdropStyleX on SamplingProbeBackdropStyle {
   /// The label shown on the backdrop style toggle.
   String get label => switch (this) {
-        SamplingProbeBackdropStyle.stress => 'Stress',
-        SamplingProbeBackdropStyle.realistic => 'Realistic',
-      };
+    SamplingProbeBackdropStyle.stress => 'Stress',
+    SamplingProbeBackdropStyle.realistic => 'Realistic',
+  };
 }

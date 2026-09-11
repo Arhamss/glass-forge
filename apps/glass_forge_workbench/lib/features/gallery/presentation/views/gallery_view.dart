@@ -40,9 +40,7 @@ class GalleryView extends StatelessWidget {
                     lightStyle: state.styleFor(Brightness.light),
                     darkStyle: state.styleFor(Brightness.dark),
                     backdrop: state.backdrop,
-                    onBackdropChanged: context
-                        .read<GalleryCubit>()
-                        .setBackdrop,
+                    onBackdropChanged: context.read<GalleryCubit>().setBackdrop,
                   );
                 },
               ),
@@ -87,9 +85,9 @@ class GalleryView extends StatelessWidget {
                         adaptation: state.adaptation,
                         lightStyle: state.styleFor(Brightness.light),
                         darkStyle: state.styleFor(Brightness.dark),
-                        minimumContrast:
-                            GalleryState.surfaces.of(state.role)
-                                .minimumContrast,
+                        minimumContrast: GalleryState.surfaces
+                            .of(state.role)
+                            .minimumContrast,
                       ),
                     ),
                   ],

@@ -129,9 +129,9 @@ class _SamplingProbeBackdropPainter extends CustomPainter {
   void _paintGradient(Canvas canvas, Rect region) {
     final paint = Paint()
       ..shader = ui.Gradient.linear(region.topLeft, region.bottomRight, [
-        AppColors.primaryLight,
-        AppColors.surfaceMuted,
-        AppColors.primaryMuted,
+        AppColors.surfaceRaised,
+        AppColors.textSecondary,
+        AppColors.textTertiary,
       ]);
     canvas.drawRect(region, paint);
   }

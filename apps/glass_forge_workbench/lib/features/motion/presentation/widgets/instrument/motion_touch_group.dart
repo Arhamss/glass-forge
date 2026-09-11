@@ -69,7 +69,8 @@ class MotionTouchGroup extends StatelessWidget {
           onChanged: onOverdragResistanceChanged,
         ),
         const InstrumentNote(
-          text: 'The band tracks the finger exactly at rest and approaches '
+          text:
+              'The band tracks the finger exactly at rest and approaches '
               'its limit without ever reaching it, so you can drag hard and '
               'the surface still never leaves its own layer. Push '
               'resistance to 1 and it follows one to one until the limit '

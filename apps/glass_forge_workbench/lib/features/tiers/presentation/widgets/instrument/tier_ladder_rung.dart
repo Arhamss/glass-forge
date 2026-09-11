@@ -71,18 +71,15 @@ class TierLadderRung extends StatelessWidget {
                   Expanded(
                     child: Text(
                       label,
-                      style: context.p2Medium.copyWith(color: foreground),
+                      style: context.callout.copyWith(color: foreground),
                     ),
                   ),
                   if (status.isNotEmpty) ...[
                     const SizedBox(width: 12),
                     Text(
                       status,
-                      style: context.p2Medium.copyWith(
-                        color: isInForce
-                            ? AppColors.stageAccent
-                            : secondary,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                      style: context.callout.copyWith(
+                        color: isInForce ? AppColors.stageAccent : secondary,
                       ),
                     ),
                   ],
@@ -91,10 +88,7 @@ class TierLadderRung extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 effect,
-                style: context.caption.copyWith(
-                  color: secondary,
-                  height: 1.4,
-                ),
+                style: context.caption.copyWith(color: secondary, height: 1.4),
               ),
             ],
           ),

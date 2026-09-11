@@ -1,5 +1,6 @@
 import 'package:glass_forge_workbench/exports.dart';
 import 'package:glass_forge_workbench/utils/enums/sampling_probe_backdrop_style.dart';
+import 'package:glass_forge_workbench/utils/widgets/instrument/instrument_segmented_control.dart';
 
 /// Switches the probe between the worst-case stress backdrop and a smooth,
 /// photographic-style stand-in.
@@ -19,15 +20,13 @@ class SamplingProbeBackdropStyleToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlidingTab(
-      initialIndex: SamplingProbeBackdropStyle.values.indexOf(style),
+    return InstrumentSegmentedControl<SamplingProbeBackdropStyle>(
+      values: SamplingProbeBackdropStyle.values,
       labels: [
         for (final value in SamplingProbeBackdropStyle.values) value.label,
       ],
-      onTapCallbacks: [
-        for (final value in SamplingProbeBackdropStyle.values)
-          () => onChanged(value),
-      ],
+      selected: style,
+      onChanged: onChanged,
     );
   }
 }

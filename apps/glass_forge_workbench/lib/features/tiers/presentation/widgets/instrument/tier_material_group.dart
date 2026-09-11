@@ -54,7 +54,8 @@ class TierMaterialGroup extends StatelessWidget {
         InstrumentValueRow(
           label: 'Renders anything',
           value: effective.rendersAnything ? 'yes' : 'no',
-          note: 'When this reads no, the layer pushes no backdrop pass at '
+          note:
+              'When this reads no, the layer pushes no backdrop pass at '
               'all, so the surface costs nothing instead of paying for a '
               'filter that draws nothing.',
         ),

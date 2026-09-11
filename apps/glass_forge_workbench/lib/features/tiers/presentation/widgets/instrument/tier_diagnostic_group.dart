@@ -17,10 +17,9 @@ class TierDiagnosticGroup extends StatelessWidget {
       cells: [
         Text(
           description,
-          style: context.caption.copyWith(
+          style: context.monoSmall.copyWith(
             color: AppColors.stageForegroundMuted,
             height: 1.6,
-            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
       ],

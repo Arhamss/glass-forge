@@ -3,7 +3,11 @@ import 'package:glass_forge_workbench/exports.dart';
 /// A row of selectable tints for `GlassMaterial.tint`.
 class TintSwatchRow extends StatelessWidget {
   /// Creates the row.
-  const TintSwatchRow({required this.selected, required this.onChanged, super.key});
+  const TintSwatchRow({
+    required this.selected,
+    required this.onChanged,
+    super.key,
+  });
 
   /// The tint currently applied to the material.
   final Color selected;

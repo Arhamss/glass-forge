@@ -16,7 +16,6 @@ class SpecimenCubit extends Cubit<SpecimenState> {
   SpecimenCubit()
     : super(SpecimenState(material: demonstrationGlassMaterial()));
 
-
   /// Picks the specimen's silhouette.
   void setShape(ShowcaseShape shape) => emit(state.copyWith(shape: shape));
 

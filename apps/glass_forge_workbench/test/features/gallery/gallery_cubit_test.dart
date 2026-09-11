@@ -40,8 +40,10 @@ void main() {
       // allows.
       const state = GalleryState(shortSide: 60);
 
-      expect(state.ignoresAmbientScheme(GlassSurfaceRole.navigationBar),
-          isTrue);
+      expect(
+        state.ignoresAmbientScheme(GlassSurfaceRole.navigationBar),
+        isTrue,
+      );
       expect(state.ignoresAmbientScheme(GlassSurfaceRole.card), isFalse);
     });
 
@@ -49,10 +51,14 @@ void main() {
       const small = GalleryState(shortSide: 60);
       const large = GalleryState(shortSide: 200);
 
-      expect(small.ignoresAmbientScheme(GlassSurfaceRole.navigationBar),
-          isTrue);
-      expect(large.ignoresAmbientScheme(GlassSurfaceRole.navigationBar),
-          isFalse);
+      expect(
+        small.ignoresAmbientScheme(GlassSurfaceRole.navigationBar),
+        isTrue,
+      );
+      expect(
+        large.ignoresAmbientScheme(GlassSurfaceRole.navigationBar),
+        isFalse,
+      );
     });
 
     test('every backdrop the rail offers resolves every role', () {
@@ -64,7 +70,8 @@ void main() {
             expect(
               style.labelContrast,
               isNotNull,
-              reason: 'a backdrop is always supplied here, so the contrast '
+              reason:
+                  'a backdrop is always supplied here, so the contrast '
                   'a surface promises is always measurable',
             );
             expect(style.material.tintOpacity, inInclusiveRange(0, 1));
@@ -86,10 +93,12 @@ void main() {
           final state = GalleryState(role: role, shortSide: height);
           final nominal = state.adaptationOf(role);
           for (final paneWidth in paneWidths) {
-            final laidOut = GalleryState.surfaces.of(role).adaptationFor(
-              Size(math.min(state.sizeOf(role).width, paneWidth), height),
-              maxShortSide: GalleryState.tokens.flipMaxShortSide,
-            );
+            final laidOut = GalleryState.surfaces
+                .of(role)
+                .adaptationFor(
+                  Size(math.min(state.sizeOf(role).width, paneWidth), height),
+                  maxShortSide: GalleryState.tokens.flipMaxShortSide,
+                );
             expect(
               laidOut,
               nominal,

@@ -11,7 +11,7 @@ enum SamplingProbeMode {
 extension SamplingProbeModeX on SamplingProbeMode {
   /// The label shown on the mode toggle.
   String get label => switch (this) {
-        SamplingProbeMode.shipped => 'Shipped',
-        SamplingProbeMode.bilinearReconstruction => 'Bilinear',
-      };
+    SamplingProbeMode.shipped => 'Shipped',
+    SamplingProbeMode.bilinearReconstruction => 'Bilinear',
+  };
 }

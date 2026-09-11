@@ -61,7 +61,8 @@ class BlendControlsGroup extends StatelessWidget {
           onChanged: onArrangementChanged,
         ),
         const InstrumentNote(
-          text: 'Bring the gap under the blend width and the shapes should '
+          text:
+              'Bring the gap under the blend width and the shapes should '
               'grow a neck between them before their edges ever meet. Two '
               'circles that only join at the moment they intersect are not '
               'folding. They are overlapping.',

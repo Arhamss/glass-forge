@@ -53,11 +53,13 @@ class TierProfileGroup extends StatelessWidget {
         InstrumentValueRow(
           label: 'Elastic motion',
           value: _onOff(value: profile.elasticMotion),
-          note: 'Read by the motion layer, not the renderer. Reduce Motion '
+          note:
+              'Read by the motion layer, not the renderer. Reduce Motion '
               'is a statement about springs, not about pixels.',
         ),
         const InstrumentNote(
-          text: 'Scales run before floors, so a floor always wins. A '
+          text:
+              'Scales run before floors, so a floor always wins. A '
               'performance rung must not be able to undo something a user '
               'asked for.',
         ),
