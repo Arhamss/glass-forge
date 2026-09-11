@@ -50,8 +50,37 @@ class MatteCodec {
   /// `thickness * 10`, which spends most of the range on values the profile
   /// never reaches.
   static double displacementRangeFor(double edgeRefraction) {
-    return math.max(1e-3, 1.05 * edgeRefraction);
+    return math.max(minimumRange, 1.05 * edgeRefraction);
   }
+
+  /// The smallest range the matte may use, in logical pixels.
+  ///
+  /// This range normalises the **signed distance** as well as the
+  /// displacement, and the final pass resolves coverage, the contour ring and
+  /// the rim from that distance. So it cannot be allowed to collapse just
+  /// because nothing is bending: the floor used to be `1e-3`, and at
+  /// `edgeRefraction: 0` every distance saturated to it. Coverage decodes as
+  /// `clamp(0.5 - distance / scale)`, so every fragment in the matte came out
+  /// about half covered and the glass drew as a **half-opaque rectangle with
+  /// its rounded corners gone**.
+  ///
+  /// That is not a corner case. `edgeRefraction` is zero on the `flat` tier
+  /// and on every Reduce Transparency and Increase Contrast path — the users
+  /// the accessibility work exists for — and Increase Contrast's promised
+  /// "contrasting border" was a uniform darkening rather than a ring for the
+  /// same reason.
+  ///
+  /// 8 logical pixels is the smallest floor that still leaves the contour and
+  /// rim bands (0.12 and 0.18 of the range) a couple of physical pixels at a
+  /// 3x ratio. It is well under `1.05 * 27.42` for every fitted Apple preset,
+  /// so none of them changes.
+  ///
+  /// Sharing one range between the two channels is what forces this
+  /// compromise: a small non-zero refraction now spends most of its range
+  /// unused, which costs displacement precision. Giving the distance its own
+  /// range would be better and is a larger change — both producers, the
+  /// shader codec and this mirror.
+  static const double minimumRange = 8;
 
   /// Encodes one texel. Returns RGBA in 0..1.
   Float32List encode({

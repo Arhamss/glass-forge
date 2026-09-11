@@ -41,6 +41,7 @@ void main() {
 
   _matteContentTests();
   _offOriginTests();
+  _flatShapeTests();
 
   test('produces a generation stamped with the scene revision', () {
     final producer = RuntimeGeometryProducer();
@@ -285,4 +286,73 @@ void _offOriginTests() {
       expect(generation.codec.decode(centre).signedDistance, lessThan(0));
     },
   );
+}
+
+void _flatShapeTests() {
+  test('a shape keeps its corners when nothing refracts', () async {
+    // Regression: the matte's signed distance is normalised by the same
+    // range as the displacement, and `displacementRangeFor` floors that at
+    // 1e-3. At edgeRefraction 0 — every `flat` tier, and every Reduce
+    // Transparency and Increase Contrast path — every distance saturated to
+    // that floor, so coverage decoded to about 0.5 everywhere and the glass
+    // drew as a half-opaque *rectangle* with its rounded corners lost. The
+    // users this hits are exactly the ones the accessibility work is for.
+    //
+    // A range covers coverage, the contour and the rim as well as the
+    // displacement, so it cannot collapse just because nothing is bending.
+    final producer = RuntimeGeometryProducer();
+    addTearDown(producer.dispose);
+    const radius = 40.0;
+    final scene = GlassScene()
+      ..register(
+        'a',
+        ShapeGeometry.resolve(
+          shape: const GlassRoundedRectangle(
+            radius: BorderRadius.all(Radius.circular(radius)),
+          ),
+          size: const Size(200, 200),
+          toLayer: Matrix4.identity(),
+          devicePixelRatio: 1,
+        ),
+      );
+
+    final flat = MatteRequest(
+      devicePixelRatio: 1,
+      maxDisplacement: MatteCodec.displacementRangeFor(0),
+      edgeRefraction: 0,
+      refractionSpread: 0,
+      antialiasWidth: 0.5,
+    );
+    final generation = producer.produce(scene, flat)!;
+    final pixels = (await generation.texture.toByteData())!;
+    final width = generation.texture.width;
+
+    Offset at(double x, double y) => Offset(x, y);
+    double distanceAt(Offset point) => generation.codec.decodeSignedDistance(
+      _texelAt(pixels, width, generation.bounds, point)[2],
+    );
+
+    // Well inside, and outside the top-left corner's arc — the corner of the
+    // bounding box, which a rounded rectangle does not cover.
+    final inside = distanceAt(at(100, 100));
+    final pastCorner = distanceAt(at(4, 4));
+    producer.release(generation);
+
+    // The sign survives the collapse; the magnitude is what dies. The final
+    // pass resolves coverage over about a pixel — `clamp(0.5 - sd / scale)`
+    // — so a distance of 1e-3 lands at 0.4999 inside and 0.5001 outside and
+    // every fragment in the matte comes out half covered. Both sides have to
+    // clear a pixel for the silhouette to exist at all.
+    expect(
+      inside,
+      lessThan(-1),
+      reason: 'the middle decoded at $inside: too small to read as covered',
+    );
+    expect(
+      pastCorner,
+      greaterThan(1),
+      reason: 'the bounding box corner decoded at $pastCorner, inside a '
+          '${radius}px round: the shape draws as a rectangle',
+    );
+  });
 }
