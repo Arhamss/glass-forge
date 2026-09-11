@@ -1,0 +1,21 @@
+{
+  "_provenance": "Seed budgets, not measured device data. No real percentile capture exists for this package yet -- see the sub-project 5 build report. Every scene shares the same generous ceiling (60Hz frame budget of 16.6ms, split so raster p90 gets most of it and build p90 a conservative slice) precisely because there is no basis yet for differentiating them by relative cost. Replace these wholesale with numbers from the first real `flutter run --profile` capture on a representative device, and only then let scenes diverge from each other. A change to this file is a reviewable diff -- do not tighten or loosen a number without a capture to justify it.",
+  "scenes": [
+    { "sceneId": "shape_count_1", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "shape_count_4", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "shape_count_8", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "blend_group_2", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "blend_group_4", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "blend_group_8", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "matte_area_small", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "matte_area_medium", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "matte_area_large", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "frost_sigma_off", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "frost_sigma_default", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "frost_sigma_heavy", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "chromatic_aberration_off", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "chromatic_aberration_on", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "geometry_producer_accelerated", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 },
+    { "sceneId": "geometry_producer_portable", "rasterP90Ms": 16.0, "rasterP99Ms": 20.0, "buildP90Ms": 8.0 }
+  ]
+}
