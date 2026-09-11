@@ -124,7 +124,15 @@ class InteractiveGlass extends StatefulWidget {
 }
 
 class _InteractiveGlassState extends State<InteractiveGlass>
-    with SingleTickerProviderStateMixin {
+    // Plural, not `SingleTickerProviderStateMixin`. Retuning a spring
+    // replaces the controller (see `didUpdateWidget`), and therefore asks
+    // for a second ticker. The single-ticker mixin asserts on that
+    // unconditionally — its guard fires if a ticker was *ever* created, not
+    // if one is still live, so disposing the old controller first does not
+    // satisfy it — and the result was that changing any spring at runtime
+    // threw "multiple tickers were created". Found by the workbench's motion
+    // playground, which exists to do exactly that.
+    with TickerProviderStateMixin {
   late GlassMotionController _controller;
 
   /// Pointer travel since this gesture began, before any rubber band.

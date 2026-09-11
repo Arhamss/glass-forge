@@ -100,6 +100,7 @@ Future<void> _settle(WidgetTester tester, RenderGlassMotion motion) async {
 }
 
 void main() {
+  _retuneTests();
   setUp(() => _BuildCounterState.builds = 0);
 
   testWidgets('a press reaches the surface on pointer down', (tester) async {
@@ -309,5 +310,33 @@ void main() {
     // The retired controller must be dead, not merely unreferenced: its
     // ticker would otherwise keep scheduling frames forever.
     expect(first.isAnimating, isFalse);
+  });
+}
+
+void _retuneTests() {
+  testWidgets('retuning a spring at runtime does not throw', (tester) async {
+    // Regression: the state used SingleTickerProviderStateMixin, whose guard
+    // fires if a ticker was ever created rather than if one is still live.
+    // Replacing the controller to adopt new springs therefore threw
+    // "multiple tickers were created" — so every spring control in the
+    // workbench's motion playground crashed the screen on first use.
+    Widget build(GlassMotion settle) => Directionality(
+      textDirection: TextDirection.ltr,
+      child: GlassLayer(
+        child: InteractiveGlass(
+          settleMotion: settle,
+          drag: const GlassDrag(),
+          child: const Glass(shape: GlassOval()),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(build(const GlassMotion.smooth()));
+    await tester.pumpWidget(build(const GlassMotion.bouncy()));
+    await tester.pumpWidget(
+      build(const GlassMotion.snappy(duration: Duration(milliseconds: 240))),
+    );
+
+    expect(tester.takeException(), isNull);
   });
 }
