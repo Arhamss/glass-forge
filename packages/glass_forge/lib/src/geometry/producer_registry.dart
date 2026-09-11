@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:glass_forge/src/geometry/geometry_producer.dart';
 import 'package:glass_forge/src/geometry/null_geometry_producer.dart';
 import 'package:glass_forge/src/geometry/runtime_geometry_producer.dart';
@@ -51,4 +52,9 @@ abstract final class ProducerRegistry {
 
   /// Clears registrations. Test-only.
   static void debugReset() => _accelerated.clear();
+
+  /// How many accelerated producer factories are currently registered.
+  /// Test-only.
+  @visibleForTesting
+  static int get debugAcceleratedCount => _accelerated.length;
 }

@@ -26,7 +26,7 @@ const String _bundleLegacyPath = 'build/shaderbundles/geometry.shaderbundle';
 /// its bare pubspec-relative path when testing glass_forge itself, unlike the
 /// `flutter: shaders:` entries, which land under both; the bare form is
 /// tried second so the package's own test suite still finds the bundle.
-const List<String> _bundleAssetKeys = <String>[
+const List<String> _defaultBundleAssetKeys = <String>[
   'packages/glass_forge/$_bundleLegacyPath',
   _bundleLegacyPath,
 ];
@@ -40,12 +40,34 @@ const List<String> _bundleAssetKeys = <String>[
 /// Every entry point is guarded. Flutter GPU is experimental, its shader
 /// bundle may not have built, and it does not exist on Skia — so
 /// [capabilities] answers honestly and [produce] returns null rather than
-/// throwing. The registry then falls through to the runtime producer and the
-/// caller never learns anything happened.
+/// throwing.
+///
+/// [capabilities] is honest in two stages, not one, because loading the
+/// shader bundle is unavoidably asynchronous while [capabilities] is not:
+/// before [warmUp] completes, `available` reflects only whether the GPU
+/// backend itself works ([_probe]); a bundle that fails to build is
+/// discovered only once [warmUp] actually tries to load it, at which point
+/// `available` is corrected to `false`. A caller that commits to this
+/// producer from the earlier, optimistic answer — [ProducerRegistry.select]
+/// does, since selection has to be synchronous — is expected to check
+/// [capabilities] again after awaiting [warmUp] and fall back if it
+/// changed; `RenderGlassLayer` does exactly that.
 class GpuGeometryProducer implements GeometryProducer {
+  /// Creates a producer.
+  ///
+  /// [debugBundleAssetKeys] overrides the asset keys [warmUp] tries to load
+  /// the shader bundle from. Test-only: it exists so a test can exercise the
+  /// real bundle-load failure path (not a stand-in for it) deterministically
+  /// — pointing at a key that can never resolve — without needing an
+  /// actually-broken build. Production code must never pass it; the default
+  /// is what `register()`'s zero-argument factory uses.
+  GpuGeometryProducer({List<String>? debugBundleAssetKeys})
+    : _bundleAssetKeys = debugBundleAssetKeys ?? _defaultBundleAssetKeys;
+
   bool? _available;
   gpu.ShaderLibrary? _library;
   final List<ui.Image> _live = <ui.Image>[];
+  final List<String> _bundleAssetKeys;
 
   /// Registers this producer as an accelerated option.
   ///
@@ -116,6 +138,14 @@ class GpuGeometryProducer implements GeometryProducer {
       'instead.',
     );
     _library = null;
+    // The context probe alone said this producer was available; loading the
+    // bundle is what actually settles it, and it just failed. Correcting
+    // `available` here — not just leaving produce() to return null forever
+    // — is what lets a caller that already committed to this producer (see
+    // the class doc) notice and fall back to a producer that works, instead
+    // of rendering unrefracted indefinitely while still claiming to be the
+    // accelerated one.
+    _available = false;
   }
 
   @override

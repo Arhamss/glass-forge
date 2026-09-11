@@ -1,9 +1,46 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:glass_forge/src/geometry/geometry_producer.dart';
+import 'package:glass_forge/src/geometry/gpu_geometry_producer.dart';
+import 'package:glass_forge/src/geometry/matte_generation.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
+import 'package:glass_forge/src/geometry/runtime_geometry_producer.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/rendering/render_glass_layer.dart';
+import 'package:glass_forge/src/scene/glass_scene.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
+
+/// A fake accelerated producer that reports itself available immediately,
+/// but flips to unavailable only once [warmUp] has actually run -- mirroring
+/// `GpuGeometryProducer`'s real two-stage honesty contract (context probe
+/// now, bundle-load result later) without needing real GPU hardware.
+class _OptimisticThenFailingProducer implements GeometryProducer {
+  bool _available = true;
+
+  /// Whether [warmUp] has been called yet.
+  bool warmUpCalled = false;
+
+  @override
+  GeometryCapabilities get capabilities =>
+      GeometryCapabilities(available: _available, name: 'optimistic');
+
+  @override
+  Future<void> warmUp() async {
+    warmUpCalled = true;
+    // Discovered only now -- the moment a real bundle load would resolve --
+    // that this producer cannot actually work.
+    _available = false;
+  }
+
+  @override
+  MatteGeneration? produce(GlassScene scene, MatteRequest request) => null;
+
+  @override
+  void release(MatteGeneration generation) {}
+
+  @override
+  void dispose() {}
+}
 
 /// Records the offset it is actually asked to paint at, then paints
 /// normally.
@@ -119,4 +156,135 @@ void main() {
     },
     tags: <String>['impeller'],
   );
+
+  group('accelerated producer wiring (Task 18 fix round)', () {
+    tearDown(() {
+      ProducerRegistry.debugReset();
+      debugResetAcceleratedProducerRegistration();
+    });
+
+    test(
+      'building a RenderGlassLayer registers an accelerated producer '
+      'without the caller ever naming GpuGeometryProducer '
+      '(regression: C1 -- register() was never called in production)',
+      () {
+        ProducerRegistry.debugReset();
+        debugResetAcceleratedProducerRegistration();
+        expect(ProducerRegistry.debugAcceleratedCount, 0);
+
+        // tier: none on purpose -- registration must happen regardless of
+        // which tier this particular layer asked for, since a later layer
+        // in the same app might ask for accelerated.
+        final layer = RenderGlassLayer(
+          material: const GlassMaterial(),
+          tier: GeometryTier.none,
+          devicePixelRatio: 1,
+        );
+
+        expect(ProducerRegistry.debugAcceleratedCount, greaterThan(0));
+        layer.dispose();
+      },
+    );
+
+    test(
+      'the constructor warms up the selected producer through the '
+      'interface, not just the shared runtime-effect ShaderLibrary '
+      '(regression: C2 -- the constructor hardcoded '
+      'ShaderLibrary.instance.warmUp(), never producer.warmUp())',
+      () async {
+        ProducerRegistry.debugReset();
+        final tracking = _OptimisticThenFailingProducer();
+        ProducerRegistry.registerAccelerated(() => tracking);
+
+        final layer = RenderGlassLayer(
+          material: const GlassMaterial(),
+          tier: GeometryTier.accelerated,
+          devicePixelRatio: 1,
+        );
+        // Confirms the fake really was selected, so warmUpCalled becoming
+        // true below can only be explained by the constructor calling
+        // producer.warmUp() -- ShaderLibrary.instance.warmUp() alone has no
+        // way to reach this unrelated object.
+        expect(identical(layer.debugProducer, tracking), isTrue);
+
+        await pumpEventQueue();
+
+        expect(tracking.warmUpCalled, isTrue);
+        layer.dispose();
+      },
+    );
+
+    test(
+      'a producer that turns out unavailable once warm-up actually runs is '
+      'replaced with the runtime producer, not left returning null forever '
+      '(regression: C3 -- claiming availability it does not have degraded '
+      'every glass layer to permanently unrefracted rendering)',
+      () async {
+        ProducerRegistry.debugReset();
+        ProducerRegistry.registerAccelerated(
+          _OptimisticThenFailingProducer.new,
+        );
+
+        final layer = RenderGlassLayer(
+          material: const GlassMaterial(),
+          tier: GeometryTier.accelerated,
+          devicePixelRatio: 1,
+        );
+        expect(layer.debugProducer, isA<_OptimisticThenFailingProducer>());
+
+        await pumpEventQueue();
+
+        expect(layer.debugProducer, isA<RuntimeGeometryProducer>());
+        layer.dispose();
+      },
+    );
+
+    test(
+      'the real GpuGeometryProducer, with a real usable GPU context but a '
+      'shader bundle that cannot load, falls all the way back to a working '
+      'runtime producer through RenderGlassLayer -- not to blank, '
+      'unrefracted rendering (fail-soft check, re-run with '
+      '--enable-flutter-gpu as flagged in the Task 18 review)',
+      () async {
+        ProducerRegistry.debugReset();
+        // A deliberately-unresolvable asset key, exercising the same
+        // ShaderLibrary.fromAsset failure path a genuinely broken build
+        // would -- see debugBundleAssetKeys' doc comment -- through the
+        // real GpuGeometryProducer, not a fake standing in for it.
+        ProducerRegistry.registerAccelerated(
+          () => GpuGeometryProducer(
+            debugBundleAssetKeys: const [
+              'packages/glass_forge/does/not/exist.shaderbundle',
+            ],
+          ),
+        );
+
+        final layer = RenderGlassLayer(
+          material: const GlassMaterial(),
+          tier: GeometryTier.accelerated,
+          devicePixelRatio: 1,
+        );
+
+        if (!layer.debugProducer.capabilities.available) {
+          // Flutter GPU's own backend is unavailable here (no
+          // --enable-flutter-gpu in this invocation), so ProducerRegistry
+          // .select already fell through to the runtime producer before
+          // construction finished, and the warm-up-time fallback this test
+          // targets never has anything to do. A legitimate outcome, not a
+          // false pass: confirm the trivial case explicitly instead of
+          // silently asserting nothing.
+          expect(layer.debugProducer, isA<RuntimeGeometryProducer>());
+          layer.dispose();
+          return;
+        }
+        expect(layer.debugProducer, isA<GpuGeometryProducer>());
+
+        await pumpEventQueue();
+
+        expect(layer.debugProducer, isA<RuntimeGeometryProducer>());
+        layer.dispose();
+      },
+      tags: ['impeller'],
+    );
+  });
 }

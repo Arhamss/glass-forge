@@ -91,6 +91,45 @@ void main() {
     producer.dispose();
   });
 
+  test(
+    'capabilities.available is corrected to false once warmUp discovers '
+    'the shader bundle cannot load, not left permanently true from the '
+    'context probe alone (regression: C3 -- claiming availability it does '
+    'not have)',
+    () async {
+      // debugBundleAssetKeys points at a key that can never resolve, so this
+      // exercises the real ShaderLibrary.fromAsset failure path -- not a
+      // stand-in for it -- deterministically, without needing an
+      // actually-broken build.
+      final producer = GpuGeometryProducer(
+        debugBundleAssetKeys: const [
+          'packages/glass_forge/does/not/exist.shaderbundle',
+        ],
+      );
+      if (!producer.capabilities.available) {
+        // Flutter GPU's own backend is unavailable here (this environment
+        // was not run with --enable-flutter-gpu), so the bundle-load path
+        // this test targets never starts. A legitimate outcome -- see
+        // dart_test.yaml's `impeller` tag and task-18-fix-report.md.
+        producer.dispose();
+        return;
+      }
+
+      // The context probe alone says available -- the honest, but
+      // provisional, first-stage answer.
+      expect(producer.capabilities.available, isTrue);
+
+      await producer.warmUp();
+
+      // warmUp() tried to load the (deliberately bogus) bundle, failed, and
+      // must have corrected the answer rather than leaving it stuck at the
+      // provisional `true`.
+      expect(producer.capabilities.available, isFalse);
+      producer.dispose();
+    },
+    tags: ['impeller'],
+  );
+
   group('cross-producer matte parity (acceptance criterion 8)', () {
     // Requires a real Impeller/GPU backend, which flutter_tester's default
     // software backend does not provide -- see dart_test.yaml's `impeller`

@@ -159,6 +159,20 @@ void main() {
         ),
       );
 
+      // GlassLayer's default tier is accelerated, which -- since Task 18's
+      // fix round wired GpuGeometryProducer's registration in -- now
+      // genuinely resolves to it under this file's real, usable GPU
+      // context (see the `impeller` tag and its required
+      // --enable-flutter-gpu run flag). Its shader bundle load is a real
+      // engine asset read, which the fake clock a bare testWidgets body
+      // runs under cannot drive to completion -- see _captureRgba's doc
+      // comment above for the identical issue with toImage(); runAsync
+      // drops out of that fake zone so the read actually resolves, and the
+      // extra pump() lets the repaint its completion schedules
+      // (RenderGlassLayer._warmUp -> markNeedsPaint) actually run.
+      await tester.runAsync(pumpEventQueue);
+      await tester.pump();
+
       final layer = tester.renderObject<RenderGlassLayer>(
         find.byType(GlassLayer),
       );
@@ -286,6 +300,10 @@ void main() {
         ),
       );
 
+      // Real GPU shader bundle load; see the first testWidgets above for
+      // why runAsync + the extra pump() are both needed here.
+      await tester.runAsync(pumpEventQueue);
+      await tester.pump();
       final layer = tester.renderObject<RenderGlassLayer>(
         find.byType(GlassLayer),
       );
@@ -375,6 +393,10 @@ void main() {
         ),
       );
 
+      // Real GPU shader bundle load; see the first testWidgets above for
+      // why runAsync + the extra pump() are both needed here.
+      await tester.runAsync(pumpEventQueue);
+      await tester.pump();
       final layer = tester.renderObject<RenderGlassLayer>(
         find.byType(GlassLayer),
       );
