@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/rendering/render_glass_layer.dart';
+import 'package:glass_forge/src/tier/glass_tier_scope.dart';
 
 /// One backdrop capture, shared by every `Glass` beneath it.
 ///
@@ -14,12 +15,18 @@ import 'package:glass_forge/src/rendering/render_glass_layer.dart';
 /// [RenderGlassLayer] always exists and always paints its subtree in place,
 /// with or without a backdrop pass, so descendants are visible from the
 /// first frame and the glass itself fades in once loading finishes.
+///
+/// Under a `GlassTierScope`, the layer adopts the resolved tier: both the
+/// geometry producer and [material] are degraded to what the device, its
+/// temperature, its recent frame times and the user's accessibility settings
+/// allow. With no scope above it, nothing is adopted and the layer renders
+/// exactly what it was given.
 class GlassLayer extends StatelessWidget {
   /// Creates a glass layer.
   const GlassLayer({
     required this.child,
     this.material = const GlassMaterial(),
-    this.tier = GeometryTier.accelerated,
+    this.tier,
     super.key,
   });
 
@@ -27,16 +34,44 @@ class GlassLayer extends StatelessWidget {
   final Widget child;
 
   /// How the glass in this layer looks by default.
+  ///
+  /// A ceiling, not a guarantee. A resolved tier can only reduce it — take
+  /// refraction away, add frost, force a border — never add to it.
   final GlassMaterial material;
 
   /// How much geometry work this layer may do.
-  final GeometryTier tier;
+  ///
+  /// Null adopts the enclosing `GlassTierScope`'s answer, or
+  /// [GeometryTier.accelerated] when there is no scope. Setting it pins the
+  /// producer for this layer regardless of what any scope resolved, which is
+  /// the escape hatch for a surface whose cost is known — a single small
+  /// control that should stay cheap, or a hero surface that should stay rich.
+  ///
+  /// It pins the *producer* only. The material is still degraded by the
+  /// resolved tier, because the parts of that degradation that come from
+  /// accessibility settings are not preferences to opt out of.
+  final GeometryTier? tier;
 
   @override
   Widget build(BuildContext context) {
+    final resolved = GlassTierScope.maybeOf(context);
+    final effective =
+        resolved?.materialFor(
+          material,
+          brightness:
+              MediaQuery.maybePlatformBrightnessOf(context) ??
+              Brightness.light,
+        ) ??
+        material;
+    final geometry = tier ?? resolved?.geometry ?? GeometryTier.accelerated;
+
     return GlassLayerScope(
-      material: material,
-      child: _RawGlassLayer(material: material, tier: tier, child: child),
+      material: effective,
+      child: _RawGlassLayer(
+        material: effective,
+        tier: geometry,
+        child: child,
+      ),
     );
   }
 }
@@ -54,6 +89,10 @@ class GlassLayerScope extends InheritedWidget {
   });
 
   /// The layer's default material.
+  ///
+  /// Already degraded to the resolved tier, so a `Glass` that inherits it
+  /// gets the same treatment as the layer itself rather than the material
+  /// the developer wrote.
   final GlassMaterial material;
 
   /// The nearest enclosing scope, if any.
@@ -92,6 +131,10 @@ class _RawGlassLayer extends SingleChildRenderObjectWidget {
   ) {
     renderObject
       ..material = material
+      // Assigned on every update, not just at creation: a tier that can only
+      // be chosen once would make every downgrade the engine resolves
+      // invisible to the thing that renders.
+      ..tier = tier
       ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
   }
 }
