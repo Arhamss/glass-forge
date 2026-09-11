@@ -95,5 +95,7 @@
 				</array>
 			</dict>
 		</dict>
-	</dict>
+	<key>FLTEnableFlutterGPU</key>
+	<true/>
+</dict>
 </plist>
