@@ -64,6 +64,16 @@ class GpuGeometryProducer implements GeometryProducer {
   GpuGeometryProducer({List<String>? debugBundleAssetKeys})
     : _bundleAssetKeys = debugBundleAssetKeys ?? _defaultBundleAssetKeys;
 
+  /// The context probe's answer, cached for the whole process.
+  ///
+  /// Static, not per-instance: whether Flutter GPU has a usable context is a
+  /// property of the engine, and it cannot change while the app runs. Every
+  /// `GlassLayer` builds its own producer, so a per-instance cache re-probed
+  /// and re-logged once per layer -- which is why the "Flutter GPU is
+  /// unavailable here" line appeared five times in a row on a screen with
+  /// five layers, reading like a repeating fault rather than one fact.
+  static bool? _contextProbe;
+
   bool? _available;
   gpu.ShaderLibrary? _library;
   final List<ui.Image> _live = <ui.Image>[];
@@ -83,18 +93,29 @@ class GpuGeometryProducer implements GeometryProducer {
       );
 
   bool _probe() {
+    final cached = _contextProbe;
+    if (cached != null) {
+      return cached;
+    }
     try {
       // Touch the GPU context. On Skia, on an older Flutter, or when Impeller
       // has no context to hand back yet, this throws — which is an answer,
       // not an error.
-      return _gpuContextIsUsable();
+      return _contextProbe = _gpuContextIsUsable();
     } on Object catch (error) {
       debugPrint(
         'glass_forge: Flutter GPU is unavailable here ($error). Falling back '
         'to the runtime-effect geometry producer.',
       );
-      return false;
+      return _contextProbe = false;
     }
+  }
+
+  /// Clears the process-wide context probe so a test can observe it running
+  /// fresh. Test-only.
+  @visibleForTesting
+  static void debugResetContextProbe() {
+    _contextProbe = null;
   }
 
   bool _gpuContextIsUsable() {

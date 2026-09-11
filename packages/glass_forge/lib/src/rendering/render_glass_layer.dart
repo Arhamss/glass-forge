@@ -9,7 +9,6 @@ import 'package:glass_forge/src/composition/pixel_buckets.dart';
 import 'package:glass_forge/src/composition/retained_clip_chain.dart';
 import 'package:glass_forge/src/diagnostics/render_counters.dart';
 import 'package:glass_forge/src/geometry/geometry_producer.dart';
-import 'package:glass_forge/src/geometry/gpu_geometry_producer.dart';
 import 'package:glass_forge/src/geometry/matte_generation.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/geometry/runtime_geometry_producer.dart';
@@ -17,48 +16,17 @@ import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/scene/glass_scene.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
 
-/// Whether [_ensureAcceleratedProducersRegistered] has already run.
-///
-/// Package-private mutable state, deliberately not a lazily-initialised
-/// `final`: the trigger point has to be an explicit, ordered step inside
-/// [RenderGlassLayer]'s constructor -- before its initializer list calls
-/// [ProducerRegistry.select] -- not merely "the first expression anywhere
-/// that happens to read some top-level value", which is fragile to get the
-/// ordering right for inside a single initializer-list expression.
-bool _acceleratedProducersRegistered = false;
-
-/// Registers [GpuGeometryProducer] as an accelerated option, exactly once
-/// per process, the first time any `GlassLayer` is built.
-///
-/// `GlassLayer` and every other public export never import or name
-/// [GpuGeometryProducer]; this is the one place that does, so a consumer
-/// gets the accelerated path without ever knowing it exists.
-/// `GpuGeometryProducer.register()` only appends a factory to a list -- it
-/// does not construct or probe anything -- so this cannot throw. The
-/// `try`/`catch` is defensive redundancy, not a load-bearing guard: nothing
-/// in this package may ever let registration itself break a consumer's
-/// first frame.
-void _ensureAcceleratedProducersRegistered() {
-  if (_acceleratedProducersRegistered) {
-    return;
-  }
-  _acceleratedProducersRegistered = true;
-  try {
-    GpuGeometryProducer.register();
-  } on Object catch (error) {
-    debugPrint(
-      'glass_forge: registering the Flutter GPU geometry producer failed '
-      '($error). The runtime-effect producer remains available.',
-    );
-  }
-}
-
-/// Un-does [_ensureAcceleratedProducersRegistered]'s "only once" guard, so a
-/// test can observe registration happening fresh, paired with
+/// Un-does the registry's "register the shipped accelerated producers once"
+/// guard, so a test can observe registration happening fresh, paired with
 /// [ProducerRegistry.debugReset]. Test-only.
+///
+/// Kept here as a delegating shim: the guard itself moved to
+/// [ProducerRegistry] when the tier engine's capability probe became a
+/// second caller that needs the list populated, and callers of this name
+/// should not have to care which file holds the flag.
 @visibleForTesting
 void debugResetAcceleratedProducerRegistration() {
-  _acceleratedProducersRegistered = false;
+  ProducerRegistry.debugReset();
 }
 
 /// Owns one backdrop capture and the scene it is shaped by.
@@ -79,7 +47,8 @@ class RenderGlassLayer extends RenderProxyBox {
     required this._material,
     required GeometryTier tier,
     required this._devicePixelRatio,
-  }) : _producer = _selectProducer(tier) {
+  }) : _tier = tier,
+       _producer = _selectProducer(tier) {
     unawaited(_warmUp());
   }
 
@@ -90,7 +59,7 @@ class RenderGlassLayer extends RenderProxyBox {
   /// list uses for `_producer` -- an initializer list has no earlier point
   /// to hook a side effect into.
   static GeometryProducer _selectProducer(GeometryTier tier) {
-    _ensureAcceleratedProducersRegistered();
+    ProducerRegistry.ensureAcceleratedRegistered();
     return ProducerRegistry.select(tier: tier);
   }
 
@@ -113,7 +82,20 @@ class RenderGlassLayer extends RenderProxyBox {
   int? _refreshedRevision;
   int? _refreshedGeneration;
 
+  /// The request [_refreshMatte] last handed [_producer].
+  ///
+  /// The third thing that invalidates a matte, alongside the scene and the
+  /// producer's readiness: the material itself. `edgeRefraction`,
+  /// `refractionSpread` and `maxDisplacement` are baked *into* the matte by
+  /// the geometry pass -- the band's width and profile are pixels in a
+  /// texture, not uniforms applied afterwards -- so changing them without
+  /// re-baking leaves the displacement frozen wherever it was when the
+  /// shapes were last registered. That is precisely what made the
+  /// edge-refraction and refraction-spread sliders appear inert.
+  MatteRequest? _refreshedRequest;
+
   GlassMaterial _material;
+  GeometryTier _tier;
   double _devicePixelRatio;
   bool _disposed = false;
 
@@ -202,6 +184,43 @@ class RenderGlassLayer extends RenderProxyBox {
       return;
     }
     _material = value;
+    markNeedsPaint();
+  }
+
+  /// How much geometry work this layer may do.
+  ///
+  /// Settable, not fixed at construction, because the tier engine downgrades
+  /// live: a device that starts accelerated and then overheats, or starts
+  /// missing frames, has to be able to drop to the runtime producer and then
+  /// to no matte at all without the widget tree being rebuilt around it. A
+  /// construction-only tier would mean the only way to act on a thermal or
+  /// frame-health signal is to throw away the layer -- and with it the
+  /// backdrop capture, the retained clips and every registered shape.
+  ///
+  /// Swapping producers retires the current matte through the producer that
+  /// made it, before that producer is disposed: a generation outlives the
+  /// scene it came from, and releasing it afterwards would hand a texture to
+  /// an owner that has already let go of it.
+  GeometryTier get tier => _tier;
+  set tier(GeometryTier value) {
+    if (_tier == value) {
+      return;
+    }
+    _tier = value;
+    final retiring = _producer;
+    final matte = _matte;
+    if (matte != null) {
+      retiring.release(matte);
+    }
+    _matte = null;
+    _producer = _selectProducer(value);
+    retiring.dispose();
+    // The new producer has not warmed up, so _refreshMatte must ask it again
+    // rather than trust the (revision, generation, request) triple the old
+    // one answered for. Bumping the generation is exactly that signal; the
+    // warm-up bumps it a second time when it settles.
+    _producerGeneration++;
+    unawaited(_warmUp());
     markNeedsPaint();
   }
 
@@ -378,21 +397,20 @@ class RenderGlassLayer extends RenderProxyBox {
     // null -- so an accelerated producer not yet ready on an early paint
     // caused a fresh, wasted `produce()` call on every single subsequent
     // paint before its warm-up settled, not just the one that mattered.
+    final request = MatteRequest(
+      devicePixelRatio: _devicePixelRatio,
+      maxDisplacement: _material.maxDisplacement * _devicePixelRatio,
+      edgeRefraction: _material.edgeRefraction * _devicePixelRatio,
+      refractionSpread: _material.refractionSpread,
+      antialiasWidth: 0.5,
+    );
     if (_refreshedRevision == scene.revision &&
-        _refreshedGeneration == _producerGeneration) {
+        _refreshedGeneration == _producerGeneration &&
+        _refreshedRequest == request) {
       return;
     }
     final existing = _matte;
-    final next = _producer.produce(
-      scene,
-      MatteRequest(
-        devicePixelRatio: _devicePixelRatio,
-        maxDisplacement: _material.maxDisplacement * _devicePixelRatio,
-        edgeRefraction: _material.edgeRefraction * _devicePixelRatio,
-        refractionSpread: _material.refractionSpread,
-        antialiasWidth: 0.5,
-      ),
-    );
+    final next = _producer.produce(scene, request);
     GlassRenderCounters.instance.recordMatteProduce();
     if (existing != null) {
       _producer.release(existing);
@@ -400,6 +418,7 @@ class RenderGlassLayer extends RenderProxyBox {
     _matte = next;
     _refreshedRevision = scene.revision;
     _refreshedGeneration = _producerGeneration;
+    _refreshedRequest = request;
   }
 
   Float32List _coordinateMapping(Offset offset) {

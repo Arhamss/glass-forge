@@ -48,6 +48,36 @@ class MatteRequest {
   /// Computed from the transform basis rather than `fwidth`, which is
   /// unavailable in runtime effects even on Impeller.
   final double antialiasWidth;
+
+  /// Value equality, so a layer can tell whether a re-bake would differ.
+  ///
+  /// Every field here is baked *into* the matte, not applied to it
+  /// afterwards, so a request that differs by any of them describes a
+  /// different matte. A layer that invalidates only on scene changes leaves
+  /// the displacement profile frozen at whatever the material was when the
+  /// shapes were last registered -- which is what made the edge-refraction
+  /// and refraction-spread controls appear to do nothing.
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is MatteRequest &&
+        other.devicePixelRatio == devicePixelRatio &&
+        other.maxDisplacement == maxDisplacement &&
+        other.edgeRefraction == edgeRefraction &&
+        other.refractionSpread == refractionSpread &&
+        other.antialiasWidth == antialiasWidth;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    devicePixelRatio,
+    maxDisplacement,
+    edgeRefraction,
+    refractionSpread,
+    antialiasWidth,
+  );
 }
 
 /// Bakes a scene into a matte.

@@ -52,67 +52,17 @@ out vec4 fragColor;
 
 #include "common/sdf.glsl"
 
-// Identical to geometry.frag's gfSceneDistance -- see there for the fold
-// order and culling rationale. Kept in sync by hand; drift here silently
-// diverges the two producers, which is exactly what the cross-producer
-// golden suite in gpu_geometry_producer_test.dart exists to catch.
-float gfSceneDistance(vec2 p) {
-    float result = 1e9;
-    float groupResult = 1e9;
-    float groupBlend = 0.0;
-    int count = int(uNumShapes);
-
-    for (int i = 0; i < MAX_SHAPES; i++) {
-        if (i >= count) { break; }
-
-        float marker = GF_MARKER(i);
-        bool startsGroup = marker < 0.0;
-        float blend = startsGroup ? -marker - 1.0 : marker;
-
-        // Conservative bound first, matching geometry.frag.
-        float bound = gfBoundLowerBound(i, p);
-        float best = min(result, groupResult);
-        if (bound >= best + blend && !startsGroup) {
-            continue;
-        }
-
-        float d = gfShapeDistance(i, p);
-
-        if (startsGroup) {
-            result = min(result, groupResult);
-            groupResult = d;
-            groupBlend = blend;
-        } else {
-            groupResult = smoothUnion(groupResult, d, groupBlend);
-        }
-    }
-    return min(result, groupResult);
-}
-
+#include "common/scene.glsl"
 #include "common/profile.glsl"
 #include "common/codec.glsl"
+#include "common/matte_pass.glsl"
 
 void main() {
-    vec2 p = gl_FragCoord.xy + frag_info.uOrigin;
-
-    float maxDisplacement = uOptical.x;
-    float edgeRefraction  = uOptical.y;
-    float spread          = uOptical.z;
-    float aaWidth         = uOptical.w;
-
-    float sd = gfSceneDistance(p);
-
-    // Centred half-pixel coverage, matching geometry.frag.
-    float alpha = 1.0 - smoothstep(-aaWidth, aaWidth, sd);
-    if (alpha <= 0.0) {
-        fragColor = vec4(0.0);
-        return;
-    }
-
-    vec2 normal = gfSceneNormal(p, 1.0);
-    float band = mix(edgeRefraction, edgeRefraction * 4.0, clamp(spread, 0.0, 1.0));
-    float magnitude = gfDisplacementMagnitude(min(sd, 0.0), band, edgeRefraction);
-
-    vec4 encoded = gfEncodeMatte(normal, min(sd, 0.0), magnitude, maxDisplacement);
-    fragColor = encoded * alpha;   // premultiplied output
+    // gl_FragCoord is the render target's own raw pixel coordinates, so the
+    // allocation origin is added back to reach the same layer-local space
+    // FlutterFragCoord() reports in geometry.frag -- see the file header.
+    // Everything downstream lives in common/matte_pass.glsl, shared with the
+    // runtime-effect producer.
+    fragColor = gfBakeMatte(gl_FragCoord.xy + frag_info.uOrigin, uOptical.x,
+                            uOptical.y, uOptical.z);
 }

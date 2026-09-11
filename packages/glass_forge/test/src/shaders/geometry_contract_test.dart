@@ -7,6 +7,10 @@ void main() {
   final geometry = File('shaders/geometry.frag').readAsStringSync();
   final profile = File('shaders/common/profile.glsl').readAsStringSync();
   final codec = File('shaders/common/codec.glsl').readAsStringSync();
+  final gpuGeometry =
+      File('shaders/gpu/geometry_fragment.glsl').readAsStringSync();
+  final mattePass =
+      File('shaders/common/matte_pass.glsl').readAsStringSync();
 
   test('MAX_SHAPES matches the Dart constant', () {
     // Drift here silently truncates the shape list, and the missing shapes
@@ -37,6 +41,7 @@ void main() {
     // Apple displaces only an edge band. Losing this makes the effect both
     // more expensive and less faithful.
     expect(profile.contains('gfDisplacementMagnitude'), isTrue);
+    expect(mattePass.contains('gfDisplacementMagnitude'), isTrue);
     expect(profile.contains('-sd >= height'), isTrue);
   });
 
@@ -45,20 +50,19 @@ void main() {
     expect(codec.contains('1.0 - sqrt(1.0 - clamp'), isTrue);
   });
 
-  test('the matte carries a real signed distance on both sides of the edge',
-      () {
-    // Not `min(sd, 0.0)`, and not scaled by coverage. The final pass derives
-    // coverage, the contour and the rim falloff from this channel, so an
-    // interior-clamped value cannot say how far outside a texel is, and a
-    // premultiplied one decays toward the code for "deep inside" at exactly
-    // the fringe where coverage is being resolved.
-    expect(geometry.contains('gfEncodeMatte(normal, sd, magnitude'), isTrue);
-    expect(geometry.contains('encoded * alpha'), isFalse);
-  });
-
-  test('texels past the band encode as outside, never as a zeroed texel', () {
-    // A zeroed texel decodes to -maxDisplacement -- the deep interior --
-    // which would make the padding around every shape read as solid glass.
-    expect(geometry.contains('vec4(0.5, 0.5, 1.0, 0.0)'), isTrue);
+  test('both producers bake the matte through the same shared code', () {
+    // These two shaders each used to carry a hand-copied scene fold and a
+    // hand-copied encode, with comments on both warning that drift between
+    // them silently diverges the producers. The Flutter GPU file aliases its
+    // uniform-block members to the same bare identifiers the runtime-effect
+    // file declares as globals, so the bodies were identical by
+    // construction and now live in common/. This pins that: re-inlining
+    // either one brings the drift hazard back.
+    for (final source in <String>[geometry, gpuGeometry]) {
+      expect(source.contains('common/matte_pass.glsl'), isTrue);
+      expect(source.contains('gfBakeMatte('), isTrue);
+      expect(source.contains('gfEncodeMatte('), isFalse);
+      expect(source.contains('float gfSceneDistance(vec2 p)'), isFalse);
+    }
   });
 }
