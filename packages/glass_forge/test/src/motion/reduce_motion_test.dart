@@ -28,6 +28,22 @@ void main() {
     expect(GlassReduceMotion.instance.value, isTrue);
   });
 
+  testWidgets('honours the iOS-only reduceMotion bit on its own', (
+    tester,
+  ) async {
+    // The two engine bits are not interchangeable. dart:ui documents
+    // reduceMotion as "only supported on iOS", while disableAnimations is
+    // the generic flag Android sets from its animator duration scale.
+    // Gating on disableAnimations alone leaves iOS Reduce Motion doing
+    // nothing at all (flutter#65874) — which is the platform this package
+    // models — so either bit has to count.
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(reduceMotion: true);
+    expect(GlassReduceMotion.instance.value, isTrue);
+  });
+
   testWidgets('notifies when the setting actually changes', (tester) async {
     await tester.pumpWidget(const SizedBox.shrink());
     var notifications = 0;

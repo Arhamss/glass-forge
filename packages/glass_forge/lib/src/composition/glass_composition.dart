@@ -41,6 +41,24 @@ class GlassComposition {
       return _filter;
     }
 
+    if (!ui.ImageFilter.isShaderFilterSupported) {
+      // Skia, and therefore the web canvaskit/html backends. Constructing
+      // `ui.ImageFilter.shader` there throws during paint, which turns the
+      // package's own headline claim -- real refraction where the GPU allows,
+      // graceful degradation everywhere else -- into a crash for anyone who
+      // has not wrapped their app in a `GlassTierScope`. Degrading is the
+      // behaviour a consumer is entitled to by default, not something they
+      // have to opt into, so the frost survives on its own and the
+      // refraction, rim and contour simply do not happen.
+      //
+      // Cached against `snapshot` like the shader path, so a surface whose
+      // frost never changes is not rebuilding a blur every frame.
+      _filter = _blurOnly(material, devicePixelRatio);
+      _snapshot = snapshot;
+      _buildCount++;
+      return _filter;
+    }
+
     final shaderId = debugBilinearBackdropSampling
         ? GlassShaderId.finalRenderBilinearProbe
         : GlassShaderId.finalRender;
@@ -62,6 +80,26 @@ class GlassComposition {
     _snapshot = snapshot;
     _buildCount++;
     return _filter;
+  }
+
+  /// The degraded filter: the frost, and nothing else.
+  ///
+  /// Returns null rather than an identity filter when there is no blur to
+  /// apply — pushing a `BackdropFilter` that does nothing still forces a
+  /// saveLayer and a full backdrop read for every glass surface on screen.
+  static ui.ImageFilter? _blurOnly(
+    GlassMaterial material,
+    double devicePixelRatio,
+  ) {
+    final frost = material.frost * devicePixelRatio;
+    if (frost <= 0) {
+      return null;
+    }
+    return ui.ImageFilter.blur(
+      sigmaX: frost,
+      sigmaY: frost,
+      tileMode: TileMode.mirror,
+    );
   }
 
   void _writeUniforms(

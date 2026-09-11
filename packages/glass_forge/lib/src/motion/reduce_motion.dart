@@ -6,9 +6,17 @@ import 'package:flutter/widgets.dart';
 /// Deliberately **not** `MediaQuery.disableAnimations`.
 /// `MediaQueryData.disableAnimations` is documented not to be set by iOS
 /// Reduce Motion, so anything branching on it is right on Android and
-/// silently wrong on the platform this package models. `dart:ui`'s
-/// `AccessibilityFeatures.disableAnimations` is the engine's own bitmask,
-/// and it is set on both.
+/// silently wrong on the platform this package models.
+///
+/// Reads **both** engine bits, and treats either as a yes. They are not
+/// interchangeable and neither one covers both platforms:
+/// `AccessibilityFeatures.reduceMotion` is documented in `dart:ui` as "only
+/// supported on iOS", while `disableAnimations` is the generic flag Android
+/// sets from its animator duration scale. Gating on `disableAnimations`
+/// alone leaves iOS Reduce Motion doing nothing (flutter#65874); gating on
+/// `reduceMotion` alone leaves Android's setting doing nothing. The union
+/// is the only reading that cannot be silently wrong on one of them, and
+/// over-honouring a request for less motion is the safe direction to err.
 ///
 /// None of this comes from motor: it stores an `AnimationBehavior` on every
 /// controller and never reads it back (see
@@ -45,11 +53,11 @@ class GlassReduceMotion extends ChangeNotifier
   @override
   bool get value => _readFromPlatform();
 
-  static bool _readFromPlatform() => WidgetsBinding
-      .instance
-      .platformDispatcher
-      .accessibilityFeatures
-      .disableAnimations;
+  static bool _readFromPlatform() {
+    final features =
+        WidgetsBinding.instance.platformDispatcher.accessibilityFeatures;
+    return features.disableAnimations || features.reduceMotion;
+  }
 
   /// Re-reads the signal and notifies only on a real change.
   ///
