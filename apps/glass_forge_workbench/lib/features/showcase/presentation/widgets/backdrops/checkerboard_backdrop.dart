@@ -1,55 +1,50 @@
 import 'package:glass_forge_workbench/exports.dart';
 
-/// Proves the renderer snaps glass edges to true device pixels rather than
-/// logical ones.
+/// The backdrop that makes refraction legible: bold, high-contrast squares
+/// whose displacement at the specimen's rim is unmistakable.
 ///
-/// A checkerboard is the sharpest test available for texel snapping: any
-/// half-pixel error in the geometry shows up as a visible shimmer or a
-/// misaligned seam along the specimen's edge. To actually test that, the
-/// squares must be exactly 1 *physical* pixel wide — at a 3x device pixel
-/// ratio, a square sized to 1 *logical* pixel would be 3 physical pixels
-/// wide and hide the error it exists to catch.
+/// Feature size is the whole point. Refraction is only visible as the
+/// *offset of a recognisable feature*, so the backdrop's structure has to be
+/// larger than the displacement — at a 64pt edge refraction, a 3pt stripe is
+/// pushed through twenty-one whole periods and lands looking exactly like
+/// itself. This was originally a 1-*physical*-pixel checkerboard, chosen to
+/// expose half-pixel texel-snapping errors; at that size it averages to flat
+/// grey, shows nothing to a viewer, and costs over a million rects a paint.
+/// The high-frequency snapping case belongs to the diagonals backdrop, whose
+/// off-axis stripes catch it without having to be invisible.
 class CheckerboardBackdrop extends StatelessWidget {
   /// Creates the backdrop.
   const CheckerboardBackdrop({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
-    return ColoredBox(
+    return const ColoredBox(
       color: AppColors.stageGround,
       child: SizedBox.expand(
-        child: CustomPaint(
-          painter: CheckerboardPainter(devicePixelRatio: devicePixelRatio),
-        ),
+        child: CustomPaint(painter: CheckerboardPainter()),
       ),
     );
   }
 }
 
-/// Paints [CheckerboardBackdrop]'s grid at exactly 1 physical pixel per
-/// square.
+/// Paints [CheckerboardBackdrop]'s grid.
 ///
 /// Public (not `_`-prefixed) so a widget test can construct it directly and
-/// assert [squareSize] tracks the device pixel ratio rather than being
-/// pinned to a fixed logical size.
+/// assert [squareSize] stays large enough to survive being refracted.
 class CheckerboardPainter extends CustomPainter {
-  /// Creates the painter for the given [devicePixelRatio].
-  const CheckerboardPainter({required this.devicePixelRatio});
-
-  /// The device pixel ratio the checker squares are sized against.
-  final double devicePixelRatio;
+  /// Creates the painter.
+  const CheckerboardPainter();
 
   /// Edge length of one checker square, in logical pixels.
   ///
-  /// The canvas a [CustomPainter] draws into is scaled to the device pixel
-  /// ratio at composite time, so a square this size in logical units
-  /// rasterises to exactly one physical pixel.
-  double get squareSize => 1 / devicePixelRatio;
+  /// Comfortably larger than the largest edge refraction the instrument
+  /// offers, so the displacement at the rim reads as a *bent* square rather
+  /// than an identical one a few periods over.
+  double get squareSize => 28;
 
   // Backdrop content, not UI chrome — deliberately outside AppColors, the
   // same way a photograph's pixels would be.
-  static const _lightSquare = Color(0xFF2A3242);
+  static const _lightSquare = Color(0xFF48536E);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -82,6 +77,5 @@ class CheckerboardPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CheckerboardPainter oldDelegate) =>
-      oldDelegate.devicePixelRatio != devicePixelRatio;
+  bool shouldRepaint(covariant CheckerboardPainter oldDelegate) => false;
 }

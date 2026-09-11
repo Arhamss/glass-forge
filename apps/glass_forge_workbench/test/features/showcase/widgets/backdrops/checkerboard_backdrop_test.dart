@@ -4,21 +4,16 @@ import 'package:glass_forge_workbench/features/showcase/presentation/widgets/bac
 
 void main() {
   testWidgets(
-    'CheckerboardBackdrop sizes its squares to device pixels, not logical '
-    'ones',
+    'CheckerboardBackdrop keeps its squares larger than the refraction it '
+    'has to survive',
     (tester) async {
-      const devicePixelRatio = 3.0;
-
       await tester.pumpWidget(
-        const MediaQuery(
-          data: MediaQueryData(devicePixelRatio: devicePixelRatio),
-          child: Directionality(
-            textDirection: TextDirection.ltr,
-            child: SizedBox(
-              width: 200,
-              height: 200,
-              child: CheckerboardBackdrop(),
-            ),
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: SizedBox(
+            width: 200,
+            height: 200,
+            child: CheckerboardBackdrop(),
           ),
         ),
       );
@@ -29,12 +24,13 @@ void main() {
       expect(painter, isA<CheckerboardPainter>());
       final squareSize = (painter! as CheckerboardPainter).squareSize;
 
-      // A true 1-physical-pixel square is 1/devicePixelRatio logical
-      // pixels. If the painter were sized to 1 *logical* pixel instead,
-      // squareSize would be 1.0 regardless of devicePixelRatio — exactly
-      // the bug this test exists to catch.
-      expect(squareSize, closeTo(1 / devicePixelRatio, 1e-9));
-      expect(squareSize, isNot(closeTo(1.0, 1e-9)));
+      // Refraction is only visible as the offset of a recognisable feature.
+      // A square smaller than the displacement is pushed through whole
+      // periods of the pattern and lands looking exactly like itself, so the
+      // glass appears to do nothing — which is what a 1-physical-pixel grid
+      // did here before. The instrument's edge-refraction slider tops out
+      // well under this, so the bend always stays legible.
+      expect(squareSize, greaterThanOrEqualTo(24));
     },
   );
 }

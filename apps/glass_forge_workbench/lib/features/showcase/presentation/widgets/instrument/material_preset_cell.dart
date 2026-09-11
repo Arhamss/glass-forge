@@ -5,12 +5,19 @@ class MaterialPresetCell extends StatelessWidget {
   /// Creates the cell.
   const MaterialPresetCell({
     required this.label,
+    required this.isSelected,
     required this.onTap,
     super.key,
   });
 
   /// The preset's name, e.g. `'Regular · Dark'`.
   final String label;
+
+  /// Whether the specimen's material currently equals this preset.
+  ///
+  /// Without this a preset row reads as dead: tapping a cell that is already
+  /// active, or whose effect is subtle, gives no acknowledgement at all.
+  final bool isSelected;
 
   /// Called when the cell is tapped.
   final VoidCallback onTap;
@@ -28,7 +35,9 @@ class MaterialPresetCell extends StatelessWidget {
           vertical: 10,
         ),
         decoration: BoxDecoration(
-          color: AppColors.stageGround,
+          color: isSelected
+              ? AppColors.stageForeground.withValues(alpha: 0.12)
+              : AppColors.stageGround,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.stageBorder),
         ),
@@ -37,7 +46,9 @@ class MaterialPresetCell extends StatelessWidget {
           textAlign: TextAlign.center,
           maxLines: 2,
           style: context.captionMedium.copyWith(
-            color: AppColors.stageForegroundMuted,
+            color: isSelected
+                ? AppColors.stageForeground
+                : AppColors.stageForegroundMuted,
           ),
         ),
       ),

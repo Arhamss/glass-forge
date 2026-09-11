@@ -116,7 +116,7 @@ void main() {
     // Contour: the darkened ring that reads as the edge of a solid object.
     // A boundary line, so a quarter of the refraction band rather than a
     // wash over the whole surface.
-    float contourBand = max(1.0, uOptical.x * 0.25);
+    float contourBand = max(1.0, uOptical.x * 0.12);
     float contourT = clamp(1.0 - depth / contourBand, 0.0, 1.0);
     refracted *= 1.0 - uLighting.w * contourT * contourT;
 
@@ -127,12 +127,16 @@ void main() {
     float facing = dot(normal, lightDir);
     float rim = max(0.0, facing) + 0.8 * max(0.0, -facing);
 
-    // Confined to the band the lensing occupies, so the highlight sits where
-    // the bend is. Without this falloff the term ran at full strength across
-    // the entire interior, and since an SDF gradient is piecewise constant
-    // inside a rounded box it painted flat wedges of brightness meeting at
-    // the centre rather than a lit edge.
-    float rimBand = max(1.0, uOptical.x);
+    // Confined to a thin strip at the boundary. Without any falloff the term
+    // ran at full strength across the entire interior, and since an SDF
+    // gradient is piecewise constant inside a rounded box it painted flat
+    // wedges of brightness meeting at the centre rather than a lit edge.
+    //
+    // A *thin* strip specifically: at the full width of the refraction band
+    // the wedges are still what you see, just with a gradient on them --
+    // the shape reads as a bevelled plastic button rather than a lit glass
+    // edge. A rim is a highlight on a boundary, not a shading of the body.
+    float rimBand = max(1.0, uOptical.x * 0.18);
     float rimT = clamp(1.0 - depth / rimBand, 0.0, 1.0);
     float rimFalloff = rimT * rimT * rimT;
 

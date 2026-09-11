@@ -12,6 +12,7 @@ class ShapeVariantGroup extends StatelessWidget {
   /// Creates the group.
   const ShapeVariantGroup({
     required this.shape,
+    required this.material,
     required this.variant,
     required this.onShapeChanged,
     required this.onVariantChanged,
@@ -21,6 +22,9 @@ class ShapeVariantGroup extends StatelessWidget {
 
   /// The specimen's current silhouette.
   final ShowcaseShape shape;
+
+  /// The specimen's current material, used to mark the active preset.
+  final GlassMaterial material;
 
   /// The material's current variant.
   final GlassVariant variant;
@@ -51,7 +55,10 @@ class ShapeVariantGroup extends StatelessWidget {
           selected: variant,
           onChanged: onVariantChanged,
         ),
-        MaterialPresetRow(onPresetSelected: onPresetSelected),
+        MaterialPresetRow(
+          material: material,
+          onPresetSelected: onPresetSelected,
+        ),
       ],
     );
   }

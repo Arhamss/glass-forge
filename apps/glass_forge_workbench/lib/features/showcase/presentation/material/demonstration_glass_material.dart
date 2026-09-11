@@ -14,15 +14,28 @@ import 'package:glass_forge_workbench/constants/app_colors.dart';
 /// nothing left to refract through.
 ///
 /// This material is not fitted data; it is tuned so the optical bend at
-/// the specimen's rim is the thing a viewer notices — tint kept low, edge
-/// refraction pushed well past the fitted `27.42` so the backdrop visibly
-/// displaces, a light frost that reads as glass without smearing the
-/// refraction, and a faint chromatic edge.
+/// the specimen's rim is the thing a viewer notices — tint kept low, a
+/// faint chromatic edge, and an edge refraction close to the fitted value
+/// rather than far above it.
+///
+/// Pushing the refraction up does not make the bend more visible, it makes
+/// it stop reading as a bend. The band is `edgeRefraction` wide, so at 64 it
+/// swallowed nearly half the specimen's half-width and the undistorted
+/// interior shrank to a small central square — with the band's own boundary
+/// showing as hard diagonal seams where a rounded rectangle's SDF normal
+/// changes quadrant. The result reads as a bevelled plastic button. A narrow
+/// band against a coarse backdrop is what reads as glass.
+///
+/// The frost is deliberately far below the fitted value. Blur is what
+/// destroys the evidence of refraction: it erases the backdrop structure
+/// whose displacement is the only thing making the bend visible. At the
+/// fitted sigma a finely-patterned backdrop flattens to grey inside the
+/// shape and the glass reads as a solid.
 GlassMaterial demonstrationGlassMaterial() {
   return const GlassMaterial().copyWith(
-    edgeRefraction: 64,
-    frost: 6,
-    chromaticAberration: 1.5,
+    edgeRefraction: 28,
+    frost: 3,
+    chromaticAberration: 0.35,
     tint: AppColors.stageForeground,
     tintOpacity: 0.1,
     highlight: 1.2,

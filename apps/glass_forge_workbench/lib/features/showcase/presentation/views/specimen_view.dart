@@ -55,11 +55,17 @@ class SpecimenView extends StatelessWidget {
                             constraints.maxHeight,
                           ) *
                           _specimenSizeFraction;
-                      return GlassLayer(
-                        material: state.material,
-                        child: SpecimenStage(
-                          backdrop: state.backdrop,
-                          onBackdropChanged: cubit.setBackdrop,
+                      // The GlassLayer sits *inside* the stage, above the
+                      // backdrop. A backdrop filter refracts what was painted
+                      // behind it; wrapping the whole stage put the backdrop
+                      // inside the layer, so the glass sampled the scaffold
+                      // behind the stage and the backdrop then painted over
+                      // the filter's output entirely.
+                      return SpecimenStage(
+                        backdrop: state.backdrop,
+                        onBackdropChanged: cubit.setBackdrop,
+                        child: GlassLayer(
+                          material: state.material,
                           child: SizedBox(
                             width: specimenSize,
                             height: specimenSize,
@@ -89,6 +95,7 @@ class SpecimenView extends StatelessWidget {
                           final cubit = context.read<SpecimenCubit>();
                           return ShapeVariantGroup(
                             shape: state.shape,
+                            material: state.material,
                             variant: state.material.variant,
                             onShapeChanged: cubit.setShape,
                             onVariantChanged: cubit.setVariant,
