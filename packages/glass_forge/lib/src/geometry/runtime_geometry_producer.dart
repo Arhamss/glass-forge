@@ -92,9 +92,16 @@ class RuntimeGeometryProducer implements GeometryProducer {
     for (var s = 0; s < kMaxShapes; s++) {
       if (s < shapes.length) {
         final g = shapes[s];
+        // Layer-local, not allocation-relative. FlutterFragCoord reports the
+        // pre-translation space the translated Canvas draws into, which is
+        // already layer-local; subtracting the allocation origin here as
+        // well applied that offset twice. Invisible for a shape at its
+        // layer's top-left, where the allocation starts at about zero, and
+        // fatal everywhere else — the SDF is evaluated entirely off the
+        // shape and the whole matte encodes "outside".
         shader
-          ..setFloat(i++, g.origin.dx - allocation.left)
-          ..setFloat(i++, g.origin.dy - allocation.top)
+          ..setFloat(i++, g.origin.dx)
+          ..setFloat(i++, g.origin.dy)
           ..setFloat(i++, g.halfExtent.width)
           ..setFloat(i++, g.halfExtent.height)
           ..setFloat(i++, g.inverseBasis[0])

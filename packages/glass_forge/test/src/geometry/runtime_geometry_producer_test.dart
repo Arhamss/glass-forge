@@ -40,6 +40,7 @@ void main() {
   tearDownAll(ShaderLibrary.instance.disposeAll);
 
   _matteContentTests();
+  _offOriginTests();
 
   test('produces a generation stamped with the scene revision', () {
     final producer = RuntimeGeometryProducer();
@@ -236,4 +237,52 @@ void _matteContentTests() {
     // and the padding around every shape would read as solid glass.
     expect(baked.codec.decode(corner).signedDistance, greaterThan(0));
   });
+}
+
+void _offOriginTests() {
+  test(
+    'a shape away from its layer origin still bakes as inside at its centre',
+    () async {
+      // Regression: both producers wrote shape origins relative to the
+      // matte allocation (`origin - allocation.left`) while evaluating the
+      // SDF at a *layer-local* coordinate — FlutterFragCoord in the
+      // pre-translation space here, gl_FragCoord plus an origin uniform in
+      // the Flutter GPU producer. The allocation offset was therefore
+      // applied twice. It is invisible for a shape at its layer's top-left,
+      // where the allocation starts at about zero — which is every shape
+      // the earlier tests used, and the workbench's specimen screen, which
+      // is why it survived. Anywhere else the SDF is evaluated entirely off
+      // the shape: the blend screen's two circles rendered as nothing at all.
+      final producer = RuntimeGeometryProducer();
+      addTearDown(producer.dispose);
+      final scene = GlassScene()
+        ..register(
+          'a',
+          ShapeGeometry.resolve(
+            shape: const GlassOval(),
+            size: const Size(96, 96),
+            toLayer: Matrix4.translationValues(300, 220, 0),
+            devicePixelRatio: 1,
+          ),
+        );
+
+      final generation = producer.produce(scene, _request)!;
+      final pixels = (await generation.texture.toByteData())!;
+      final centre = _texelAt(
+        pixels,
+        generation.texture.width,
+        generation.bounds,
+        const Offset(348, 268),
+      );
+      producer.release(generation);
+
+      expect(
+        generation.bounds.left,
+        greaterThan(200),
+        reason: 'the test only means something if the allocation is well '
+            'away from the layer origin',
+      );
+      expect(generation.codec.decode(centre).signedDistance, lessThan(0));
+    },
+  );
 }

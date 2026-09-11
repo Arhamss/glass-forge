@@ -11,7 +11,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge/src/diagnostics/render_counters.dart';
-import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/rendering/render_glass_layer.dart';
 import 'package:glass_forge/src/rendering/render_glass_shape.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';

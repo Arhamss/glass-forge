@@ -16,6 +16,7 @@ export 'src/design/glass_surfaces.dart';
 export 'src/design/glass_theme.dart';
 export 'src/design/glass_tint.dart';
 export 'src/design/glass_tokens.dart';
+export 'src/geometry/producer_registry.dart' show GeometryTier;
 export 'src/glass_forge.dart';
 export 'src/material/glass_material.dart';
 export 'src/material/glass_variant.dart';

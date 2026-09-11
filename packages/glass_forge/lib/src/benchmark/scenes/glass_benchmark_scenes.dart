@@ -2,7 +2,6 @@ import 'package:flutter/widgets.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge/src/benchmark/scenes/benchmark_backdrop.dart';
 import 'package:glass_forge/src/benchmark/scenes/benchmark_scene.dart';
-import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/shapes/shape_limits.dart';
 
 /// The fixed backdrop size every scene renders against.

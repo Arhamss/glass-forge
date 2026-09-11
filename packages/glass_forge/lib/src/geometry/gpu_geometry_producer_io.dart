@@ -332,8 +332,14 @@ class GpuGeometryProducer implements GeometryProducer {
       final g = shapes[s];
       final base = shapeDataOffset + s * 3 * 16;
       final values = <double>[
-        g.origin.dx - allocation.left,
-        g.origin.dy - allocation.top,
+        // Layer-local, matching the runtime-effect producer: the shader adds
+        // uOrigin to gl_FragCoord to reach layer-local space, so subtracting
+        // the allocation origin here too applied it twice. The two
+        // producers agreed with each other byte for byte — which is why the
+        // cross-producer golden passed — and were both wrong for any shape
+        // not at its layer's top-left.
+        g.origin.dx,
+        g.origin.dy,
         g.halfExtent.width,
         g.halfExtent.height,
         g.inverseBasis[0],

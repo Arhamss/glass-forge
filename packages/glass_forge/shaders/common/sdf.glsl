@@ -69,7 +69,18 @@ float sdEllipse(vec2 p, vec2 ab) {
         t = clamp(t, 0.0, 1.5707963268);
     }
     vec2 nearest = e * vec2(cos(t), sin(t));
-    return length(nearest - q) * sign(q.y - nearest.y);
+    // The sign comes from the ellipse's own implicit equation, not from
+    // comparing q.y against the nearest point's y. That comparison is zero
+    // on the whole horizontal axis: q.y is 0 there, and whenever the Newton
+    // step overshoots to t <= 0 the clamp above snaps it to exactly 0, so
+    // nearest.y is exactly 0 too and sign(0) wipes out the distance — inside
+    // or outside. It drew a hairline through every oval and a little way
+    // past its edges. Whether the step overshoots depends on the GPU's
+    // sin/asin precision: Skia's CPU raster lands a hair above zero and gets
+    // lucky, Metal does not, which is why no test in the untagged lane could
+    // see it. The implicit test has no such dependence.
+    vec2 n = q / e;
+    return length(nearest - q) * sign(dot(n, n) - 1.0);
 }
 
 // Rounded superellipse, matching Flutter's own RoundedSuperellipse so the
