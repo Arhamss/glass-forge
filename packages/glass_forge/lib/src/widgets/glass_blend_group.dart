@@ -12,7 +12,12 @@ class GlassBlendGroup extends StatefulWidget {
   /// The subtree whose glass merges.
   final Widget child;
 
-  /// How wide the merge is, in logical pixels.
+  /// The widest gap between two members that still merges them, in
+  /// logical pixels.
+  ///
+  /// Members closer than this join through a smooth neck; further apart,
+  /// they stay separate shapes. Overlapping members always merge, and the
+  /// larger this is, the softer the join.
   final double blend;
 
   @override

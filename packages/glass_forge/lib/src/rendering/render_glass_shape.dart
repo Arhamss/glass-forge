@@ -122,14 +122,27 @@ class RenderGlassShape extends RenderProxyBox {
 
   /// The marker this shape's geometry carries, derived from group
   /// membership: whoever [BlendGroupLink.isFirst] names opens the group.
-  double get _blendMarker {
+  ///
+  /// What the marker carries is the smooth-min's own width, which is not
+  /// the number the caller gave. [BlendGroupLink.blend] is the widest gap
+  /// that merges, in logical pixels. The shader's quadratic smooth-min
+  /// lowers the surface by at most a quarter of its width, so a gap closes
+  /// when half of it is under that: width = 2 x blend. And it goes in
+  /// physical pixels, like every other length the shader folds with.
+  ///
+  /// Both used to be missing. The logical value went through unscaled,
+  /// four to six times too narrow on a 2-3x phone: a gap the Blend screen
+  /// said would bridge did not, or bridged through a pinched thread, and
+  /// the fold's cull -- which trusts the same width -- dropped shapes the
+  /// merge still needed.
+  double _blendMarker(double devicePixelRatio) {
     final link = _group;
     if (link == null) {
       return encodeBlendMarker(startsGroup: true, blend: 0);
     }
     return encodeBlendMarker(
       startsGroup: link.isFirst(this),
-      blend: link.blend,
+      blend: 2 * link.blend * devicePixelRatio,
     );
   }
 
@@ -193,7 +206,7 @@ class RenderGlassShape extends RenderProxyBox {
         size: size,
         toLayer: transform,
         devicePixelRatio: target.devicePixelRatio,
-        blendMarker: _blendMarker,
+        blendMarker: _blendMarker(target.devicePixelRatio),
       ),
       _material,
       _group,

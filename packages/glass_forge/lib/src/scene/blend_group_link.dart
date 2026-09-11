@@ -38,7 +38,8 @@ class BlendGroupLink extends ChangeNotifier {
 
   double _blend;
 
-  /// How wide the smooth-min between members is, in logical pixels.
+  /// The widest gap between two members that still merges them, in logical
+  /// pixels. See `GlassBlendGroup.blend`.
   ///
   /// Mutable, not replaced: swapping in a whole new [BlendGroupLink] when
   /// this changes would force every still-attached member to migrate

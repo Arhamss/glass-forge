@@ -136,8 +136,16 @@ void main() {
 
     expect(markers, hasLength(2));
     expect(markers.where((m) => m.startsGroup), hasLength(1));
+    // The marker carries the smooth-min's own width, in physical pixels:
+    // twice the blend (the widest gap that merges -- the smooth-min lowers
+    // the surface by a quarter of its width) at this view's pixel ratio.
+    // It used to carry the logical 16 untouched, which on this 3x view ran
+    // the merge six times too narrow.
     for (final marker in markers) {
-      expect(marker.blend, closeTo(16, 1e-9));
+      expect(
+        marker.blend,
+        closeTo(2 * 16 * tester.view.devicePixelRatio, 1e-9),
+      );
     }
   });
 
