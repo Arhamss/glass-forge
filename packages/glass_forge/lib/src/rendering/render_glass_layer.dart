@@ -632,15 +632,38 @@ class RenderGlassLayer extends RenderProxyBox {
   /// needing a value only "before the compositing phase of the pipeline",
   /// and assigning it calls `markNeedsAddToScene` for exactly this.
   ///
-  /// Siblings, never nested. Nesting is what flutter#187820 is about (see
-  /// [GlassComposition]); siblings are the ordinary arrangement of two
-  /// `BackdropFilter`s side by side. A pass writes transparent black outside
-  /// its own shapes' coverage and composites srcOver, so what a later pass
-  /// reads as backdrop is the untouched original everywhere the earlier
-  /// passes did not draw. Where two materials' shapes genuinely overlap the
-  /// later one samples the earlier one's glass — glass sampling glass, which
-  /// Apple's own guidance says not to do, and which is the reason to put
-  /// overlapping surfaces in one material or one blend group.
+  /// Siblings, never nested — but be clear about what that does and does not
+  /// buy. An earlier version of this comment claimed nesting is what
+  /// flutter#187820 is about. **That is wrong**, and the issue itself says
+  /// so: its title is "BackdropFilter(ImageFilter.shader) *stacked above*
+  /// another BackdropFilter samples stale previous-frame backdrop including
+  /// its own output", and its minimal repro is two ordinary siblings in one
+  /// `Stack` — a glass tab bar with a shader filter positioned over it. On a
+  /// physical iPhone the upper filter's input is resolved from a stale copy
+  /// that includes its own previous output, so it feeds back and converges to
+  /// an opaque white wash within a few frames. The simulator composites
+  /// correctly and reproduces nothing. The issue is closed, but by a bot for
+  /// lack of a reply, not by a fix.
+  ///
+  /// So the arrangement below is exposed wherever two passes overlap. A pass
+  /// writes transparent black outside its own shapes' coverage and composites
+  /// srcOver, so where the earlier passes drew nothing the later one reads
+  /// the untouched original — but each pass currently covers the whole layer
+  /// clip, not its own shapes, so two materials in one layer stack across the
+  /// entire layer whether or not their shapes meet.
+  ///
+  /// Clipping each pass to its own shapes' bounds would remove that for
+  /// non-overlapping materials, and make every pass cheaper. It is not as
+  /// simple as clipping to the coverage: the shader samples the backdrop up
+  /// to the full displacement away from each shape, and a composed frost
+  /// blur reaches further again, so the clip has to be inflated by both or
+  /// every rim picks up mirrored-edge artefacts. That wants a physical device
+  /// to verify, which is also the only way to confirm #187820 here at all.
+  ///
+  /// Where two materials' shapes genuinely overlap, the later one samples the
+  /// earlier one's glass — glass sampling glass, which Apple's own guidance
+  /// says not to do, and the reason to put overlapping surfaces in one
+  /// material or one blend group.
   void _pushBackdropPasses(
     PaintingContext context,
     Offset offset,
