@@ -131,6 +131,18 @@ class RenderGlassLayer extends RenderProxyBox {
   /// the material: each retained clip is re-pushed here, outside this
   /// layer's own offset, so it stays anchored to its own ancestor's bounds
   /// instead of moving with this layer's content.
+  ///
+  /// Each retained clip's own transform only accounts for its own step in
+  /// the chain (see [RetainedClip.transform]), so nesting them still leaves
+  /// the canvas transformed by their full composition once the innermost
+  /// one is reached -- that composition is undone in one step, right
+  /// before the real content paints, since the content already expects
+  /// this layer's own frame. Skipping that undo (or reusing each clip's
+  /// transform as if it were already relative to the layer) is exactly
+  /// what displaced both the backdrop and the widget subtree by however
+  /// far a retained clip sat from the layer -- see
+  /// `retained_clip_chain_test.dart`'s "a clip offset from the layer does
+  /// not displace the content it clips" for the regression this guards.
   void _pushGlassLayers(
     PaintingContext context,
     Offset offset,
@@ -155,10 +167,43 @@ class RenderGlassLayer extends RenderProxyBox {
       });
     }
 
-    // Innermost first when building the closure chain, so that the
-    // outermost clip ends up outermost in the layer tree.
-    var paint = pushBackdrop;
-    for (final captured in _clipChain.clips) {
+    final clips = _clipChain.clips;
+    if (clips.isEmpty) {
+      // The common case, and the only one Task 15 had to handle: skip the
+      // transform bookkeeping below entirely rather than pay for an
+      // identity pushTransform every frame.
+      pushBackdrop(context, offset);
+      return;
+    }
+
+    var accumulated = Matrix4.identity();
+    for (final captured in clips) {
+      accumulated = accumulated.multiplied(captured.transform);
+    }
+
+    // Composing every clip's own transform, outermost first, reconstructs
+    // exactly the transform from the innermost captured clip's local space
+    // to this layer's -- the same value `innermostNode.getTransformTo(
+    // layer)` would produce, with no ancestor path double-counted. Undoing
+    // it here, once, right before the real content, is what keeps that
+    // content in this layer's own frame despite everything nested around
+    // it above.
+    var paint = (PaintingContext innerContext, Offset innerOffset) {
+      innerContext.pushTransform(
+        needsCompositing,
+        innerOffset,
+        Matrix4.inverted(accumulated),
+        pushBackdrop,
+      );
+    };
+
+    // Reversed: `clips` is outermost first, but building the closure chain
+    // must process the outermost clip *last* so it ends up as the
+    // outermost invocation once nesting unwinds -- processing it first
+    // would instead leave the innermost clip outermost in the layer tree,
+    // composing the chain's transforms in the opposite order to the one
+    // `accumulated` above undoes.
+    for (final captured in clips.reversed) {
       final next = paint;
       paint = (innerContext, innerOffset) {
         innerContext.pushTransform(

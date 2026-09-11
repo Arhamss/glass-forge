@@ -303,4 +303,121 @@ void main() {
 
     expect(hardEdge.matches(antiAlias), isFalse);
   });
+
+  test(
+    "composing the chain's transforms, outermost first, reconstructs the "
+    "innermost clip's true transform to the layer even when clips sit at "
+    'a non-identity offset from each other '
+    '(regression: each transform was absolute to the layer, so nesting '
+    'them applied the path two clips share twice)',
+    () {
+      final shape = _leaf();
+      final innerClip = RenderClipRect(child: shape);
+      final betweenClips = RenderPadding(
+        padding: const EdgeInsets.only(left: 10, top: 10),
+        child: innerClip,
+      );
+      final outerClip = RenderClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: betweenClips,
+      );
+      final aboveOuterClip = RenderPadding(
+        padding: const EdgeInsets.only(left: 20, top: 20),
+        child: outerClip,
+      );
+      final layer = RenderConstrainedBox(
+        additionalConstraints: const BoxConstraints.tightFor(
+          width: 200,
+          height: 200,
+        ),
+        child: aboveOuterClip,
+      );
+      _attachAndLayout(layer, const Size(200, 200));
+
+      final chain = RetainedClipChain()..collect(shape, layer);
+      expect(chain.clips, hasLength(2));
+
+      // The same left-to-right fold _pushGlassLayers uses when it composes
+      // every clip's transform to find (and then undo) the net shift left
+      // once the innermost clip is reached.
+      var composed = Matrix4.identity();
+      for (final clip in chain.clips) {
+        composed = composed.multiplied(clip.transform);
+      }
+
+      expect(composed, innerClip.getTransformTo(layer));
+      // The Padding between the two clips means this would fail if either
+      // clip's transform were absolute to the layer instead of relative to
+      // its own parent in the chain: the 20-logical-pixel offset above
+      // outerClip would then be counted twice.
+      expect(composed, isNot(Matrix4.identity()));
+    },
+  );
+
+  test(
+    'a RenderClipRect with clipBehavior none contributes no clip',
+    () {
+      final shape = _leaf();
+      final clip = RenderClipRect(clipBehavior: Clip.none, child: shape);
+      final layer = RenderConstrainedBox(
+        additionalConstraints: const BoxConstraints.tightFor(
+          width: 60,
+          height: 60,
+        ),
+        child: clip,
+      );
+      _attachAndLayout(layer, const Size(60, 60));
+
+      final chain = RetainedClipChain()..collect(shape, layer);
+
+      // Not just "no crash": a clip this chain still tried to re-push
+      // would be pointless work at best, since pushClipRect/pushClipRRect
+      // already no-op for Clip.none -- but every entry here also carries a
+      // pushTransform, which is not free.
+      expect(chain.clips, isEmpty);
+    },
+  );
+
+  test(
+    "a RenderClipRect's custom clipper narrows the captured rect",
+    () {
+      final shape = _leaf();
+      final clip = RenderClipRect(
+        clipper: const _FixedRectClipper(Rect.fromLTWH(0, 0, 30, 30)),
+        child: shape,
+      );
+      final layer = RenderConstrainedBox(
+        additionalConstraints: const BoxConstraints.tightFor(
+          width: 60,
+          height: 60,
+        ),
+        child: clip,
+      );
+      _attachAndLayout(layer, const Size(60, 60));
+
+      final chain = RetainedClipChain()..collect(shape, layer);
+
+      expect(chain.clips, hasLength(1));
+      // Not clip.paintBounds (0,0,60,60) -- the clipper's approximate rect,
+      // which describeApproximatePaintClip is the one to know about.
+      expect(chain.clips.single.rect, const Rect.fromLTWH(0, 0, 30, 30));
+    },
+  );
+}
+
+/// A [CustomClipper] that always reports the same approximate rect,
+/// regardless of the size it is asked to clip.
+class _FixedRectClipper extends CustomClipper<Rect> {
+  const _FixedRectClipper(this.rect);
+
+  final Rect rect;
+
+  @override
+  Rect getClip(Size size) => rect;
+
+  @override
+  Rect getApproximateClipRect(Size size) => rect;
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Rect> oldClipper) => false;
 }
