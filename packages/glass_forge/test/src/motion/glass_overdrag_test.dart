@@ -53,6 +53,27 @@ void main() {
         expect(band.rawForScalar(band.applyToScalar(raw)), closeTo(raw, 1e-6));
       }
     });
+
+    test(
+      'stays finite past the asymptote, so a gesture that grabs a surface '
+      'a fling pushed out of the band is still a live gesture',
+      () {
+        // Without a cap the inverse diverges and every later pointer delta
+        // is lost in the noise: the surface can neither be pulled further
+        // out nor dragged back, for the rest of the gesture.
+        for (final beyond in <double>[48, 60, 400]) {
+          final resumed = band.rawForScalar(beyond);
+          expect(resumed.isFinite, isTrue);
+          expect(band.applyToScalar(resumed), lessThan(48));
+
+          // Stiff this deep in a band is correct; unable to move at all is
+          // not. Both directions must still change the surface's position.
+          final here = band.applyToScalar(resumed);
+          expect(band.applyToScalar(resumed + 200), greaterThan(here));
+          expect(band.applyToScalar(resumed - 200), lessThan(here));
+        }
+      },
+    );
   });
 
   group('GlassOverdrag.none', () {

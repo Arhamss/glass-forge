@@ -78,14 +78,30 @@ class GlassOverdrag {
   /// Needed when a gesture starts on a surface that is already displaced:
   /// the accumulated pointer travel has to resume from where the band
   /// currently sits, or the surface jumps as soon as the finger moves.
+  ///
+  /// Capped at [_maxInverseTravel] limits of pointer travel. The band is
+  /// asymptotic, so inverting a displacement at or past [limit] — which a
+  /// fling reaches, since a fling overshoots the band and springs back —
+  /// diverges. The cap is about arithmetic, not feel: a gesture resuming
+  /// from a value ten orders of magnitude larger than its own deltas would
+  /// be numerically dead for its whole life, unable to carry the surface
+  /// further out *or* bring it back. Being stiff that deep in a rubber band
+  /// is correct; being unable to move at all is not. The cap is far past
+  /// any real gesture, so it never touches an in-band inverse.
   double rawForScalar(double banded) {
     if (!isActive || banded == 0) {
       return banded;
     }
-    final magnitude = banded.abs().clamp(0.0, limit * (1 - 1e-9));
-    final raw = limit * magnitude / (resistance * (limit - magnitude));
-    return raw * banded.sign;
+    final ceiling = limit * _maxInverseTravel;
+    final magnitude = banded.abs();
+    final raw = magnitude >= limit
+        ? ceiling
+        : limit * magnitude / (resistance * (limit - magnitude));
+    return (raw < ceiling ? raw : ceiling) * banded.sign;
   }
+
+  /// How many [limit]s of pointer travel [rawForScalar] will report.
+  static const double _maxInverseTravel = 64;
 
   @override
   bool operator ==(Object other) {
