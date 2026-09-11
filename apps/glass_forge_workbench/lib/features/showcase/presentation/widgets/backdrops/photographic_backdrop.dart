@@ -17,24 +17,33 @@ class PhotographicBackdrop extends StatelessWidget {
   // Backdrop content, not UI chrome — deliberately outside AppColors, the
   // same way a photograph's pixels would be. Colours carry transparent
   // stops so each blob fades into the ground rather than showing a hard
-  // gradient edge.
+  // gradient edge. One blob sits near the frame's centre with a tight
+  // radius — where a specimen usually lands — so refraction always has a
+  // real, high-contrast edge to bend rather than a smooth average.
   static const _blobs = [
-    Alignment(-0.6, -0.7),
-    Alignment(0.7, -0.2),
-    Alignment(-0.2, 0.8),
-    Alignment(0.9, 0.9),
+    Alignment(-0.65, -0.75),
+    Alignment(0.75, -0.35),
+    Alignment(-0.05, -0.05),
+    Alignment(0.55, 0.6),
+    Alignment(-0.75, 0.65),
+    Alignment(0.15, 0.95),
   ];
+  static const _blobRadii = [0.9, 0.85, 0.45, 0.8, 0.85, 0.9];
   static const _blobColors = [
-    Color(0xFF3B5A8C),
-    Color(0xFF8C4A3B),
-    Color(0xFF3B8C6E),
-    Color(0xFF8C7A3B),
+    Color(0xFF2E5AA8),
+    Color(0xFFD9502B),
+    Color(0xFF2E9E7A),
+    Color(0xFFC9832E),
+    Color(0xFF7A3EB1),
+    Color(0xFFC23B6B),
   ];
   static const _blobTransparent = [
-    Color(0x003B5A8C),
-    Color(0x008C4A3B),
-    Color(0x003B8C6E),
-    Color(0x008C7A3B),
+    Color(0x002E5AA8),
+    Color(0x00D9502B),
+    Color(0x002E9E7A),
+    Color(0x00C9832E),
+    Color(0x007A3EB1),
+    Color(0x00C23B6B),
   ];
 
   @override
@@ -49,7 +58,7 @@ class PhotographicBackdrop extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: RadialGradient(
                   center: _blobs[i],
-                  radius: 1.2,
+                  radius: _blobRadii[i],
                   colors: [_blobColors[i], _blobTransparent[i]],
                 ),
               ),

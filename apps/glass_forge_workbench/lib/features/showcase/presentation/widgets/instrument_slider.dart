@@ -57,8 +57,8 @@ class InstrumentSlider extends StatelessWidget {
             Text(
               '${value.toStringAsFixed(fractionDigits)} $unit',
               style: context.p2Medium.copyWith(
-                fontFamily: 'monospace',
                 color: AppColors.stageForeground,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ],

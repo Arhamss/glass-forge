@@ -7,7 +7,7 @@ class AppRouter {
       _rootNavigatorKey.currentState?.context;
 
   static final router = GoRouter(
-    initialLocation: AppRoutes.splash,
+    initialLocation: AppRoutes.specimen,
     debugLogDiagnostics: true,
     navigatorKey: _rootNavigatorKey,
     redirect: (context, state) {
@@ -20,6 +20,7 @@ class AppRouter {
       const publicRoutes = <String>[
         AppRoutes.splash,
         AppRoutes.loginScreen,
+        AppRoutes.specimen,
         AppRoutes.samplingProbe,
       ];
 
@@ -49,6 +50,11 @@ class AppRouter {
         name: AppRouteNames.loginScreen,
         path: AppRoutes.loginScreen,
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        name: AppRouteNames.specimen,
+        path: AppRoutes.specimen,
+        builder: (context, state) => const SpecimenView(),
       ),
       GoRoute(
         name: AppRouteNames.samplingProbe,
