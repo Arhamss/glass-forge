@@ -16,6 +16,7 @@ environment:
 # tidiness.
 workspace:
   - packages/glass_forge
+  - packages/glass_forge/example
   - apps/glass_forge_workbench
   - apps/glass_forge_benchmark
 
