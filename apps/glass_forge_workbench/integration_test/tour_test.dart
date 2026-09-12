@@ -120,8 +120,8 @@ void main() {
     }
 
     // The same screens at twice the text size, in this run rather than a
-    // second one: pumping the app twice leaves the platform's reduce
-    // transparency stream with nothing to cancel.
+    // second one: one app for the whole tour keeps the run short, and the
+    // screens are the subject either way.
     tester.platformDispatcher.textScaleFactorTestValue = 2;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pump();
