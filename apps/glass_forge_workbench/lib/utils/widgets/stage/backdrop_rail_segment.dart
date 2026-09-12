@@ -1,8 +1,8 @@
 import 'package:glass_forge_workbench/exports.dart';
+import 'package:glass_forge_workbench/utils/widgets/primitives/pressable_scale.dart';
 
-/// One label in the `BackdropRail` segmented control.
+/// One option in the `BackdropRail`.
 class BackdropRailSegment extends StatelessWidget {
-  /// Creates the segment.
   const BackdropRailSegment({
     required this.label,
     required this.isSelected,
@@ -10,45 +10,44 @@ class BackdropRailSegment extends StatelessWidget {
     super.key,
   });
 
-  /// The backdrop's display name.
   final String label;
-
-  /// Whether this segment is the currently picked backdrop.
   final bool isSelected;
-
-  /// Called when the segment is tapped.
   final VoidCallback onTap;
+
+  /// The drawn height. The rail's own padding lifts the touch target to the
+  /// 44 pt floor.
+  static const double height = 38;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return PressableScale(
       onTap: onTap,
-      child: ConstrainedBox(
-        // The hit area meets the 44pt touch-target floor even though the
-        // visual pill below it stays thin — Center expands to fill this
-        // box without stretching the pill it wraps.
-        constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
-        child: Center(
-          child: Container(
-            padding: const EdgeInsetsDirectional.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? AppColors.stageForeground.withValues(alpha: 0.12)
-                  : AppColors.transparent,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              label,
-              style: context.captionMedium.copyWith(
-                color: isSelected
-                    ? AppColors.stageForeground
-                    : AppColors.stageForegroundMuted,
-              ),
-            ),
+      isSelected: isSelected,
+      semanticLabel: label,
+      pressedScale: 0.94,
+      // A fixed height, not a minimum: a Container with an alignment and
+      // loose constraints — which an Align at the foot of a stage hands it —
+      // grows to the full height available, and the rail swallowed the stage.
+      child: AnimatedContainer(
+        duration: AppMotion.select,
+        curve: AppMotion.selectCurve,
+        height: height,
+        alignment: Alignment.center,
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.s8,
+          vertical: AppSpacing.s8,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.selectedFill : AppColors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.rPill),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: context.captionMedium.copyWith(
+            color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
           ),
         ),
       ),

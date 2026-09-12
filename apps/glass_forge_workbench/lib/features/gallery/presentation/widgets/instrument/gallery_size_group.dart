@@ -13,12 +13,16 @@ class GallerySizeGroup extends StatelessWidget {
   /// Creates the group.
   const GallerySizeGroup({
     required this.shortSide,
+    required this.maxShortSide,
     required this.onShortSideChanged,
     super.key,
   });
 
   /// The height every demonstration surface is drawn at.
   final double shortSide;
+
+  /// The tallest the stage can draw right now.
+  final double maxShortSide;
 
   /// Called as the height is dragged.
   final ValueChanged<double> onShortSideChanged;
@@ -33,7 +37,7 @@ class GallerySizeGroup extends StatelessWidget {
           value: shortSide,
           unit: 'px',
           min: GalleryState.minShortSide,
-          max: GalleryState.maxShortSide,
+          max: maxShortSide,
           fractionDigits: 0,
           onChanged: onShortSideChanged,
         ),

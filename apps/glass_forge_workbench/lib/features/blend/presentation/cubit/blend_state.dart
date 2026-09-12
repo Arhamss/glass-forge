@@ -31,7 +31,9 @@ class BlendState extends Equatable {
   static const minSeparation = 60.0;
 
   /// The furthest, in logical pixels.
-  static const maxSeparation = 240.0;
+  /// Two nodes plus this must fit the narrowest phone stage with a margin:
+  /// 96 + 180 is 276, inside a 320 pt stage's 288 pt of usable width.
+  static const maxSeparation = 180.0;
 
   /// The widest merge the slider offers, in logical pixels.
   static const maxBlend = 64.0;
@@ -69,11 +71,18 @@ class BlendState extends Equatable {
     final half = separation / 2;
     return switch (arrangement) {
       BlendArrangement.pair => <Offset>[Offset(-half, 0), Offset(half, 0)],
-      BlendArrangement.triad => <Offset>[
-        Offset(-half, -separation / (2 * math.sqrt(3))),
-        Offset(half, -separation / (2 * math.sqrt(3))),
-        Offset(0, separation / math.sqrt(3)),
-      ],
+      BlendArrangement.triad => () {
+        // Centred on the triangle's bounding box rather than its centroid:
+        // a centroid-centred triad hangs low enough to reach the caption.
+        final row = separation / (2 * math.sqrt(3));
+        final apex = separation / math.sqrt(3);
+        final shift = (apex - row) / 2;
+        return <Offset>[
+          Offset(-half, -row - shift),
+          Offset(half, -row - shift),
+          Offset(0, apex - shift),
+        ];
+      }(),
     };
   }
 

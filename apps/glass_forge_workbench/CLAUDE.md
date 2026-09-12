@@ -105,6 +105,10 @@ Widgets use `context.l10n.key`; enums, extensions and state use
 - Scrollables inside a tab pad their end by `ShellInsets.bottomClearance`.
 - Phones are portrait-only; tablets keep all orientations.
 - Rows that pair a label with a value: label `Expanded`, value `Flexible`.
+- **A `Container`/`AnimatedContainer` with an `alignment` fills the space it
+  is given.** Inside an `Align`, a `bottomNavigationBar` or anything else with
+  loose constraints it grows to full height and swallows the screen's
+  gestures. Give bars, pills and segments an explicit height.
 
 ---
 

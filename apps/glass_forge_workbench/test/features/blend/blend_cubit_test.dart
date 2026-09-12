@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge_workbench/features/blend/presentation/cubit/blend_cubit.dart';
 import 'package:glass_forge_workbench/features/blend/presentation/cubit/blend_state.dart';
@@ -91,19 +92,19 @@ void main() {
     });
 
     test('a triad stays centred on the stage', () {
+      // Centred on the bounding box, not the centroid: the apex sits further
+      // from the centre than the base row does, so a centroid-centred triad
+      // hangs low and meets the caption on a short stage.
       const state = BlendState(
         arrangement: BlendArrangement.triad,
         separation: 150,
       );
       final centres = state.nodeCentres;
+      final xs = centres.map((c) => c.dx).toList();
+      final ys = centres.map((c) => c.dy).toList();
 
-      final centroidX =
-          centres.map((c) => c.dx).reduce((a, b) => a + b) / centres.length;
-      final centroidY =
-          centres.map((c) => c.dy).reduce((a, b) => a + b) / centres.length;
-
-      expect(centroidX, closeTo(0, 0.001));
-      expect(centroidY, closeTo(0, 0.001));
+      expect(xs.reduce(math.min) + xs.reduce(math.max), closeTo(0, 0.001));
+      expect(ys.reduce(math.min) + ys.reduce(math.max), closeTo(0, 0.001));
     });
 
     test('a pair is exactly the separation apart', () {
@@ -112,6 +113,21 @@ void main() {
 
       expect(centres, hasLength(2));
       expect((centres.first - centres.last).distance, closeTo(170, 0.001));
+    });
+  });
+
+  group('arrangement geometry', () {
+    test('a pair is centred on the origin', () {
+      const state = BlendState();
+      final centres = state.nodeCentres;
+      expect(centres.first.dx, -centres.last.dx);
+      expect(centres.every((c) => c.dy == 0), isTrue);
+    });
+
+    test('two nodes at full separation fit the narrowest stage', () {
+      const state = BlendState(separation: BlendState.maxSeparation);
+      final span = state.separation + BlendState.nodeDiameter;
+      expect(span, lessThanOrEqualTo(320 - 32));
     });
   });
 }

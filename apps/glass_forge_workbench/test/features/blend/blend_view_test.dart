@@ -1,7 +1,9 @@
+import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_workbench/exports.dart';
 import 'package:glass_forge_workbench/features/blend/presentation/cubit/blend_cubit.dart';
+import 'package:glass_forge_workbench/features/blend/presentation/cubit/blend_state.dart';
 import 'package:glass_forge_workbench/features/blend/presentation/views/blend_view.dart';
 import 'package:glass_forge_workbench/features/blend/presentation/widgets/blend_stage.dart';
 import 'package:glass_forge_workbench/utils/enums/blend_arrangement.dart';
@@ -99,7 +101,10 @@ void main() {
       await tester.drag(find.byType(BlendStage), const Offset(30, 0));
       await tester.pumpAndSettle();
 
-      expect(_cubitOf(tester).state.separation, before + 60);
+      expect(
+        _cubitOf(tester).state.separation,
+        math.min(before + 60, BlendState.maxSeparation),
+      );
     });
   });
 }

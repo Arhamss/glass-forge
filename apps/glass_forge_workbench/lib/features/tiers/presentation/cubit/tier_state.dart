@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:glass_forge/glass_forge.dart';
+import 'package:glass_forge_workbench/features/tiers/data/models/tier_rung_status.dart';
 import 'package:glass_forge_workbench/utils/enums/glass_backdrop.dart';
 
 /// State for the tiers screen.
@@ -42,6 +43,26 @@ class TierState extends Equatable {
   ).tier;
 
   /// Returns a copy with the given fields replaced.
+  /// What [tier]'s rung is doing, or the automatic rung's when null.
+  ///
+  /// Only one rung can be [TierRungStatus.inForce] — the pin, or automatic
+  /// when nothing is pinned — and only one can be rendering.
+  TierRungStatus statusFor(GlassTier? tier) {
+    if (tier == null) {
+      return requested == null ? TierRungStatus.inForce : TierRungStatus.none;
+    }
+    final outcome = outcomeFor(tier);
+    if (tier == requested) {
+      return outcome == tier ? TierRungStatus.inForce : TierRungStatus.heldAt;
+    }
+    if (tier == resolved.tier) return TierRungStatus.rendering;
+    if (outcome != tier) return TierRungStatus.wouldHoldAt;
+    return TierRungStatus.none;
+  }
+
+  /// The tier a rung would hold at, for the statuses that name one.
+  GlassTier heldTierFor(GlassTier tier) => outcomeFor(tier);
+
   TierState copyWith({ResolvedTier? resolved, GlassBackdrop? backdrop}) {
     return TierState(
       resolved: resolved ?? this.resolved,

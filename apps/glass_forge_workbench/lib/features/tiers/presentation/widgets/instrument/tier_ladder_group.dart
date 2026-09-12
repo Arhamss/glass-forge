@@ -1,5 +1,6 @@
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_workbench/exports.dart';
+import 'package:glass_forge_workbench/features/tiers/data/models/tier_rung_status.dart';
 import 'package:glass_forge_workbench/features/tiers/presentation/cubit/tier_state.dart';
 import 'package:glass_forge_workbench/features/tiers/presentation/widgets/instrument/tier_ladder_rung.dart';
 import 'package:glass_forge_workbench/utils/extensions/glass_tier_extensions.dart';
@@ -22,21 +23,15 @@ class TierLadderGroup extends StatelessWidget {
   /// Called with the rung to pin, or null to go back to automatic.
   final ValueChanged<GlassTier?> onTierForced;
 
-  String _statusFor(GlassTier tier) {
-    final isInForce = tier == state.resolved.tier;
-    final isPinned = tier == state.requested;
-    final outcome = state.outcomeFor(tier);
-    if (isPinned && outcome != tier) {
-      return 'held at ${outcome.label.toLowerCase()}';
-    }
-    if (isInForce) {
-      return 'in force';
-    }
-    if (outcome != tier) {
-      return 'would hold at ${outcome.label.toLowerCase()}';
-    }
-    return '';
-  }
+  String _words(TierRungStatus status, GlassTier tier) => switch (status) {
+    TierRungStatus.inForce => 'in force',
+    TierRungStatus.rendering => 'rendering now',
+    TierRungStatus.heldAt =>
+      'held at ${state.heldTierFor(tier).label.toLowerCase()}',
+    TierRungStatus.wouldHoldAt =>
+      'would hold at ${state.heldTierFor(tier).label.toLowerCase()}',
+    TierRungStatus.none => '',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +43,9 @@ class TierLadderGroup extends StatelessWidget {
           effect:
               'Let capability, heat, frame health and the accessibility '
               'settings decide, and re-decide, on their own.',
-          status: state.requested == null ? 'in force' : '',
+          status: state.statusFor(null) == TierRungStatus.inForce
+              ? 'in force'
+              : '',
           isSelected: state.requested == null,
           isInForce: state.requested == null,
           onTap: () => onTierForced(null),
@@ -57,7 +54,7 @@ class TierLadderGroup extends StatelessWidget {
           TierLadderRung(
             label: tier.label,
             effect: tier.effect,
-            status: _statusFor(tier),
+            status: _words(state.statusFor(tier), tier),
             isSelected: tier == state.requested,
             isInForce: tier == state.resolved.tier,
             onTap: () => onTierForced(tier),

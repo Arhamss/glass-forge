@@ -45,42 +45,43 @@ class TierStage extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         GlassBackdropSurface(backdrop: backdrop),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final size =
-                math.min(constraints.maxWidth, constraints.maxHeight) *
-                _specimenSizeFraction;
-            return Center(
-              child: GlassLayer(
-                material: demonstrationGlassMaterial(),
-                child: SizedBox(
-                  width: size,
-                  height: size,
-                  child: const Glass(
-                    shape: GlassSuperellipse(
-                      radius: BorderRadius.all(Radius.circular(28)),
+        Column(
+          children: [
+            // The specimen is centred in the room left above the caption and
+            // the rail, not in the whole stage: centred in the stage, its
+            // lower edge ran under the caption on a short screen.
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final size =
+                      math.min(constraints.maxWidth, constraints.maxHeight) *
+                      _specimenSizeFraction;
+                  return Center(
+                    child: GlassLayer(
+                      material: demonstrationGlassMaterial(),
+                      child: SizedBox(
+                        width: size,
+                        height: size,
+                        child: const Glass(
+                          shape: GlassSuperellipse(
+                            radius: BorderRadius.all(Radius.circular(28)),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
-            );
-          },
-        ),
-        Align(
-          alignment: Alignment.bottomCenter,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              StageCaption(
-                text: isForced
-                    ? 'tier $tierName  ·  pinned'
-                    : 'tier $tierName  ·  resolved',
-                isLive: isForced,
-              ),
-              const SizedBox(height: 12),
-              BackdropRail(selected: backdrop, onChanged: onBackdropChanged),
-            ],
-          ),
+            ),
+            StageCaption(
+              text: isForced
+                  ? 'tier $tierName  ·  pinned'
+                  : 'tier $tierName  ·  resolved',
+              isLive: isForced,
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            BackdropRail(selected: backdrop, onChanged: onBackdropChanged),
+          ],
         ),
       ],
     );

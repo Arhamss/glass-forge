@@ -26,10 +26,10 @@ enum GlassBackdrop {
 extension GlassBackdropX on GlassBackdrop {
   /// The label shown on the backdrop-picker rail.
   String get label => switch (this) {
-    GlassBackdrop.checkerboard => 'Checkerboard',
-    GlassBackdrop.diagonals => 'Diagonals',
-    GlassBackdrop.photographic => 'Photographic',
-    GlassBackdrop.gradientMesh => 'Gradient mesh',
+    GlassBackdrop.checkerboard => 'Checker',
+    GlassBackdrop.diagonals => 'Lines',
+    GlassBackdrop.photographic => 'Photo',
+    GlassBackdrop.gradientMesh => 'Mesh',
     GlassBackdrop.pureBlack => 'Void',
   };
 

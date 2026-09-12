@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_workbench/features/gallery/presentation/cubit/gallery_state.dart';
@@ -15,13 +17,37 @@ class GalleryCubit extends Cubit<GalleryState> {
   /// Carrying the previous role's height over would show a 180 pt button
   /// and a 44 pt sheet, and the flip gate reads exactly that number — so
   /// the screen would be answering a question nobody asked.
-  void setRole(GlassSurfaceRole role) =>
-      emit(state.copyWith(role: role, shortSide: role.naturalShortSide));
+  void setRole(GlassSurfaceRole role) => emit(
+    state.copyWith(
+      role: role,
+      shortSide: math.min(role.naturalShortSide, state.availableShortSide),
+    ),
+  );
+
+  /// Tells the state how tall a surface the stage can actually draw, so the
+  /// slider and every readout stay inside it.
+  void setAvailableShortSide(double available) {
+    final clamped = math.max(available, GalleryState.minShortSide);
+    if (clamped == state.availableShortSide) return;
+    emit(
+      state.copyWith(
+        availableShortSide: clamped,
+        shortSide: math.min(state.shortSide, clamped),
+      ),
+    );
+  }
 
   /// Picks what the surfaces are drawn over, and told they are over.
   void setBackdrop(GlassBackdrop backdrop) =>
       emit(state.copyWith(backdrop: backdrop));
 
   /// Sets the height every demonstration surface is drawn at.
-  void setShortSide(double value) => emit(state.copyWith(shortSide: value));
+  void setShortSide(double value) => emit(
+    state.copyWith(
+      shortSide: value.clamp(
+        GalleryState.minShortSide,
+        state.availableShortSide,
+      ),
+    ),
+  );
 }

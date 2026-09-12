@@ -5,6 +5,7 @@ import 'package:glass_forge_workbench/features/gallery/presentation/widgets/gall
 import 'package:glass_forge_workbench/features/gallery/presentation/widgets/instrument/gallery_resolution_group.dart';
 import 'package:glass_forge_workbench/features/gallery/presentation/widgets/instrument/gallery_roster_group.dart';
 import 'package:glass_forge_workbench/features/gallery/presentation/widgets/instrument/gallery_size_group.dart';
+import 'package:glass_forge_workbench/features/gallery/presentation/widgets/stage_size_reporter.dart';
 
 /// The five semantic surfaces, one at a time, drawn twice: once in a light
 /// app and once in a dark one, over the same backdrop and at the size the
@@ -28,21 +29,25 @@ class GalleryView extends StatelessWidget {
           children: [
             Expanded(
               flex: 55,
-              child: BlocBuilder<GalleryCubit, GalleryState>(
-                buildWhen: (previous, current) =>
-                    previous.role != current.role ||
-                    previous.backdrop != current.backdrop ||
-                    previous.shortSide != current.shortSide,
-                builder: (context, state) {
-                  return GalleryStage(
-                    role: state.role,
-                    size: state.surfaceSize,
-                    lightStyle: state.styleFor(Brightness.light),
-                    darkStyle: state.styleFor(Brightness.dark),
-                    backdrop: state.backdrop,
-                    onBackdropChanged: context.read<GalleryCubit>().setBackdrop,
-                  );
-                },
+              child: StageSizeReporter(
+                child: BlocBuilder<GalleryCubit, GalleryState>(
+                  buildWhen: (previous, current) =>
+                      previous.role != current.role ||
+                      previous.backdrop != current.backdrop ||
+                      previous.shortSide != current.shortSide,
+                  builder: (context, state) {
+                    return GalleryStage(
+                      role: state.role,
+                      size: state.surfaceSize,
+                      lightStyle: state.styleFor(Brightness.light),
+                      darkStyle: state.styleFor(Brightness.dark),
+                      backdrop: state.backdrop,
+                      onBackdropChanged: context
+                          .read<GalleryCubit>()
+                          .setBackdrop,
+                    );
+                  },
+                ),
               ),
             ),
             Expanded(
@@ -68,6 +73,7 @@ class GalleryView extends StatelessWidget {
                           previous.shortSide != current.shortSide,
                       builder: (context, state) => GallerySizeGroup(
                         shortSide: state.shortSide,
+                        maxShortSide: state.availableShortSide,
                         onShortSideChanged: context
                             .read<GalleryCubit>()
                             .setShortSide,

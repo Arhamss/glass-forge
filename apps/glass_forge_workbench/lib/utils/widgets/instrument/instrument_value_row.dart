@@ -29,35 +29,53 @@ class InstrumentValueRow extends StatelessWidget {
   /// Whether this row is reporting the state currently in force.
   final bool isLive;
 
+  TextStyle _valueStyle(BuildContext context) => context.mono.copyWith(
+    color: isLive ? AppColors.accent : AppColors.textPrimary,
+  );
+
   @override
   Widget build(BuildContext context) {
     final note = this.note;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Text(
+        // Past about 1.5x text a label and its reading no longer fit one
+        // line on a narrow phone, and the label was squeezed to a column of
+        // single letters. Past that, the reading goes underneath.
+        if (MediaQuery.textScalerOf(context).scale(1) >= 1.5)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
                 label,
-                style: context.callout.copyWith(
-                  color: AppColors.stageForegroundMuted,
+                style: context.callout.copyWith(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 2),
+              Text(value, style: _valueStyle(context)),
+            ],
+          )
+        else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: context.callout.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              value,
-              textAlign: TextAlign.end,
-              style: context.mono.copyWith(
-                color: isLive
-                    ? AppColors.stageAccent
-                    : AppColors.stageForeground,
+              const SizedBox(width: AppSpacing.s12),
+              Flexible(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.end,
+                  style: _valueStyle(context),
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         if (note != null) ...[
           const SizedBox(height: 4),
           Text(

@@ -15,6 +15,7 @@ class GalleryState extends Equatable {
     this.role = GlassSurfaceRole.navigationBar,
     this.backdrop = GlassBackdrop.photographic,
     this.shortSide = 52,
+    this.availableShortSide = maxShortSide,
   });
 
   /// The fitted role set. Not themed here: the gallery's whole subject is
@@ -50,6 +51,13 @@ class GalleryState extends Equatable {
   /// The height every demonstration surface is drawn at, in logical
   /// pixels.
   final double shortSide;
+
+  /// The tallest a surface can be drawn in the stage as it is laid out now.
+  ///
+  /// The slider stops here, so every readout on this screen describes the
+  /// surface that is actually on the stage rather than one the pane had to
+  /// clamp.
+  final double availableShortSide;
 
   /// What the app tells the package is behind the surface.
   Color get backdropColor => backdrop.meanColor;
@@ -97,14 +105,16 @@ class GalleryState extends Equatable {
     GlassSurfaceRole? role,
     GlassBackdrop? backdrop,
     double? shortSide,
+    double? availableShortSide,
   }) {
     return GalleryState(
       role: role ?? this.role,
       backdrop: backdrop ?? this.backdrop,
       shortSide: shortSide ?? this.shortSide,
+      availableShortSide: availableShortSide ?? this.availableShortSide,
     );
   }
 
   @override
-  List<Object?> get props => [role, backdrop, shortSide];
+  List<Object?> get props => [role, backdrop, shortSide, availableShortSide];
 }

@@ -51,13 +51,15 @@ class InstrumentSlider extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text(
-              label,
-              style: context.callout.copyWith(
-                color: AppColors.stageForegroundMuted,
+            Expanded(
+              child: Text(
+                label,
+                style: context.callout.copyWith(
+                  color: AppColors.stageForegroundMuted,
+                ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: AppSpacing.s8),
             Text(
               _reading,
               style: context.mono.copyWith(color: AppColors.stageForeground),
