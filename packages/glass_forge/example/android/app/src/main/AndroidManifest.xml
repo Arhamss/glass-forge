@@ -30,6 +30,13 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- glass_forge uses Flutter GPU for its accelerated geometry pass.
+             Without this key the package still renders, one tier down, on the
+             runtime-effect producer. The iOS equivalent is FLTEnableFlutterGPU
+             in ios/Runner/Info.plist. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableFlutterGPU"
+            android:value="true" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
