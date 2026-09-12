@@ -37,12 +37,21 @@ class AccessibilitySignals {
   ///
   /// Two traps are avoided here deliberately:
   ///
-  /// - **`reduceMotion` is read from `dart:ui`, never from `MediaQuery`.**
-  ///   `MediaQueryData` mirrors only seven of the engine's accessibility
-  ///   flags and has no `reduceMotion` field at all; its `disableAnimations`
-  ///   is documented *not* to be set by iOS Reduce Motion
-  ///   (flutter#65874). Reading it there would silently answer "off" for
-  ///   every iOS user who turned the setting on.
+  /// - **`reduceMotion` is read from `dart:ui`, never from `MediaQuery`, and
+  ///   takes *either* engine bit.** `MediaQueryData` mirrors only seven of
+  ///   the engine's accessibility flags and has no `reduceMotion` field at
+  ///   all; its `disableAnimations` is documented *not* to be set by iOS
+  ///   Reduce Motion (flutter#65874). Reading it there would silently answer
+  ///   "off" for every iOS user who turned the setting on.
+  ///
+  ///   The two engine bits are not interchangeable either: `dart:ui`
+  ///   documents `reduceMotion` as "only supported on iOS", while
+  ///   `disableAnimations` is the generic flag Android sets from its animator
+  ///   duration scale. This read was `flags.reduceMotion` alone, which is the
+  ///   mirror-image of the `MediaQuery` trap — right on iOS and silently
+  ///   "off" for every Android user. `GlassReduceMotion` already took the
+  ///   union; the tier path did not, so the same setting could degrade motion
+  ///   and not the tier on the same device.
   /// - **`highContrast` is Increase Contrast, not Reduce Transparency.**
   ///   The iOS bitmask builder maps `isDarkerSystemColorsEnabled` onto
   ///   `highContrast`; that is a different toggle with a different meaning,
@@ -56,7 +65,7 @@ class AccessibilitySignals {
         features ?? ui.PlatformDispatcher.instance.accessibilityFeatures;
     return AccessibilitySignals(
       reduceTransparency: nativeReduceTransparency ?? flags.highContrast,
-      reduceMotion: flags.reduceMotion,
+      reduceMotion: flags.disableAnimations || flags.reduceMotion,
       increaseContrast: flags.highContrast,
       reduceTransparencyIsApproximated: nativeReduceTransparency == null,
     );

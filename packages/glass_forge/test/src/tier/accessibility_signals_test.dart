@@ -42,13 +42,22 @@ void main() {
       expect(signals.reduceMotion, isTrue);
     });
 
-    test('does not mistake disableAnimations for Reduce Motion', () {
+    test("takes Android's disableAnimations as Reduce Motion too", () {
+      // This test used to assert the opposite, and pinned a real bug in
+      // place. The two engine bits are not interchangeable: `dart:ui`
+      // documents `reduceMotion` as "only supported on iOS", while
+      // `disableAnimations` is the generic flag Android sets from its
+      // animator duration scale. Honouring only `reduceMotion` is the
+      // mirror-image of the MediaQuery trap the test above guards — correct
+      // on iOS, and silently "off" for every Android user who asked for less
+      // motion. `GlassReduceMotion` already took the union, so the same
+      // setting degraded motion but not the tier on the same device.
       final signals = AccessibilitySignals.fromPlatform(
         nativeReduceTransparency: false,
         features: const FakeAccessibilityFeatures(disableAnimations: true),
       );
 
-      expect(signals.reduceMotion, isFalse);
+      expect(signals.reduceMotion, isTrue);
     });
 
     test('maps the highContrast bit to Increase Contrast', () {
@@ -180,7 +189,7 @@ void main() {
     );
 
     testWidgets(
-      'disableAnimations alone does not turn Reduce Motion on',
+      'disableAnimations alone does turn Reduce Motion on',
       (tester) async {
         final platform = _FakePlatform(initial: false);
         addTearDown(platform.controller.close);
@@ -195,13 +204,15 @@ void main() {
             const FakeAccessibilityFeatures(disableAnimations: true);
         source.didChangeAccessibilityFeatures();
 
-        // They are different bits with different meanings, and the engine
-        // sets `reduceMotion` for iOS Reduce Motion. Treating
-        // `disableAnimations` as the signal would answer "on" for an Android
-        // user who only asked to remove animations, and — per
-        // flutter#65874, which is about this exact bit — leaves the iOS case
-        // it was meant to cover unhandled.
-        expect(source.value.reduceMotion, isFalse);
+        // They are different bits with different meanings — and both of them
+        // mean the user asked for less motion. `dart:ui` documents
+        // `reduceMotion` as "only supported on iOS"; `disableAnimations` is
+        // what Android sets from its animator duration scale. Honouring only
+        // the first, which this test used to require, answered "off" for
+        // every Android user who turned the setting on, while
+        // `GlassReduceMotion` was already honouring both — so the same
+        // setting degraded motion but not the tier on the same device.
+        expect(source.value.reduceMotion, isTrue);
       },
     );
 
