@@ -1,5 +1,6 @@
 import 'package:glass_forge_workbench/exports.dart';
 import 'package:glass_forge_workbench/features/house_glass/presentation/cubit/house_glass_cubit.dart';
+import 'package:glass_forge_workbench/features/material_studio/presentation/widgets/studio/studio_title.dart';
 import 'package:glass_forge_workbench/l10n/l10n.dart';
 import 'package:glass_forge_workbench/utils/helpers/glass_material_code.dart';
 import 'package:glass_forge_workbench/utils/widgets/glass/feedback/glass_toast.dart';
@@ -30,40 +31,33 @@ class StudioHeader extends StatelessWidget {
           AppSpacing.gutter,
           AppSpacing.s12,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Column(
+        child: MediaQuery.textScalerOf(context).scale(1) >= 1.5
+            // Past about 1.5x the title, its line and the button no longer
+            // share a row: the title was squeezed to a single letter.
+            ? Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Semantics(
-                    header: true,
-                    child: Text(
-                      l10n.materialTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.display,
-                    ),
+                  const StudioTitle(),
+                  const SizedBox(height: AppSpacing.s12),
+                  SolidButton.secondary(
+                    label: l10n.copyAsDart,
+                    icon: AssetPaths.code,
+                    onPressed: () => _copy(context),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    l10n.materialSubtitle,
-                    style: context.calloutRegular.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Expanded(child: StudioTitle()),
+                  const SizedBox(width: AppSpacing.s12),
+                  SolidButton.secondary(
+                    label: l10n.copyAsDart,
+                    icon: AssetPaths.code,
+                    onPressed: () => _copy(context),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: AppSpacing.s12),
-            SolidButton.secondary(
-              label: l10n.copyAsDart,
-              icon: AssetPaths.code,
-              onPressed: () => _copy(context),
-            ),
-          ],
-        ),
       ),
     );
   }

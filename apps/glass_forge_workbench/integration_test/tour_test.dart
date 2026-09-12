@@ -118,15 +118,15 @@ void main() {
       await hold(tester, step);
       await back(tester);
     }
-  });
 
-  testWidgets('the main screens hold up at twice the text size', (
-    tester,
-  ) async {
+    // The same screens at twice the text size, in this run rather than a
+    // second one: pumping the app twice leaves the platform's reduce
+    // transparency stream with nothing to cancel.
     tester.platformDispatcher.textScaleFactorTestValue = 2;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pump();
 
-    await tester.pumpWidget(const App());
+    await tester.tap(find.text('Showcase'));
     await hold(tester, '20-large-text-showcase');
     await tester.tap(find.text('Components'));
     await hold(tester, '21-large-text-components');
