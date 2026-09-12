@@ -3,24 +3,34 @@
 Liquid glass for Flutter that is honest about the GPU it is running on.
 
 Real refraction where the device can afford it, a graceful climb-down
-everywhere else, and the frame timings published so the claim is checkable.
+everywhere else, and a benchmark harness that refuses to pass off a debug
+build as a measurement.
 
-> **Status: scaffold.** No rendering is implemented yet. The research and the
-> design are done and written down; start with the
-> [architecture design](docs/superpowers/specs/2026-09-10-glass-forge-architecture-design.md).
-> This README describes where it is going, not where it is.
+> **Status: built, not released.** The renderer, tier engine, motion, design
+> system, benchmark harness and a workbench app all exist and are tested.
+> Nothing is published — the package is `publish_to: none`, so
+> `flutter pub add glass_forge` will not find it; depend on it by path.
+>
+> **Nothing has been measured on real hardware.** Every performance number in
+> this repo, including the budgets the benchmark gate enforces, is a seed
+> value rather than a capture. Verifying [flutter#187820] (glass over glass
+> washing out) also needs a physical device, and has not been done.
+
+[flutter#187820]: https://github.com/flutter/flutter/issues/187820
 
 ## Layout
 
-One package. `flutter pub add glass_forge` and everything works — rendering,
-tiering, motion, and the native accessibility signals. There is no companion
+One package. Add it and everything works — rendering, tiering, motion, the
+design system and the native accessibility signals. There is no companion
 package to remember, and no configuration required to get correct behaviour.
+The package's own [README](packages/glass_forge/README.md) is the API guide,
+and every snippet in it is compiled by a test.
 
 | Path | What it is |
 |---|---|
 | [`packages/glass_forge`](packages/glass_forge) | The package. Shapes, SDF, both geometry producers, composition, tier engine, motion, tokens, native signals. |
 | [`apps/glass_forge_workbench`](apps/glass_forge_workbench) | Visual workbench — test surfaces, tier forcing, material knobs. |
-| [`apps/glass_forge_benchmark`](apps/glass_forge_benchmark) | Device benchmark harness. Deliberately minimal, so it measures the renderer rather than itself. |
+| [`packages/glass_forge/benchmark`](packages/glass_forge/benchmark) | The benchmark runner — 16 single-axis scenes, real percentiles, and budgets in a checked-in file. |
 
 ## Why
 
@@ -31,15 +41,25 @@ expensive fast, and gets expensive worst on the cheapest phones.
 
 `glass_forge` keeps one widget API and varies the strategy underneath:
 
-| Tier | Condition | Renders |
-|---|---|---|
-| **T3 Full** | Impeller + Vulkan | Refraction, chromatic aberration, specular, shape blending |
-| **T2 Reduced** | Impeller + OpenGL ES | Refraction at lower samples, clamped blur |
-| **T1 Cheap** | Low-end / throttled | `BackdropFilter` + gradient border + baked sheen |
-| **T0 Static** | Weakest devices, and *reduce transparency* | Solid translucent fill |
+| Tier | Renders |
+|---|---|
+| **full** | Everything: refraction, dispersion, specular, blending, and the dome lens |
+| **balanced** | The dome without dispersion — 12 backdrop reads per fragment down to 4 |
+| **reduced** | The lens flattens to Apple's edge band, keeping tint, saturation, frost and light |
+| **flat** | No refraction: the frost, the tint and a contrasting border |
+| **off** | Nothing is rendered at all |
 
-T0 doubles as the accessibility path — which almost no Flutter glass package
-honours today.
+The engine resolves a tier from four inputs — GPU capability, thermal state,
+observed frame health, and accessibility settings. Capability, heat and
+accessibility set absolute ceilings; frame health steps down relatively from
+wherever those left it, so the same frame rate lands lower on a hot device
+than a cool one. Flattening holds until the device is fully healthy again, so
+it cannot oscillate. `ResolvedTier.describe()` reports *why* the current tier
+was chosen, not just which one it is.
+
+`flat` doubles as the accessibility path for Reduce Transparency and Increase
+Contrast — which almost no Flutter glass package honours today. It applies
+automatically only inside a `GlassTierScope`.
 
 ## Documentation
 

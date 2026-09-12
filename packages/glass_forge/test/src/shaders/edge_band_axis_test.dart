@@ -3,6 +3,15 @@
 // Untagged on purpose: the tear this guards against is the model's, not a
 // rounding difference between backends, so the software lane shows it just
 // as plainly as Metal does and every `flutter test` should catch it.
+//
+// Given a longer deadline because these bake real mattes through the shader
+// and read every texel back. The slowest takes well over a minute on the
+// software rasteriser, against `flutter test`'s 30-second default, so the
+// whole untagged lane — and therefore CI — went red under load while every
+// assertion in the file passed. A timeout that only fires on a busy machine
+// is worse than a slow test: it fails somewhere other than the defect.
+@Timeout(Duration(minutes: 5))
+library;
 
 import 'dart:math' as math;
 import 'dart:typed_data';

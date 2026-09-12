@@ -22,4 +22,10 @@ jobs:
   build:
     uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
     with:
-      flutter_version: "3.44.x"
+      # Must satisfy packages/glass_forge/pubspec.yaml's `flutter: ^3.47.0`.
+      # This was pinned at 3.44.x, which cannot resolve that constraint, so
+      # the job failed at `pub get` and had never actually run anything.
+      flutter_version: "3.47.2"
+      # This is a pub workspace: the root has no test/ directory, so a run
+      # from there finds nothing. The package is the unit under test.
+      working_directory: packages/glass_forge
