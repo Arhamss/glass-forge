@@ -3,7 +3,8 @@ import 'package:glass_forge_workbench/exports.dart';
 /// Shows the rolling average frame time for whichever mode is currently
 /// bound, plus the device pixel ratio it was measured at.
 ///
-/// Not a substitute for `glass_forge_benchmark`'s harness — this is a
+/// Not a substitute for the package's own benchmark harness
+/// (`packages/glass_forge/benchmark`) — this is a
 /// same-device, same-session comparison between the two shaders, useful for
 /// telling whether the four-tap reconstruction is affordable at all on the
 /// device the probe is running on.

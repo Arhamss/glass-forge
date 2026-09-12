@@ -300,7 +300,10 @@ glass_forge/                    pub workspace
                                 the native signals (Swift / Kotlin / macOS).
   apps/
     glass_forge_workbench/      visual workbench
-    glass_forge_benchmark/      device benchmark harness
+
+  The benchmark app named here was scaffolded and never wired up — it
+  imported the package zero times — and has been deleted. The harness lives
+  in `packages/glass_forge/benchmark/`, run with `flutter run --profile`.
 ```
 
 An earlier draft split this three ways — core, a Flutter GPU accelerator, and

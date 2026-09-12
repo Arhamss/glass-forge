@@ -14,11 +14,11 @@
 // If a Flutter upgrade breaks this (the mirrored files stop resolving, or
 // `build/unit_test_assets` changes shape), do not patch the bridge harder.
 // This repo already has the correct fallback: `apps/glass_forge_workbench`
-// and `apps/glass_forge_benchmark` both depend on glass_forge as an ordinary
-// path package, so a test run from either bundles shaders under
+// and `packages/glass_forge/example` both depend on glass_forge as an
+// ordinary path package, so a test run from either bundles shaders under
 // `packages/glass_forge/...` exactly as a real consumer does, with no bridge
 // needed. Move the asset-loading assertions (the `ShaderLibrary` tests that
-// actually call `warmUp()`) into one of those app test suites instead.
+// actually call `warmUp()`) into one of those test suites instead.
 import 'dart:async';
 import 'dart:io';
 

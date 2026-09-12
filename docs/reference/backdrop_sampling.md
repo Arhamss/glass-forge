@@ -252,10 +252,11 @@ Also not obtained:
   because nothing used `GlassLayer` in an app until now. Left unfixed:
   it is a real defect, but it is Task 18's/the GPU producer's surface, not
   backdrop sampling, and fixing it means a conditional import with a web
-  stub — a bigger, separate change. `apps/glass_forge_benchmark` (the other
-  app) has no web platform at all and, once added for this check, failed
-  build for an unrelated pre-existing reason (`gen_localizations`, missing
-  `flutter: generate: true`) before ever reaching shader compilation. Shader
+  stub — a bigger, separate change. The second app of the time,
+  `apps/glass_forge_benchmark`, had no web platform at all and, once added
+  for this check, failed build for an unrelated pre-existing reason
+  (`gen_localizations`, missing `flutter: generate: true`) before ever
+  reaching shader compilation. That app has since been deleted as dead. Shader
   SkSL-legality was instead confirmed the way described above: directly, via
   `ShaderLibrary.warmUp()` in the package's own test suite, which loads
   `ui.FragmentProgram.fromAsset` for every `GlassShaderId` and is what

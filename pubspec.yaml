@@ -18,7 +18,6 @@ workspace:
   - packages/glass_forge
   - packages/glass_forge/example
   - apps/glass_forge_workbench
-  - apps/glass_forge_benchmark
 
 dev_dependencies:
   very_good_analysis: ^10.3.0
