@@ -119,4 +119,20 @@ void main() {
       await back(tester);
     }
   });
+
+  testWidgets('the main screens hold up at twice the text size', (
+    tester,
+  ) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    await tester.pumpWidget(const App());
+    await hold(tester, '20-large-text-showcase');
+    await tester.tap(find.text('Components'));
+    await hold(tester, '21-large-text-components');
+    await tester.tap(find.text('Material').last);
+    await hold(tester, '22-large-text-material');
+    await tester.tap(find.text('Lab').last);
+    await hold(tester, '23-large-text-lab');
+  });
 }

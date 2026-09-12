@@ -13,7 +13,7 @@ class GlassSlider extends StatefulWidget {
     required this.semanticLabel,
     this.min = 0,
     this.max = 1,
-    this.semanticValue,
+    this.formatValue,
     this.material,
     super.key,
   });
@@ -24,9 +24,10 @@ class GlassSlider extends StatefulWidget {
   final double max;
   final String semanticLabel;
 
-  /// What a screen reader says for the value, with its unit. Defaults to a
-  /// percentage of the range.
-  final String? semanticValue;
+  /// How a screen reader says a value, with its unit. Defaults to a
+  /// percentage of the range. Used for the value and for what one step up or
+  /// down would make it.
+  final String Function(double value)? formatValue;
 
   /// Null uses the house material.
   final GlassMaterial? material;
@@ -61,14 +62,20 @@ class _GlassSliderState extends State<GlassSlider> {
     widget.onChanged(widget.min + fraction * (widget.max - widget.min));
   }
 
-  void _nudge(double direction) {
-    final step = (widget.max - widget.min) / 20;
-    widget.onChanged(
-      (widget.value + step * direction).clamp(widget.min, widget.max),
-    );
-  }
+  double get _step => (widget.max - widget.min) / 20;
 
-  String _percent(double fraction) => '${(fraction * 100).round()}%';
+  double _stepped(double direction) =>
+      (widget.value + _step * direction).clamp(widget.min, widget.max);
+
+  void _nudge(double direction) => widget.onChanged(_stepped(direction));
+
+  String _format(double value) {
+    final format = widget.formatValue;
+    if (format != null) return format(value);
+    final range = widget.max - widget.min;
+    final fraction = range == 0 ? 0 : (value - widget.min) / range;
+    return '${(fraction * 100).round()}%';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +84,9 @@ class _GlassSliderState extends State<GlassSlider> {
     return Semantics(
       slider: true,
       label: widget.semanticLabel,
-      value: widget.semanticValue ?? _percent(fraction),
+      value: _format(widget.value),
+      increasedValue: _format(_stepped(1)),
+      decreasedValue: _format(_stepped(-1)),
       onIncrease: () => _nudge(1),
       onDecrease: () => _nudge(-1),
       child: LayoutBuilder(

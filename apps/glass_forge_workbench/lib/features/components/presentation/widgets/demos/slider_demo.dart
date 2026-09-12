@@ -38,7 +38,7 @@ class _SliderDemoState extends State<SliderDemo> {
             GlassSlider(
               value: value,
               semanticLabel: label,
-              semanticValue: percent,
+              formatValue: (v) => '${(v * 100).round()}%',
               onChanged: (next) => _value.value = next,
             ),
           ],

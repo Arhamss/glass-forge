@@ -1,3 +1,8 @@
+> **Superseded (2026-09-12)** by
+> `docs/superpowers/specs/2026-09-11-workbench-redesign-design.md`. The
+> principle that tinker controls are never glass survives there; the rest of
+> this document describes the earlier instrument-only workbench.
+
 # Glass Forge Workbench — design direction
 
 Resolved via `ui-ux-pro-max` (Flutter stack) with the design dials at

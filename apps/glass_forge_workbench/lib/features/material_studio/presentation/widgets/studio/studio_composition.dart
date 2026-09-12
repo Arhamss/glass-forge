@@ -26,21 +26,24 @@ class StudioComposition extends StatelessWidget {
             shape: const GlassSuperellipse(
               radius: BorderRadius.all(Radius.circular(28)),
             ),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.all(AppSpacing.s20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(l10n.demoCardTitle, style: context.title),
-                  const SizedBox(height: AppSpacing.s4),
-                  Text(
-                    l10n.demoCardBody,
-                    style: context.calloutRegular.copyWith(
-                      color: AppColors.textSecondary,
+            child: ColoredBox(
+              color: AppColors.glassChromeScrim,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.all(AppSpacing.s20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(l10n.demoCardTitle, style: context.title),
+                    const SizedBox(height: AppSpacing.s4),
+                    Text(
+                      l10n.demoCardBody,
+                      style: context.calloutRegular.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

@@ -12,7 +12,7 @@ ComponentStory sliderStory() => ComponentStory(
 GlassSlider(
   value: brightness,
   semanticLabel: 'Brightness',
-  semanticValue: '${(brightness * 100).round()}%',
+  formatValue: (value) => '${(value * 100).round()}%',
   onChanged: (value) => setState(() => brightness = value),
 )''',
 );
