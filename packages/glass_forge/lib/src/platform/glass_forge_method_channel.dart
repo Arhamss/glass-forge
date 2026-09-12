@@ -75,16 +75,43 @@ class MethodChannelGlassForge extends GlassForgePlatform {
     }
   }
 
-  /// Opens [channel], swallowing the "no such channel" failure.
+  /// One stream per channel, for the life of the process.
+  ///
+  /// A channel may have exactly one active stream, and every
+  /// `receiveBroadcastStream()` call builds a new one. Two of them on a
+  /// single channel means two listen/cancel pairs against one native sink,
+  /// and the second cancel finds nothing to cancel: the host throws
+  /// `PlatformException(error, No active stream to cancel)`. That surfaces
+  /// from the cancel handler rather than from the stream, so a consumer
+  /// cannot catch it — it simply fails their test. Reported from an
+  /// integration run that pumped its app twice, which is enough to build a
+  /// second `AccessibilitySignalSource` in one process.
+  ///
+  /// Caching the stream makes every consumer share the one broadcast stream,
+  /// so the host sees a single listen and a single cancel no matter how many
+  /// sources come and go.
+  static final Map<String, Stream<Object?>> _streams =
+      <String, Stream<Object?>>{};
+
+  /// Opens [channel], swallowing the "no such channel" failure and sharing
+  /// one stream per channel — see [_streams].
   ///
   /// Same reasoning as [_ask]: a platform with no implementation must look
   /// like a platform with nothing to say, not like an error a consumer has
   /// to catch. `handleError` rather than a `try` because the failure arrives
   /// as the first event, after the stream is already open.
   Stream<Object?> _events(EventChannel channel) {
-    return channel.receiveBroadcastStream().handleError(
-      (Object _) {},
-      test: (error) => error is MissingPluginException,
+    return _streams.putIfAbsent(
+      channel.name,
+      () => channel.receiveBroadcastStream().handleError(
+        (Object _) {},
+        test: (error) => error is MissingPluginException,
+      ),
     );
   }
+
+  /// Drops the cached streams so a test can observe a channel being opened
+  /// again. Test-only.
+  @visibleForTesting
+  static void debugResetStreams() => _streams.clear();
 }
