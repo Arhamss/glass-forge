@@ -1,11 +1,23 @@
 name: glass_forge
 description: Performance-tiered liquid glass rendering for Flutter — real refraction where the GPU allows, graceful degradation everywhere else.
-version: 0.1.0+1
+version: 0.1.0
+homepage: https://gocodeable.com
+# repository and issue_tracker wait for the public repo: pub.dev checks that
+# both URLs resolve, and there is no GitHub repository for this package yet.
+
+topics:
+  - liquid-glass
+  - glass
+  - shaders
+  - ui
+  - animation
+
+# Remove when the package is ready to publish.
 publish_to: none
 
 environment:
   sdk: ^3.13.0
-  flutter: ^3.47.0
+  flutter: ">=3.47.0"
 
 resolution: workspace
 
