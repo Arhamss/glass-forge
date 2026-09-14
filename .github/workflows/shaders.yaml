@@ -18,13 +18,6 @@ jobs:
 
       - run: flutter pub get
 
-      # A web build compiles every bundled shader through the SkSL target.
-      # This is the gate upstream did not have: it shipped shaders that fail
-      # SkSL twice, and found out from user bug reports months later.
-      - name: build web (compiles shaders as SkSL)
-        run: flutter build web --release -t lib/main_development.dart
-        working-directory: apps/glass_forge_workbench
-
       # Workspace-aware: analyzing from the workspace root covers every
       # package in the pub workspace. Explicit so that stays true on purpose,
       # not because it happens to be the step's default working directory.
@@ -63,3 +56,19 @@ jobs:
       - name: flutter test (impeller)
         run: flutter test --tags impeller --run-skipped --enable-impeller
         working-directory: packages/glass_forge
+
+      # The SkSL gate. A web build compiles every bundled shader through the
+      # SkSL target, which is the gate upstream did not have: it shipped
+      # shaders that fail SkSL twice, and found out from user bug reports
+      # months later.
+      #
+      # It builds the example, now the only app in the repo. The example is a
+      # phone demo with no web/ folder checked in, so `flutter create` makes
+      # one here. That also drops a template test/widget_test.dart into the
+      # example which does not compile against this app, which is why this
+      # runs last in the job rather than before analyze and test.
+      - name: build web (compiles shaders as SkSL)
+        run: |
+          flutter create --platforms=web .
+          flutter build web --release
+        working-directory: packages/glass_forge/example
