@@ -1,0 +1,47 @@
+# What `dart pub publish` leaves out of the package.
+#
+# When this file exists, pub reads it *instead of* .gitignore for this
+# directory, so everything .gitignore keeps out of the repo is repeated here
+# first. Dropping any of it would upload build output and machine-local files.
+
+# Everything .gitignore already excludes
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+pubspec.lock
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+lib/generated_plugin_registrant.dart
+app.*.symbols
+app.*.map.json
+coverage/
+graphify-out/
+
+# In the repository, but not part of the package. These are notes for the
+# people building glass_forge: the original brief, the design records and
+# research, and instructions for coding agents. Nobody who depends on the
+# package needs them in their pub cache.
+/CLAUDE.md
+/PROJECT_BRIEF.md
+/docs/

@@ -22,8 +22,8 @@ int _shapeCaseArity(String sdf) {
 }
 
 void main() {
-  // This test's checked-out working directory must be packages/glass_forge,
-  // matching every other shader contract test.
+  // This test's working directory must be the package root, matching every
+  // other shader contract test.
   final geometry = File('shaders/geometry.frag').readAsStringSync();
   final sdf = File('shaders/common/sdf.glsl').readAsStringSync();
 

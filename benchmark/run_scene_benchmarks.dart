@@ -8,7 +8,7 @@
 // raster thread, so it would produce numbers that measure nothing -- see the
 // package's own build report for why that risk mattered enough to call out.
 //
-// Usage, from `packages/glass_forge/`:
+// Usage, from the repository root:
 //
 //   flutter run --profile -d macos -t benchmark/run_scene_benchmarks.dart
 //
@@ -21,7 +21,7 @@
 //
 // Reading `budgets.json` uses `dart:io`, resolved relative to the process's
 // working directory -- true for desktop targets launched from
-// `packages/glass_forge/`, which is the intended invocation. A mobile
+// the repository root, which is the intended invocation. A mobile
 // device's filesystem is not this repository's, so gating does not work
 // there yet; mobile runs still print every scene's measured percentiles,
 // which is the harness's other job. Bundling `budgets.json` as a Flutter
@@ -104,7 +104,7 @@ Future<void> _gate(
   } on Object catch (error) {
     debugPrint(
       'Could not load benchmark/budgets.json ($error). Run this from '
-      "packages/glass_forge/, or see this file's header for why mobile "
+      "the repository root, or see this file's header for why mobile "
       'targets cannot read it yet.',
     );
     exit(2);

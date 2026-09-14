@@ -18,36 +18,54 @@ jobs:
 
       - run: flutter pub get
 
-      # Workspace-aware: analyzing from the workspace root covers every
-      # package in the pub workspace. Explicit so that stays true on purpose,
-      # not because it happens to be the step's default working directory.
+      # The example is an app with its own pubspec, so it resolves on its own.
+      # Analyzing from the root reaches into example/ as well, and cannot
+      # resolve a single import there without this.
+      - name: flutter pub get (example)
+        run: flutter pub get
+        working-directory: example
+
+      # The SkSL gate. A web build compiles every bundled shader through the
+      # SkSL target, which is the gate upstream did not have: it shipped
+      # shaders that fail SkSL twice, and found out from user bug reports
+      # months later.
+      #
+      # It has to run before analyze, for a second reason. Building runs the
+      # package's hook/build.dart, which generates
+      # build/shaderbundles/geometry.shaderbundle. pubspec.yaml declares that
+      # file as an asset, so on a checkout where nothing has been built yet
+      # analyze reports `asset_does_not_exist` and fails the job.
+      #
+      # The example is a phone demo with no web/ folder checked in, so
+      # `flutter create` makes one. It also writes a template
+      # test/widget_test.dart that refers to a `MyApp` this app does not have;
+      # that file is deleted straight after, before analyze can trip on it.
+      - name: build web (compiles shaders as SkSL)
+        run: |
+          flutter create --platforms=web .
+          flutter build web --release
+          rm -f test/widget_test.dart
+        working-directory: example
+
       - name: flutter analyze
         run: flutter analyze
-        working-directory: .
 
-      # packages/glass_forge is where test/ actually lives — the pub
-      # workspace root has none. Without this, `flutter test` fails
-      # immediately with `Test directory "test" not found`, before any of
-      # the package's tests, including the SDF contract test, ever run.
-      #
       # This bare invocation reports anything tagged `impeller` as skipped
       # rather than running it (see dart_test.yaml) — see the step below
       # for why, and for where those tests actually run.
       - name: flutter test
         run: flutter test
-        working-directory: packages/glass_forge
 
       # Tests tagged `impeller` (currently glass_composition_test.dart and
       # glass_widgets_test.dart, which construct `ui.ImageFilter.shader`) are
       # skipped by the step above: that API throws `UnsupportedError` unless
-      # the engine's
-      # Impeller backend is active, and `flutter_tester`'s default software
-      # backend — what plain `flutter test` runs on — does not enable it.
-      # Run them here instead, explicitly selected and with Impeller turned
-      # on. `--run-skipped` is required alongside `--tags`: dart_test.yaml
-      # marks the tag `skip`, not `exclude_tags` (exclusions can't be
-      # un-excluded from the command line — verified empirically — so
-      # `skip` is what leaves them selectable at all).
+      # the engine's Impeller backend is active, and `flutter_tester`'s
+      # default software backend — what plain `flutter test` runs on — does
+      # not enable it. Run them here instead, explicitly selected and with
+      # Impeller turned on. `--run-skipped` is required alongside `--tags`:
+      # dart_test.yaml marks the tag `skip`, not `exclude_tags` (exclusions
+      # can't be un-excluded from the command line — verified empirically —
+      # so `skip` is what leaves them selectable at all).
       #
       # If this step ever turns out not to be viable on headless CI runners
       # (no GPU/Vulkan for Impeller to bind to), move these tests to a
@@ -55,20 +73,3 @@ jobs:
       # flag on the step above.
       - name: flutter test (impeller)
         run: flutter test --tags impeller --run-skipped --enable-impeller
-        working-directory: packages/glass_forge
-
-      # The SkSL gate. A web build compiles every bundled shader through the
-      # SkSL target, which is the gate upstream did not have: it shipped
-      # shaders that fail SkSL twice, and found out from user bug reports
-      # months later.
-      #
-      # It builds the example, now the only app in the repo. The example is a
-      # phone demo with no web/ folder checked in, so `flutter create` makes
-      # one here. That also drops a template test/widget_test.dart into the
-      # example which does not compile against this app, which is why this
-      # runs last in the job rather than before analyze and test.
-      - name: build web (compiles shaders as SkSL)
-        run: |
-          flutter create --platforms=web .
-          flutter build web --release
-        working-directory: packages/glass_forge/example

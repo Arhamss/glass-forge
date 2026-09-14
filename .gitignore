@@ -5,9 +5,11 @@
 *.swp
 .DS_Store
 .atom/
+.build/
 .buildlog/
 .history
 .svn/
+.swiftpm/
 migrate_working_dir/
 
 # IntelliJ related
@@ -20,6 +22,10 @@ migrate_working_dir/
 .vscode/*
 
 # Flutter/Dart/Pub related
+# A library does not commit pubspec.lock: consumers resolve their own
+# versions, and a checked-in lock would only describe this machine.
+# https://dart.dev/guides/libraries/private-files#pubspeclock
+pubspec.lock
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
@@ -28,8 +34,7 @@ migrate_working_dir/
 .packages
 .pub-cache/
 .pub/
-/build/
-pubspec.lock
+build/
 
 # Web related
 lib/generated_plugin_registrant.dart
@@ -41,11 +46,7 @@ app.*.symbols
 app.*.map.json
 
 # Test related
-coverage
-graphify-out/
+coverage/
 
-# Workspace
-.dart_tool/
-build/
-pubspec.lock
-!/pubspec.lock
+# Knowledge graph, rebuilt locally by graphify
+graphify-out/

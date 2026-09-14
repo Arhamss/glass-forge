@@ -2,9 +2,8 @@
 ///
 /// Deliberately separate from `package:glass_forge/glass_forge.dart` --
 /// nothing exported here is part of the rendering API ordinary consumers of
-/// the package use. Import this directly from a benchmark runner, the way
-/// `glass_forge_workbench`'s sampling probe imports `debug.dart` for its own
-/// tooling needs.
+/// the package use. Import this directly from a benchmark runner, such as
+/// `benchmark/run_scene_benchmarks.dart`.
 ///
 /// See `docs/superpowers/specs/2026-09-10-glass-forge-architecture-design.md`
 /// §7: "The harness is not a deliverable that comes after -- tiers cannot be

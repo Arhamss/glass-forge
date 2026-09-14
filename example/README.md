@@ -6,7 +6,7 @@ layer between the reader and `GlassLayer`, `Glass`, `GlassMaterial`,
 `InteractiveGlass` and `GlassSurface`.
 
 ```sh
-cd packages/glass_forge/example
+cd example
 flutter run
 ```
 

@@ -1,45 +1,118 @@
 # glass_forge
 
-Liquid glass for Flutter that is honest about the GPU it is running on.
+Liquid glass for Flutter: real refraction where the GPU allows, graceful
+degradation everywhere else.
 
-Real refraction where the device can afford it, a graceful climb-down
-everywhere else, and a benchmark harness that refuses to pass off a debug
-build as a measurement.
+One package, one `pub add`. Rendering, tiering, motion, design tokens and the
+native accessibility signals all live here, because a consumer should never
+have to assemble a library themselves to get correct behaviour.
 
-> **Status: built, not released.** The renderer, tier engine, motion, design
-> system, benchmark harness and a workbench app all exist and are tested.
-> Nothing is published — the package is `publish_to: none`, so
-> `flutter pub add glass_forge` will not find it; depend on it by path.
->
-> **Nothing has been measured on real hardware.** Every performance number in
-> this repo, including the budgets the benchmark gate enforces, is a seed
-> value rather than a capture. Verifying [flutter#187820] (glass over glass
-> washing out) also needs a physical device, and has not been done.
+```dart
+GlassLayer(
+  material: GlassMaterial.regular(brightness: Brightness.dark),
+  child: Stack(
+    children: [
+      const YourContent(),
+      const Align(
+        alignment: Alignment.bottomCenter,
+        child: Glass(
+          shape: GlassRoundedRectangle(
+            radius: BorderRadius.all(Radius.circular(28)),
+          ),
+          child: SizedBox(height: 56, child: YourTabBar()),
+        ),
+      ),
+    ],
+  ),
+)
+```
+
+The [example app](example/) shows the rest: the dome lens, Apple's two
+fitted materials side by side, liquid blending, spring motion, and the tier
+engine explaining its own decision.
+
+## How it works, in one paragraph
+
+A `GlassLayer` captures the backdrop behind it once. Every `Glass` inside it
+registers a shape into a shared signed-distance field, which is baked into a
+compact RGBA8 **matte** — surface normal, edge distance and displacement
+magnitude, one texel per pixel. A single `BackdropFilter` per material then
+reads that matte and bends the captured backdrop along the normals, inside a
+narrow band at each shape's edge. The interior is left undistorted, which is
+what Apple's material does and what makes it read as glass rather than as a
+lens.
+
+That "one capture per layer" is a hard invariant, not an implementation
+detail: a shader filter stacked *above* another backdrop filter reads a stale
+previous-frame backdrop on physical iPhones ([flutter#187820]), which shows up
+as a progressive white-wash.
 
 [flutter#187820]: https://github.com/flutter/flutter/issues/187820
 
-## Layout
+## Shapes and blending
 
-One package. Add it and everything works — rendering, tiering, motion, the
-design system and the native accessibility signals. There is no companion
-package to remember, and no configuration required to get correct behaviour.
-The package's own [README](packages/glass_forge/README.md) is the API guide,
-and every snippet in it is compiled by a test.
+`GlassRoundedRectangle`, `GlassOval` and `GlassSuperellipse` (Apple's
+continuous-curvature squircle). Shapes in a `GlassBlendGroup` smooth-min into
+one another in the distance field, so they merge like liquid rather than
+overlapping like two cut-outs:
 
-| Path | What it is |
-|---|---|
-| [`packages/glass_forge`](packages/glass_forge) | The package. Shapes, SDF, both geometry producers, composition, tier engine, motion, tokens, native signals. |
-| [`apps/glass_forge_workbench`](apps/glass_forge_workbench) | Visual workbench — test surfaces, tier forcing, material knobs. |
-| [`packages/glass_forge/benchmark`](packages/glass_forge/benchmark) | The benchmark runner — 16 single-axis scenes, real percentiles, and budgets in a checked-in file. |
+```dart
+const GlassBlendGroup(
+  blend: 24,
+  child: Row(children: [Glass(shape: GlassOval()), Glass(shape: GlassOval())]),
+)
+```
 
-## Why
+Blend width is in logical pixels. Because the smooth-min is not associative,
+registration order is load-bearing and is preserved deliberately.
 
-Flutter's glass packages render one way and hope for the best. `BackdropFilter`
-forces a `saveLayer` and a framebuffer read-back, which defeats the tile-based
-rendering mobile GPUs depend on — so a design language built on glass gets
-expensive fast, and gets expensive worst on the cheapest phones.
+## Motion
 
-`glass_forge` keeps one widget API and varies the strategy underneath:
+`InteractiveGlass` gives a surface press, drag, fling and spring-home, with
+squash-and-stretch **derived from the spring's live velocity** rather than
+animated as a separate channel — which is what keeps it physically coherent
+instead of looking like a rectangle being scaled.
+
+```dart
+InteractiveGlass(
+  drag: const GlassDrag(),
+  settleMotion: const GlassMotion.smooth(),
+  onTap: () {},
+  child: const Glass(shape: GlassOval()),
+)
+```
+
+Springs are specified the way Apple specifies them — **duration and bounce**,
+not stiffness and damping. `GlassMotion.bouncy/.snappy/.smooth/.interactive`
+cover the common cases.
+
+This is built on [`motor`], with the gaps filled: `motor` has no decay
+simulation (so `GlassDecay` wraps `FrictionSimulation`), no rubber-banding
+despite a changelog entry claiming it (`GlassOverdrag`), no follow primitive
+that avoids reallocating simulations per pointer event (`SpringAxis`), and no
+reduce-motion handling at all — it stores an `AnimationBehavior` on every
+controller and never reads it back.
+
+[`motor`]: https://pub.dev/packages/motor
+
+## Tiering
+
+Glass is expensive, and the honest answer on a cold-throttled mid-range phone
+is *less glass*. Wrap the app once:
+
+```dart
+GlassTierScope(child: MyApp())
+```
+
+The engine resolves a tier from four inputs: GPU capability, thermal state,
+observed frame health, and the user's accessibility settings. Capability,
+thermal and accessibility impose **absolute** ceilings — statements about the
+device and the user. Frame health steps down **relatively** from wherever
+those left it, because it is a statement about workload. So a strained frame
+rate on a hot device lands lower than the same frame rate on a cool one.
+
+`ResolvedTier.describe()` reports *why* the current tier was chosen, not just
+which one it is.
 
 | Tier | Renders |
 |---|---|
@@ -49,47 +122,96 @@ expensive fast, and gets expensive worst on the cheapest phones.
 | **flat** | No refraction: the frost, the tint and a contrasting border |
 | **off** | Nothing is rendered at all |
 
-The engine resolves a tier from four inputs — GPU capability, thermal state,
-observed frame health, and accessibility settings. Capability, heat and
-accessibility set absolute ceilings; frame health steps down relatively from
-wherever those left it, so the same frame rate lands lower on a hot device
-than a cool one. Flattening holds until the device is fully healthy again, so
-it cannot oscillate. `ResolvedTier.describe()` reports *why* the current tier
-was chosen, not just which one it is.
+Degradation is also the default when the renderer simply cannot run. On Skia
+and the web backends `ui.ImageFilter.shader` throws, so the frost is applied
+on its own and the refraction, rim and contour do not happen. You do not have
+to opt in to that.
 
-`flat` doubles as the accessibility path for Reduce Transparency and Increase
-Contrast — which almost no Flutter glass package honours today. It applies
-automatically only inside a `GlassTierScope`.
+## Accessibility
 
-## Documentation
+- **Reduce Transparency** is read through a native channel, because Flutter's
+  accessibility bitmask never reports it on iOS and Android has no public
+  equivalent. When the platform cannot answer it returns `null`, and callers
+  treat that as *unknown* rather than *off* — rendering full glass to someone
+  who asked for less is the one failure worth engineering against.
+- **Reduce Motion** honours both engine bits. `AccessibilityFeatures.reduceMotion`
+  is documented as iOS-only and `disableAnimations` is what Android sets from
+  its animator duration scale, so either alone is silently wrong on one
+  platform.
+- **Increase Contrast** drives surfaces toward near-opaque plus a border.
 
-**Design**
+## Design system
 
-| Document | Contents |
-|---|---|
-| [Architecture design](docs/superpowers/specs/2026-09-10-glass-forge-architecture-design.md) | Locked decisions, the ten invariants, the render graph, decomposition |
-| [Renderer core design](docs/superpowers/specs/2026-09-10-renderer-core-design.md) | Sub-project 1: API, shaders, invalidation, acceptance criteria |
-| [`PROJECT_BRIEF.md`](PROJECT_BRIEF.md) | The original thesis. Several assumptions in it have since been falsified — see the architecture design §1 |
+Tokens (blur, radius, depth, tint ramps), five semantic surfaces, and theming:
 
-**Research**
+```dart
+GlassTheme(
+  data: GlassThemeData.dark,
+  child: GlassSurface.navigationBar(child: YourBar()),
+)
+```
 
-| Document | Contents |
-|---|---|
-| [Upstream teardown](docs/reference/liquid_glass_renderer_teardown.md) | `liquid_glass_renderer` 0.2.0-dev.4 by source read: pipeline, batching, ~25 defects |
-| [Upstream rewrite](docs/reference/upstream_rewrite.md) | The unreleased Flutter GPU rewrite: what to take, what it drops, repo health |
-| [`motor` teardown](docs/reference/motor_teardown.md) | Spring physics: what it gives us, and the six gaps we fill ourselves |
-| [Flutter rendering capabilities](docs/reference/flutter_rendering_capabilities.md) | What Flutter 3.47 actually exposes — backend detection, thermal, accessibility, engine bugs |
-| [Apple Liquid Glass spec](docs/reference/apple_liquid_glass_spec.md) | The material as an implementable contract |
-| [Shader techniques](docs/reference/shader_techniques.md) | Techniques with licence provenance |
-| [Competitive landscape](docs/reference/competitive_landscape.md) | What others shipped, and what they document as broken |
-| [KiBU inventory](docs/reference/kibu_glass_inventory.md) | The 63 surfaces that motivated the design |
-| [`THIRD_PARTY.md`](THIRD_PARTY.md) | Attribution — upstream is under three licences, not one |
+Every tint step is the *minimum* opacity that clears its stated WCAG contrast
+threshold over the worst backdrop in its scheme, and the tests assert both
+directions — that it clears, and that slightly less does not.
+
+Surfaces adapt by size, following Apple: small elements like a control flip
+light/dark against their background, large ones like a sheet adapt without
+flipping. The gate is thinness, not area.
+
+## Presets
+
+`GlassMaterial.regular(brightness:)` and `GlassMaterial.clear()` are fitted
+against real iOS 27 captures. Those numbers are measured data — see
+`lib/src/material/apple_presets.dart` for provenance — and are deliberately
+not rounded to look tidy.
+
+They are tuned for what Apple uses them for: a small navigation surface over
+bright, content-rich material. They are not a good demo of refraction at
+large sizes, where a lower tint and a narrower band read far better.
+
+## Measuring it
+
+`benchmark/run_scene_benchmarks.dart` runs 16 scenes, each varying exactly one
+axis, and reports p50/p90/p99/worst rather than a mean. Budgets live in
+`benchmark/budgets.json` so a change to them is a reviewable diff.
+
+```
+flutter run --profile -t benchmark/run_scene_benchmarks.dart
+```
+
+It refuses to gate on a debug-mode report. A debug build carries the full
+assert overhead, so those numbers say nothing about shipped performance — the
+harness marks such a run untrustworthy rather than letting it quietly pass.
+
+## Status and known limits
+
+- The budgets shipped in `benchmark/budgets.json` are **seed values, not
+  measured data**. No profile-mode capture on real hardware has been taken
+  yet.
+- `containsChild` on `Glass` is accepted and not yet wired.
+- Backdrop luminance for surface adaptation is caller-supplied; nothing
+  samples it automatically yet.
+- Where two materials' shapes overlap, the later pass samples the earlier
+  one's glass. Apple's own guidance is not to stack glass on glass; put
+  overlapping surfaces in one material or one blend group.
+- `flutter test` cannot rasterise a backdrop filter faithfully, so rendering
+  is verified on the Impeller lane
+  (`flutter test --tags impeller --run-skipped --enable-impeller`) rather
+  than through `toImage()`.
+
+## Requirements
+
+Impeller for the refracting path; anything else degrades to blur. Flutter GPU
+is used for the accelerated geometry producer where available and needs
+`FLTEnableFlutterGPU` in `Info.plist` on iOS, or the
+`io.flutter.embedding.android.EnableFlutterGPU` metadata key on Android.
 
 ## Credit
 
 Built on [`liquid_glass_renderer`](https://github.com/whynotmake-it/flutter_liquid_glass)
-by Tim Lehmann / whynotmake.it (MIT), whose shader corpus and 16-shape batching
-design are the foundation here. Spring motion comes from
+by Tim Lehmann / whynotmake.it (MIT), whose shader corpus and 16-shape
+batching design are the foundation here. Spring motion comes from
 [`motor`](https://github.com/whynotmake-it/rivership/tree/main/packages/motor)
 by the same author.
 

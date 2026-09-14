@@ -16,11 +16,11 @@ import 'package:glass_forge/src/shaders/shader_library.dart';
 /// (flutter#186945), so every displaced lookup snaps between texels. This
 /// flag exists to measure that against a hand-reconstructed bilinear
 /// alternative — see `docs/reference/backdrop_sampling.md` for the decision
-/// and the numbers behind it, and `glass_forge_workbench`'s sampling probe
-/// screen for the toggle that flips it.
+/// and the numbers behind it. The probe screen that flipped it lived in the
+/// workbench app, which has since been deleted.
 ///
 /// Defaults to `false`. Nothing in production code ever sets it; it only
-/// matters while the sampling probe is on screen. Setting it `true` before
+/// matters to tooling that does. Setting it `true` before
 /// [debugWarmUpBilinearBackdropSampling] has completed throws — the shader
 /// it selects is not loaded eagerly (see [GlassShaderId.core]), precisely so
 /// no other consumer pays to load it.
