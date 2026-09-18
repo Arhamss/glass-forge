@@ -395,7 +395,9 @@ void main() {
         home: GlassLayer(
           child: GlassPresence(
             presence: controller,
-            child: Glass(shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28)), child: const SizedBox(width: 120, height: 48)),
+            child: Glass(shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              ), child: const SizedBox(width: 120, height: 48)),
           ),
         ),
       ),
@@ -421,7 +423,9 @@ void main() {
         home: GlassLayer(
           child: GlassPresence(
             presence: const AlwaysStoppedAnimation<double>(0),
-            child: Glass(shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28)), child: const SizedBox(width: 120, height: 48)),
+            child: Glass(shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              ), child: const SizedBox(width: 120, height: 48)),
           ),
         ),
       ),
@@ -667,7 +671,9 @@ import 'package:flutter/widgets.dart';
 /// ```dart
 /// GlassPresence(
 ///   presence: _sheetController,
-///   child: Glass(shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28))),
+///   child: Glass(shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              )),
 /// )
 /// ```
 class GlassPresence extends StatelessWidget {
@@ -764,7 +770,9 @@ void main() {
           child: GlassPresence(
             presence: presence,
             child: Glass(
-              shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28)),
+              shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              ),
               child: const SizedBox(width: 100, height: 40),
             ),
           ),
@@ -783,7 +791,9 @@ void main() {
       MaterialApp(
         home: GlassLayer(
           child: Glass(
-            shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28)),
+            shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              ),
             child: const SizedBox(width: 100, height: 40),
           ),
         ),
@@ -865,7 +875,9 @@ void main() {
       MaterialApp(
         home: GlassLayer(
           child: Glass(
-            shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28)),
+            shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              ),
             child: Builder(
               builder: (context) {
                 onGlass = GlassHostScope.isOnGlass(context);
@@ -901,9 +913,13 @@ void main() {
       MaterialApp(
         home: GlassLayer(
           child: Glass(
-            shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28)),
+            shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              ),
             child: Glass(
-              shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28)),
+              shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              ),
               child: const SizedBox(width: 40, height: 40),
             ),
           ),
@@ -1044,7 +1060,9 @@ void main() {
                 left: 0,
                 top: 0,
                 child: Glass(
-                  shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28)),
+                  shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              ),
                   material: const GlassMaterial(frost: 8),
                   child: const SizedBox(width: 100, height: 100),
                 ),
@@ -1053,7 +1071,9 @@ void main() {
                 left: 40,
                 top: 40,
                 child: Glass(
-                  shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28)),
+                  shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              ),
                   material: const GlassMaterial(frost: 20),
                   child: const SizedBox(width: 100, height: 100),
                 ),
@@ -1089,7 +1109,9 @@ void main() {
                 left: 0,
                 top: 0,
                 child: Glass(
-                  shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28)),
+                  shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              ),
                   child: const SizedBox(width: 100, height: 100),
                 ),
               ),
@@ -1097,7 +1119,9 @@ void main() {
                 left: 40,
                 top: 40,
                 child: Glass(
-                  shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28)),
+                  shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              ),
                   child: const SizedBox(width: 100, height: 100),
                 ),
               ),
@@ -1908,7 +1932,9 @@ void main() {
           child: Center(
             child: InteractiveGlass(
               child: Glass(
-                shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28)),
+                shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              ),
                 child: const SizedBox(width: 160, height: 56),
               ),
             ),
@@ -1940,7 +1966,9 @@ void main() {
             child: Center(
               child: InteractiveGlass(
                 child: Glass(
-                  shape: const GlassRoundedRectangle(radius: BorderRadius.circular(28)),
+                  shape: const GlassRoundedRectangle(
+                radius: BorderRadius.all(Radius.circular(28)),
+              ),
                   child: const SizedBox(width: 160, height: 56),
                 ),
               ),
