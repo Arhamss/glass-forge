@@ -528,6 +528,19 @@ class RenderGlassLayer extends RenderProxyBox {
   /// an unrotated shape and only approximate -- an over-estimate -- once a
   /// rotated basis is involved, which is good enough for a debug
   /// diagnostic.
+  ///
+  /// Called from two places in [paint], both *after* the subtree has
+  /// painted -- never from the top of [paint] itself, where every shape's
+  /// registered geometry could still be a fresh mount's `performLayout`-time
+  /// value. `RenderGlassShape.performLayout` can register a transform
+  /// missing an ancestor's just-assigned offset (see the doc comment on
+  /// `RenderGlassShape._syncGeometryIfTransformChanged`), and that is only
+  /// corrected once the shape's own `paint` runs. Reading before the
+  /// subtree paints caught that one-frame staleness on every fresh mount
+  /// of any glass subtree -- a false warning for geometry that never
+  /// reached the screen, since the matte and the filter are themselves
+  /// built from the corrected, post-paint values. Reading after matches
+  /// what actually renders.
   void _debugWarnOnCrossPassOverlap() {
     assert(() {
       final entries = _records.values.toList(growable: false);
@@ -612,8 +625,6 @@ class RenderGlassLayer extends RenderProxyBox {
       }
     }
 
-    _debugWarnOnCrossPassOverlap();
-
     // Everything that decides whether a pass renders at all has to be known
     // *now*, before anything is pushed: a `BackdropFilterLayer` forces a
     // saveLayer and a full backdrop read the moment it exists, so pushing
@@ -650,6 +661,11 @@ class RenderGlassLayer extends RenderProxyBox {
       // capable pass is currently at presence 0. Upstream pushes a full
       // backdrop even when its blur is zero.
       _paintSubtree(context, offset);
+      // The subtree has now painted, so every shape's registered geometry
+      // is this frame's, not layout's -- see the fuller note in
+      // _pushBackdropPasses, where the equivalent point sits on the other
+      // path through this method.
+      _debugWarnOnCrossPassOverlap();
       dormant.forEach(_warmMatte);
       return;
     }
@@ -879,6 +895,16 @@ class RenderGlassLayer extends RenderProxyBox {
     for (var i = 0; i < passes.length; i++) {
       pushed[i].filter = _buildFilter(passes[i], mapping);
     }
+
+    // Checked here, not earlier in `paint`, for the same reason the filters
+    // are built here: before this point every shape's registered geometry
+    // could still be a fresh mount's `performLayout`-time value, which
+    // `RenderGlassShape.paint`'s own re-sync had not yet corrected (see
+    // its doc comment) -- stale in exactly the way that produced a
+    // one-frame false warning on every fresh mount, never a shape that
+    // actually painted overlapping pixels. Now it reads the same geometry
+    // the mattes above were just baked from.
+    _debugWarnOnCrossPassOverlap();
 
     // Dormant passes -- a material rendering alongside a still-faded-out
     // `GlassPresence` pass -- get their matte warmed, off the
