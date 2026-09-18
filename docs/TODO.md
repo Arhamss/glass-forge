@@ -89,6 +89,47 @@ A1 → A4 → A2 → A3 → B1 → B2 → B3 → B4 → B5 → C4 → C1 → C2 
 - The edge band shows **stair-stepped contours** when refracting a smooth
   photographic gradient — consistent with the RGBA8 matte quantising
   displacement. Visible at 2× zoom, not at phone scale.
+- **A4's new cross-pass overlap warning (Task 5) fires on every tab switch
+  in the example**, on the iPhone 17e simulator. Two distinct things, found
+  together:
+  - **The transient overlap itself.** `Stage._sceneFor` swaps to a whole
+    new scene widget on `setState(() => _index = i)` — exactly what
+    `_SceneTabs`'s `onChanged` calls on a real tap — and for one frame the
+    outgoing scene's glass and the incoming scene's glass both show up in
+    `RenderGlassLayer._records` with real, non-degenerate bounds (not the
+    zero-size placeholder a genuinely unmounted shape would leave). This is
+    the legitimately-transient case the warning was designed not to assert
+    on, but it is worth fixing properly rather than living with the
+    print, since nothing here is a deliberate `GlassPresence` handoff —
+    it is every ordinary tab switch. The very first frame of the app (any
+    scene, before any tap) also warns once, for the same reason: the
+    control-panel sheet and the bottom tab bar both register with
+    `origin.y == 0` on that first frame, before the Column has assigned
+    their real offsets — `Rect.fromLTRB(0.0, 0.0, 1050.0, 156.0)` and
+    `Rect.fromLTRB(0.0, 0.0, 1050.0, 432.0)` at 3x, reproduced on every
+    cold launch and every hot restart.
+  - **A related, louder bug in the Blend scene's teardown**, surfaced by
+    the same interaction: switching away from Blend throws (caught and
+    reported, not fatal) `RenderGlassLayer#... NEEDS-PAINT
+    NEEDS-COMPOSITING-BITS-UPDATE and RenderGlassShape#... are not in the
+    same render tree`. `RenderGlassShape.detach()` unregisters itself from
+    the layer first, which is correct, but then calls `_leaveGroup()`,
+    whose `BlendGroupLink.remove()` synchronously `notifyListeners()`s —
+    reaching the *other* circle still mid-teardown, whose
+    `_onGroupChanged` re-syncs geometry via `getTransformTo(_layer)` against
+    an ancestor chain that is disturbed by the same detach cascade.
+    `ChangeNotifier.notifyListeners()` catches and reports this per
+    listener rather than rethrowing, so the frame survives, but it is a
+    real ordering bug in `RenderGlassShape`/`BlendGroupLink`, not an
+    example bug, and it is exactly the kind of thing that could leave a
+    blend-group shape's geometry stale.
+  - Not fixed here: task 5 was "add the diagnostic," and the check is
+    correctly refusing to stay quiet about a real, reproducible cross-pass
+    overlap rather than being softened to hide it (see task-5-report.md).
+    Fixing the transition order — most likely giving `Stage` a real
+    crossfade between scenes via `GlassPresence`, and fixing
+    `RenderGlassShape.detach()`/`BlendGroupLink` to finish this shape's
+    own teardown before notifying group siblings — is follow-up work.
 
 ## The finding the widget spec is built on
 
