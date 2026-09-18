@@ -8,8 +8,8 @@ import 'package:glass_forge/src/platform/glass_forge_platform_interface.dart';
 /// Flutter glass package approximates it with `MediaQuery.highContrast` and
 /// documents the resulting hole.
 ///
-/// The renderer is not implemented yet. See
-/// `docs/superpowers/specs/2026-09-10-renderer-core-design.md`.
+/// `GlassForge` is the façade app code calls; it defers to
+/// [GlassForgePlatform.instance] for the platform-specific answer.
 class GlassForge {
   /// Whether the user has asked the system to reduce transparency.
   ///
