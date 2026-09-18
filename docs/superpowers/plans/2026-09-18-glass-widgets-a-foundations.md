@@ -307,11 +307,15 @@ rm -rf web && rm -f test/widget_test.dart && git checkout .metadata
 cd ..
 ```
 
-The cleanup line is not optional. `flutter create` scaffolds `web/`, writes a
-template `test/widget_test.dart` referring to a `MyApp` this app does not
-have, and rewrites `example/.metadata`; leaving any of them behind breaks
-`flutter analyze`. See `.github/workflows/shaders.yaml`, which does the same
-thing and explains why the gate runs before analyze.
+The cleanup line is not optional **locally**. `flutter create` scaffolds
+`web/`, writes a template `test/widget_test.dart` referring to a `MyApp` this
+app does not have, and rewrites `example/.metadata`. CI deletes only the
+template test — see `.github/workflows/shaders.yaml` — because it runs on a
+throwaway checkout where a leftover `web/` and a rewritten `.metadata` are
+discarded with the runner. On a working tree they are not: they leave the
+repository dirty and the template test breaks `flutter analyze`. That
+workflow is still the authority on the rest of the gate, including why it
+must run before analyze.
 Expected: succeeds. This is the SkSL gate; a malformed shader fails here.
 
 - [ ] **Step 9: Commit**
@@ -1836,11 +1840,15 @@ rm -rf web && rm -f test/widget_test.dart && git checkout .metadata
 cd ..
 ```
 
-The cleanup line is not optional. `flutter create` scaffolds `web/`, writes a
-template `test/widget_test.dart` referring to a `MyApp` this app does not
-have, and rewrites `example/.metadata`; leaving any of them behind breaks
-`flutter analyze`. See `.github/workflows/shaders.yaml`, which does the same
-thing and explains why the gate runs before analyze.
+The cleanup line is not optional **locally**. `flutter create` scaffolds
+`web/`, writes a template `test/widget_test.dart` referring to a `MyApp` this
+app does not have, and rewrites `example/.metadata`. CI deletes only the
+template test — see `.github/workflows/shaders.yaml` — because it runs on a
+throwaway checkout where a leftover `web/` and a rewritten `.metadata` are
+discarded with the runner. On a working tree they are not: they leave the
+repository dirty and the template test breaks `flutter analyze`. That
+workflow is still the authority on the rest of the gate, including why it
+must run before analyze.
 Expected: succeeds. **If it fails here, the uniform layout is the cause** —
 check the `uGlow` declaration order against the `setFloat` order.
 
@@ -2030,11 +2038,15 @@ rm -rf web && rm -f test/widget_test.dart && git checkout .metadata
 cd ..
 ```
 
-The cleanup line is not optional. `flutter create` scaffolds `web/`, writes a
-template `test/widget_test.dart` referring to a `MyApp` this app does not
-have, and rewrites `example/.metadata`; leaving any of them behind breaks
-`flutter analyze`. See `.github/workflows/shaders.yaml`, which does the same
-thing and explains why the gate runs before analyze.
+The cleanup line is not optional **locally**. `flutter create` scaffolds
+`web/`, writes a template `test/widget_test.dart` referring to a `MyApp` this
+app does not have, and rewrites `example/.metadata`. CI deletes only the
+template test — see `.github/workflows/shaders.yaml` — because it runs on a
+throwaway checkout where a leftover `web/` and a rewritten `.metadata` are
+discarded with the runner. On a working tree they are not: they leave the
+repository dirty and the template test breaks `flutter analyze`. That
+workflow is still the authority on the rest of the gate, including why it
+must run before analyze.
 
 - [ ] **Step 7: Look at it**
 
