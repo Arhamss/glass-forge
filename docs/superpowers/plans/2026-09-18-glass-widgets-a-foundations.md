@@ -1796,7 +1796,7 @@ class GlassGlow {
 In `shaders/final_render.frag`, after `uniform vec4 uSurface;`:
 
 ```glsl
-uniform vec4 uGlow;           // centre.xy in filter space, radius, strength
+uniform vec4 uGlow;           // centre.xy in MATTE space, radius, strength
 ```
 
 and immediately before the premultiply at the end of `main`, after the
@@ -1808,7 +1808,12 @@ and immediately before the premultiply at the end of `main`, after the
     // pass -- the neighbours Apple describes -- and none of the gaps
     // between them.
     if (uGlow.w > 0.0) {
-        float glowDistance = distance(frag, uGlow.xy);
+        // Measured in MATTE space, not against `frag`. `frag` is filter
+        // space; the glow centre arrives in layer-local pixels, and the
+        // two coincide only when no ancestor has scrolled or scaled this
+        // layer. `uMapBasis`/`uMapOffset` exist to relate them, and
+        // `uMatteRect` is already compared in matte space above.
+        float glowDistance = distance(matteSpace, uGlow.xy);
         float falloff = 1.0 - smoothstep(0.0, max(uGlow.z, 1.0), glowDistance);
         refracted += uGlow.w * falloff * falloff;
     }
@@ -1832,9 +1837,12 @@ Expected: no output.
 four floats **after** the `uSurface` block and before `setImageSampler`:
 
 ```dart
-// uGlow, in filter space: the same physical pixels FlutterFragCoord
-// reports, so the centre converts by the device pixel ratio like every
-// other length here.
+// uGlow, in MATTE space -- layer-local physical pixels, the same space
+// `uMatteRect` is expressed in and the space the shader compares against
+// `matteSpace`. The centre arrives in layer-local LOGICAL pixels, so it
+// converts by the device pixel ratio, and so does the radius. Comparing
+// against filter space instead would slide the glow away from the finger
+// the moment an ancestor scrolls or scales the layer.
 ..setFloat(i++, glow.centre.dx * devicePixelRatio)
 ..setFloat(i++, glow.centre.dy * devicePixelRatio)
 ..setFloat(i++, glow.radius * devicePixelRatio)
