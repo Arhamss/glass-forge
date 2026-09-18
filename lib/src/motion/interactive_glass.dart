@@ -55,7 +55,11 @@ class GlassDrag {
 /// response:
 ///
 /// ```dart
-/// InteractiveGlass(child: Glass(shape: GlassShape.capsule()))
+/// InteractiveGlass(
+///   child: Glass(
+///     shape: GlassRoundedRectangle(radius: BorderRadius.circular(999)),
+///   ),
+/// )
 /// ```
 ///
 /// and a draggable, rubber-banded, flingable surface is one more argument:
@@ -63,7 +67,9 @@ class GlassDrag {
 /// ```dart
 /// InteractiveGlass(
 ///   drag: const GlassDrag(overdrag: GlassOverdrag(limit: 80)),
-///   child: Glass(shape: GlassShape.capsule()),
+///   child: Glass(
+///     shape: GlassRoundedRectangle(radius: BorderRadius.circular(999)),
+///   ),
 /// )
 /// ```
 ///
