@@ -508,6 +508,80 @@ class RenderGlassLayer extends RenderProxyBox {
   @override
   bool get alwaysNeedsCompositing => true;
 
+  /// Warns when two shapes in *different* backdrop passes overlap.
+  ///
+  /// Two backdrop passes over the same pixels is flutter#187820: the upper
+  /// one reads a stale previous-frame backdrop, including its own output,
+  /// and white-washes progressively on physical iPhones. It has shipped
+  /// broken in this repository by accident more than once, which is why
+  /// it is checked rather than only documented.
+  ///
+  /// A warning, not an assert -- deliberately. Overlap is legitimately
+  /// transient: a sheet rising over a tab bar overlaps it for exactly as
+  /// long as the handoff takes, and an assert would throw on the very
+  /// frame that was in the middle of fixing it. Shapes inside one pass are
+  /// fine: they share a matte and fold into one surface via smooth-min,
+  /// which is the supported way to overlap.
+  ///
+  /// Each shape's bounds are built from [ShapeGeometry.origin] and
+  /// [ShapeGeometry.halfExtent] as an axis-aligned rect. That is exact for
+  /// an unrotated shape and only approximate -- an over-estimate -- once a
+  /// rotated basis is involved, which is good enough for a debug
+  /// diagnostic.
+  void _debugWarnOnCrossPassOverlap() {
+    assert(() {
+      final entries = _records.values.toList(growable: false);
+      for (var i = 0; i < entries.length; i++) {
+        final a = entries[i];
+        final assignedA = a.assigned;
+        // Unreachable at this point in paint -- every record is assigned
+        // by _reassignPasses before the presence fold above runs -- but
+        // skipped rather than forced, since this is a diagnostic and
+        // should never be what crashes a debug build.
+        if (assignedA == null) {
+          continue;
+        }
+        if (!GlassComposition.willRender(assignedA.material, a.presence)) {
+          continue;
+        }
+        final boundsA = Rect.fromCenter(
+          center: a.geometry.origin,
+          width: a.geometry.halfExtent.width * 2,
+          height: a.geometry.halfExtent.height * 2,
+        );
+        for (var j = i + 1; j < entries.length; j++) {
+          final b = entries[j];
+          final assignedB = b.assigned;
+          if (assignedB == null || assignedA == assignedB) {
+            continue;
+          }
+          if (!GlassComposition.willRender(assignedB.material, b.presence)) {
+            continue;
+          }
+          final boundsB = Rect.fromCenter(
+            center: b.geometry.origin,
+            width: b.geometry.halfExtent.width * 2,
+            height: b.geometry.halfExtent.height * 2,
+          );
+          if (!boundsA.overlaps(boundsB)) {
+            continue;
+          }
+          debugPrint(
+            'glass_forge: two glass shapes in different backdrop passes '
+            'overlap ($boundsA and $boundsB). The upper pass samples the '
+            "lower one's output from the previous frame -- flutter#187820 "
+            '-- which white-washes progressively on a physical iPhone. '
+            'Give them the same material so they share a pass, join them '
+            'with a GlassBlendGroup, or hand one off to the other with '
+            'GlassPresence so only one is present at a time.',
+          );
+          return true;
+        }
+      }
+      return true;
+    }(), 'debug-only warning; always true');
+  }
+
   @override
   void paint(PaintingContext context, Offset offset) {
     if (!ShaderLibrary.instance.isReady) {
@@ -537,6 +611,8 @@ class RenderGlassLayer extends RenderProxyBox {
         pass.presence = record.presence;
       }
     }
+
+    _debugWarnOnCrossPassOverlap();
 
     // Everything that decides whether a pass renders at all has to be known
     // *now*, before anything is pushed: a `BackdropFilterLayer` forces a
