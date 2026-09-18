@@ -348,6 +348,60 @@ class RenderGlassLayer extends RenderProxyBox {
     markNeedsPaint();
   }
 
+  /// The touch glow every pass in this layer is lit by.
+  ///
+  /// One glow per layer, not per shape: a glow that stops at a shape's edge
+  /// is the painted version this package rejected. See `GlassGlow`.
+  GlassGlow get glow => _glow;
+  GlassGlow _glow = const GlassGlow.none();
+  set glow(GlassGlow value) {
+    if (_glow == value) {
+      return;
+    }
+    _glow = value;
+    markNeedsPaint();
+  }
+
+  /// The shared glow channel this layer listens to, if any.
+  ///
+  /// Set from `GlassLayer`, which owns the `ValueNotifier<GlassGlow>` its
+  /// `GlassGlowScope` publishes and every `InteractiveGlass` beneath this
+  /// layer writes into. Listened to directly here, the same way
+  /// `RenderGlassMotion` listens to its `GlassMotionController`: a change
+  /// calls [markNeedsPaint] with no widget rebuild in between, which is
+  /// what lets the glow follow a spring running every frame.
+  ValueListenable<GlassGlow>? get glowListenable => _glowListenable;
+  ValueListenable<GlassGlow>? _glowListenable;
+  set glowListenable(ValueListenable<GlassGlow>? value) {
+    if (identical(_glowListenable, value)) {
+      return;
+    }
+    if (attached) {
+      _glowListenable?.removeListener(_onGlowListenableChanged);
+    }
+    _glowListenable = value;
+    if (attached) {
+      _glowListenable?.addListener(_onGlowListenableChanged);
+    }
+    _onGlowListenableChanged();
+  }
+
+  void _onGlowListenableChanged() {
+    glow = _glowListenable?.value ?? const GlassGlow.none();
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _glowListenable?.addListener(_onGlowListenableChanged);
+  }
+
+  @override
+  void detach() {
+    _glowListenable?.removeListener(_onGlowListenableChanged);
+    super.detach();
+  }
+
   /// Registers [key]'s geometry, and what it asked to render with.
   ///
   /// [material] null means "whatever this layer's is"; [group] is the blend
@@ -917,9 +971,7 @@ class RenderGlassLayer extends RenderProxyBox {
 
   ui.ImageFilter _buildFilter(_GlassPass pass, Float32List mapping) {
     _refreshMatte(pass);
-    // Task 9 replaces this stub with the glow driven from the held
-    // pointer; this task only makes the shader capable of it.
-    const glow = GlassGlow.none();
+    final glow = _glow;
     final filter = pass.composition.build(
       matte: pass.matte,
       material: pass.material,

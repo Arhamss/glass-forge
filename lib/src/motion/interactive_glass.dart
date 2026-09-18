@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:glass_forge/src/composition/glass_glow.dart';
 import 'package:glass_forge/src/motion/glass_decay.dart';
 import 'package:glass_forge/src/motion/glass_jiggle.dart';
 import 'package:glass_forge/src/motion/glass_motion.dart';
@@ -7,6 +8,8 @@ import 'package:glass_forge/src/motion/glass_overdrag.dart';
 import 'package:glass_forge/src/motion/glass_press_stretch.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
 import 'package:glass_forge/src/motion/render_glass_motion.dart';
+import 'package:glass_forge/src/rendering/render_glass_layer.dart';
+import 'package:glass_forge/src/widgets/glass_layer.dart';
 
 /// Whether a surface can be dragged, and what happens when it is let go.
 @immutable
@@ -154,10 +157,52 @@ class _InteractiveGlassState extends State<InteractiveGlass>
 
   final Set<int> _pointersDown = <int>{};
 
+  /// This surface's own connection to the layer's shared glow channel.
+  ///
+  /// Looked up in [didChangeDependencies], not cached for the widget's
+  /// whole lifetime: it is an `InheritedWidget` dependency like any other,
+  /// and re-reading it there is what lets this surface follow a
+  /// `GlassLayer` that changes above it.
+  ValueNotifier<GlassGlow>? _glowNotifier;
+
+  /// The glow this surface itself last wrote into [_glowNotifier], if any.
+  ///
+  /// Compared against the channel's live value before a release clears it.
+  /// See [_releaseGlow].
+  GlassGlow? _lastWrittenGlow;
+
+  /// Where the finger last was, in global (screen) coordinates.
+  ///
+  /// Global, not layer-local: the layer can move (scroll, animate, an
+  /// ancestor's own transform) for the whole time a press is held or
+  /// decaying, so converting once and caching the result would let the
+  /// glow drift away from a layer that has since moved.
+  /// [_layerLocalPointerPosition] re-resolves this fresh every time it is
+  /// needed instead.
+  Offset? _globalPointerPosition;
+
+  /// How far the glow reaches at any press depth above zero, in logical
+  /// pixels.
+  ///
+  /// Deliberately **not** scaled by press the way `strength` is in
+  /// [_publishGlow]: see that method's own doc comment for why a radius
+  /// that ramps from zero is unsafe given how the shader floors its
+  /// falloff distance.
+  static const double _glowRadius = 140;
+
+  /// How strongly the glow brightens at its centre at full press, 0 to 1.
+  static const double _glowMaxStrength = 0.55;
+
   @override
   void initState() {
     super.initState();
-    _controller = _createController();
+    _controller = _createController()..addListener(_publishGlow);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _glowNotifier = GlassGlowScope.maybeOf(context)?.glow;
   }
 
   GlassMotionController _createController() => GlassMotionController(
@@ -185,14 +230,24 @@ class _InteractiveGlassState extends State<InteractiveGlass>
         oldWidget.drag.decay != widget.drag.decay ||
         oldWidget.drag.enabled != widget.drag.enabled ||
         oldWidget.drag.overdrag != widget.drag.overdrag) {
-      _controller.dispose();
-      _controller = _createController();
+      // The old controller's press is about to vanish along with it, so
+      // whatever it was holding on the shared glow channel has to go too
+      // — otherwise a glow claimed mid-press would be stuck there forever,
+      // since the controller that would eventually release it no longer
+      // exists.
+      _releaseGlow();
+      _controller
+        ..removeListener(_publishGlow)
+        ..dispose();
+      _controller = _createController()..addListener(_publishGlow);
       _rawDrag = Offset.zero;
     }
   }
 
   @override
   void dispose() {
+    _releaseGlow();
+    _controller.removeListener(_publishGlow);
     _controller.dispose();
     super.dispose();
   }
@@ -203,40 +258,41 @@ class _InteractiveGlassState extends State<InteractiveGlass>
     null => value,
   };
 
-  /// Whether the press channel does anything visible.
-  ///
-  /// It drives two independent effects — the uniform depth scale
-  /// ([InteractiveGlass.pressScale]) and how far press-stretch reaches
-  /// toward the anchor — so it has to spring even when
-  /// [InteractiveGlass.pressScale] is `1` and depth is off, as long as a
-  /// reach is still configured. Gating on `pressScale` alone left a surface
-  /// with `pressScale: 1` and an active [InteractiveGlass.pressStretch]
-  /// never pressing at all: the press channel would sit at `0` forever and
-  /// `pressAnchor * press` would always be zero.
-  bool get _pressChannelIsUsed =>
-      widget.pressScale != 1 || widget.pressStretch.isActive;
+  // The press channel used to be gated on `pressScale != 1 ||
+  // pressStretch.isActive`, skipping `setPressed` entirely when neither the
+  // depth scale nor the reach was configured to use it — a real saving,
+  // since an unused spring still costs a ticker. The touch glow below is a
+  // third, unconditional consumer of the same channel: every
+  // `InteractiveGlass` glows on touch regardless of `pressScale` or
+  // `pressStretch`, so the channel is now always in use and the gate always
+  // evaluated to `true` in every configuration that matters. Removed rather
+  // than left dead.
 
   void _onPointerDown(PointerDownEvent event) {
     _pointersDown.add(event.pointer);
-    if (_pressChannelIsUsed) {
-      _controller.setPressed(pressed: true);
-    }
+    // Recorded before the controller is touched: `setPressed` can publish
+    // synchronously (Reduce Motion settles instantly), and the glow this
+    // triggers needs a position to convert the moment that happens.
+    _globalPointerPosition = event.position;
+    _controller.setPressed(pressed: true);
     _controller.setPressAnchor(_anchorFor(event.localPosition));
   }
 
   void _onPointerMove(PointerMoveEvent event) {
+    _globalPointerPosition = event.position;
     _controller.setPressAnchor(_anchorFor(event.localPosition));
   }
 
   void _onPointerUp(int pointer) {
     _pointersDown.remove(pointer);
     if (_pointersDown.isEmpty) {
-      if (_pressChannelIsUsed) {
-        // Only when the last finger leaves: a second finger landing on a
-        // surface should not un-press it when it lifts again.
-        _controller.setPressed(pressed: false);
-      }
-      _controller.setPressAnchor(Offset.zero);
+      // Only when the last finger leaves: a second finger landing on a
+      // surface should not un-press it when it lifts again. The glow rides
+      // this same spring down to nothing — see `_publishGlow` — rather
+      // than being zeroed here directly, so it decays instead of vanishing.
+      _controller
+        ..setPressed(pressed: false)
+        ..setPressAnchor(Offset.zero);
     }
   }
 
@@ -277,6 +333,155 @@ class _InteractiveGlassState extends State<InteractiveGlass>
   void _onPanCancel() {
     _controller.release();
     _rawDrag = Offset.zero;
+  }
+
+  /// Whether this surface still holds [notifier]'s channel: whether it
+  /// still holds exactly the value this surface itself last wrote there.
+  ///
+  /// The channel only ever holds one `GlassGlow`, so identity is not
+  /// available to tell "still mine" from "someone else's, coincidentally
+  /// equal" apart — value equality against [_lastWrittenGlow] is the best
+  /// available proxy, and in practice two different surfaces' glows are
+  /// never equal, since their centres differ. See [_publishGlow] and
+  /// [_releaseGlow] for the two places this decides something.
+  bool _ownsGlow(ValueNotifier<GlassGlow> notifier) =>
+      _lastWrittenGlow != null && notifier.value == _lastWrittenGlow;
+
+  /// Writes this surface's glow into the layer's shared channel, or lets
+  /// its claim on that channel go.
+  ///
+  /// Called on every change of [_controller]'s value — a tick of the press
+  /// spring, or a synchronous settle under Reduce Motion — which is what
+  /// lets the glow track the same channel `pressAnchor` and press-stretch
+  /// already read, with no ticker of its own. See the class doc comment on
+  /// [GlassGlowScope] for the rule this follows when more than one surface
+  /// wants the channel at once.
+  ///
+  /// **Design decision: a live touch always claims the channel; a
+  /// decaying one never fights to reclaim it.** While a pointer is down
+  /// ([_pointersDown] is non-empty) this always writes, seizing the
+  /// channel from whatever it held before — "the glow follows the active
+  /// touch" only means something if a fresh touch always wins. Once every
+  /// pointer has lifted, [_controller]'s press spring keeps ticking this
+  /// down to zero on its own, and without a check here this surface would
+  /// keep re-publishing its own *fading* glow on every one of those ticks
+  /// even after a different surface had since claimed the channel with a
+  /// live touch of its own — clobbering it right back, one frame later,
+  /// with a glow that is not even growing any more. So a surface with no
+  /// pointer down only keeps updating a claim it still owns
+  /// ([_ownsGlow]); the moment it does not, it stops touching the channel
+  /// entirely rather than writing `GlassGlow.none()` over the new owner —
+  /// which is the same "do not clobber a newer claim" rule [_releaseGlow]
+  /// applies once this surface's own press finally reaches zero.
+  ///
+  /// Radius is held at [_glowRadius] for the whole press rather than
+  /// ramping it up alongside [_glowMaxStrength]: the uniform this writes
+  /// reaches a shader that floors its falloff distance at roughly one
+  /// physical pixel regardless of what radius asks for, so a radius
+  /// ramping up from zero in lockstep with a nonzero strength would pass
+  /// through a state where a real, hard, sub-pixel dot renders under the
+  /// finger before the glow has visibly opened up. Ramping strength alone
+  /// against a fixed radius still reads as the glow spreading: at low
+  /// strength only the pixels nearest the centre, where the falloff curve
+  /// is closest to `1`, clear the threshold of visible brightening, so the
+  /// lit area still grows as the press deepens — it never passes through
+  /// the unsafe combination in the first place.
+  void _publishGlow() {
+    final press = _controller.value.press;
+    if (press <= 0) {
+      _releaseGlow();
+      return;
+    }
+    final notifier = _glowNotifier;
+    if (notifier == null) {
+      return;
+    }
+    if (_pointersDown.isEmpty && !_ownsGlow(notifier)) {
+      _lastWrittenGlow = null;
+      return;
+    }
+    final centre = _layerLocalPointerPosition();
+    if (centre == null) {
+      return;
+    }
+    final next = GlassGlow(
+      centre: centre,
+      radius: _glowRadius,
+      strength: _glowMaxStrength * press,
+    );
+    notifier.value = next;
+    _lastWrittenGlow = next;
+  }
+
+  /// Lets this surface's claim on the shared glow channel go, if it still
+  /// holds it.
+  ///
+  /// **Design decision: a release must not clobber a newer claim.** A
+  /// `GlassLayer` holds exactly one glow for every surface beneath it, so
+  /// two fingers — or a second surface pressed while this one is still
+  /// decaying — contend for the same channel, and whichever wrote most
+  /// recently wins (see [GlassGlowScope]'s doc comment). If this surface
+  /// simply wrote `GlassGlow.none()` whenever its own press reached zero,
+  /// it would blow away a glow a different surface had since claimed,
+  /// because it has no way to tell the two apart. [_ownsGlow] is that
+  /// check: this only clears the channel when it still holds exactly what
+  /// *this* surface itself last wrote there. If something else has
+  /// written since, that comparison fails, this is a no-op, and the newer
+  /// claim survives untouched.
+  void _releaseGlow() {
+    final notifier = _glowNotifier;
+    final stillOwned = notifier != null && _ownsGlow(notifier);
+    _lastWrittenGlow = null;
+    _globalPointerPosition = null;
+    if (notifier != null && stillOwned) {
+      notifier.value = const GlassGlow.none();
+    }
+  }
+
+  /// [_globalPointerPosition] converted into the nearest `GlassLayer`'s own
+  /// coordinate space, or null if there is no pointer down or no layer to
+  /// convert against.
+  ///
+  /// **Design decision: layer space, not surface space.** The glow has to
+  /// reach neighbouring glass, which only makes sense measured against the
+  /// layer every surface in it shares — not against this surface's own
+  /// laid-out box, which is what `Listener.onPointerDown/onPointerMove`
+  /// hand back as `localPosition`. (`RenderGlassMotion.hitTestChildren`
+  /// puts pointers back into this surface's own space via
+  /// `addWithPaintTransform`, which is the wrong frame for exactly this
+  /// reason.) So this starts from [_globalPointerPosition] — recorded in
+  /// screen coordinates by the pointer handlers — and asks the layer's own
+  /// render object to convert it, freshly, every time this is called,
+  /// rather than converting once and caching the result: the layer can
+  /// move (scroll, an ancestor's own animation) for the whole time a press
+  /// is held or decaying, and a cached layer-local offset would silently
+  /// drift away from the finger the moment that happens.
+  Offset? _layerLocalPointerPosition() {
+    final global = _globalPointerPosition;
+    if (global == null) {
+      return null;
+    }
+    final layer = _findAncestorLayer();
+    if (layer == null) {
+      return null;
+    }
+    return layer.globalToLocal(global);
+  }
+
+  /// Walks the render tree for the nearest enclosing `RenderGlassLayer`,
+  /// the same way `RenderGlassShape._findAncestorLayer` does. The widget
+  /// tree only tells this surface *whether* a layer exists above it (via
+  /// `GlassGlowScope`); the render object it actually converts against has
+  /// to come from the render tree, which is what will really paint.
+  RenderGlassLayer? _findAncestorLayer() {
+    var node = context.findRenderObject();
+    while (node != null) {
+      if (node is RenderGlassLayer) {
+        return node;
+      }
+      node = node.parent;
+    }
+    return null;
   }
 
   @override

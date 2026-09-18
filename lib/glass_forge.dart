@@ -9,6 +9,7 @@
 /// for how the pieces fit together.
 library;
 
+export 'src/composition/glass_glow.dart' show GlassGlow;
 export 'src/design/glass_legibility.dart';
 export 'src/design/glass_motion_defaults.dart';
 export 'src/design/glass_surface.dart';

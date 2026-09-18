@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:glass_forge/src/composition/glass_glow.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/rendering/render_glass_layer.dart';
@@ -27,7 +28,7 @@ import 'package:glass_forge/src/tier/glass_tier_scope.dart';
 /// temperature, its recent frame times and the user's accessibility settings
 /// allow. With no scope above it, nothing is adopted and the layer renders
 /// exactly what it was given.
-class GlassLayer extends StatelessWidget {
+class GlassLayer extends StatefulWidget {
   /// Creates a glass layer.
   const GlassLayer({
     required this.child,
@@ -59,27 +60,85 @@ class GlassLayer extends StatelessWidget {
   final GeometryTier? tier;
 
   @override
+  State<GlassLayer> createState() => _GlassLayerState();
+}
+
+class _GlassLayerState extends State<GlassLayer> {
+  /// This layer's shared touch-glow channel.
+  ///
+  /// A plain field, not created per build: every `InteractiveGlass` beneath
+  /// this layer writes into the same instance for as long as this state
+  /// lives, and [GlassGlowScope.updateShouldNotify] relies on that identity
+  /// staying put.
+  final ValueNotifier<GlassGlow> _glow = ValueNotifier(const GlassGlow.none());
+
+  @override
+  void dispose() {
+    _glow.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final resolved = GlassTierScope.maybeOf(context);
     final effective =
         resolved?.materialFor(
-          material,
+          widget.material,
           brightness:
-              MediaQuery.maybePlatformBrightnessOf(context) ??
-              Brightness.light,
+              MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light,
         ) ??
-        material;
-    final geometry = tier ?? resolved?.geometry ?? GeometryTier.accelerated;
+        widget.material;
+    final geometry =
+        widget.tier ?? resolved?.geometry ?? GeometryTier.accelerated;
 
-    return GlassLayerScope(
-      material: effective,
-      child: _RawGlassLayer(
+    return GlassGlowScope(
+      glow: _glow,
+      child: GlassLayerScope(
         material: effective,
-        tier: geometry,
-        child: child,
+        child: _RawGlassLayer(
+          material: effective,
+          tier: geometry,
+          glow: _glow,
+          child: widget.child,
+        ),
       ),
     );
   }
+}
+
+/// Publishes the nearest `GlassLayer`'s shared touch-glow channel.
+///
+/// One `ValueNotifier<GlassGlow>` per layer, not per surface: every
+/// `InteractiveGlass` beneath a given `GlassLayer` writes into the same
+/// instance, because the glow itself is a property of the layer's single
+/// backdrop pass, not of any one shape. See `RenderGlassLayer.glow`.
+///
+/// **Contention rule, decided explicitly because the design leaves it
+/// open:** last writer wins. Whichever surface most recently wrote a glow
+/// into the channel is the one that shows — there is no queueing and no
+/// blending between two surfaces pressed at once, which matches Apple's own
+/// description of the glow following the live touch. The one place that
+/// needs a rule beyond "just write" is release: a surface letting go must
+/// not zero a glow that a different surface has since claimed. Each
+/// `InteractiveGlass` enforces that itself, by only ever clearing the
+/// channel back to `GlassGlow.none()` when it still holds exactly what that
+/// surface last wrote there — see `InteractiveGlass`'s own glow-release
+/// doc comment for the mechanics.
+class GlassGlowScope extends InheritedWidget {
+  /// Creates a scope publishing [glow].
+  const GlassGlowScope({required this.glow, required super.child, super.key});
+
+  /// The nearest layer's shared glow channel.
+  final ValueNotifier<GlassGlow> glow;
+
+  /// The nearest enclosing scope, if any.
+  static GlassGlowScope? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<GlassGlowScope>();
+  }
+
+  @override
+  bool updateShouldNotify(GlassGlowScope oldWidget) =>
+      !identical(oldWidget.glow, glow);
 }
 
 /// Exposes the nearest layer's default material to descendants.
@@ -115,11 +174,13 @@ class _RawGlassLayer extends SingleChildRenderObjectWidget {
   const _RawGlassLayer({
     required this.material,
     required this.tier,
+    required this.glow,
     required Widget super.child,
   });
 
   final GlassMaterial material;
   final GeometryTier tier;
+  final ValueNotifier<GlassGlow> glow;
 
   @override
   RenderGlassLayer createRenderObject(BuildContext context) {
@@ -127,7 +188,7 @@ class _RawGlassLayer extends SingleChildRenderObjectWidget {
       material: material,
       tier: tier,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-    );
+    )..glowListenable = glow;
   }
 
   @override
@@ -141,6 +202,12 @@ class _RawGlassLayer extends SingleChildRenderObjectWidget {
       // be chosen once would make every downgrade the engine resolves
       // invisible to the thing that renders.
       ..tier = tier
-      ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+      ..devicePixelRatio = MediaQuery.devicePixelRatioOf(context)
+      // `glow` is the same `ValueNotifier` instance across every rebuild
+      // (see `_GlassLayerState._glow`), so this is a no-op past the first
+      // assignment — the render object was already listening to it
+      // directly, which is how the glow reaches paint without going
+      // through build at all.
+      ..glowListenable = glow;
   }
 }
