@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/motion/glass_jiggle.dart';
@@ -85,4 +87,62 @@ void main() {
     );
     expect(m, equals(Matrix4.identity()));
   });
+
+  test(
+    'velocity-stretch and press-anchor at 45 degrees pin the '
+    'multiplication order to V·A, not A·V',
+    () {
+      // Velocity along x and an anchor at exactly 45 degrees on a square
+      // surface: the one non-axis-aligned, non-parallel configuration that
+      // still keeps the arithmetic checkable by hand (see the doc comment
+      // on glassSurfaceTransform). Axis-aligned choices would make both
+      // matrices diagonal, so they would commute and neither order would
+      // disagree with the other.
+      const activeJiggle = GlassJiggle();
+      const activeStretch = GlassPressStretch(intensity: 0.6, squash: 0.4);
+      const velocity = Offset(1500, 0);
+      const state = GlassMotionState(
+        translation: Offset.zero,
+        velocity: velocity,
+        press: 1,
+        pressAnchor: Offset(50, 50),
+      );
+
+      final m = glassSurfaceTransform(
+        size: const Size(100, 100),
+        state: state,
+        jiggle: activeJiggle,
+        pressStretch: activeStretch,
+        pressScale: 1,
+      );
+
+      // Velocity is along x, so V (the velocity matrix) is diagonal:
+      // v00 = along, v11 = across, v01 = 0.
+      final velocityStretch = activeJiggle.stretchFor(velocity.distance);
+      final along = velocityStretch;
+      final across = 1 / velocityStretch;
+
+      // The anchor is at 45 degrees on a square surface, so its reach is
+      // (1, 1) and A (the anchor matrix) has a00 == a11 and a nonzero a01.
+      final reachDistance = math.sqrt(2);
+      final pressAlong = 1 + activeStretch.intensity * reachDistance;
+      final pressAcross =
+          1 /
+          (1 + activeStretch.intensity * reachDistance * activeStretch.squash);
+      final a01 = (pressAlong - pressAcross) * 0.5;
+
+      // V·A, what glassSurfaceTransform computes, gives:
+      //   m01 = v00*a01 + v01*a11 = along * a01
+      //   m10 = v01*a00 + v11*a01 = across * a01
+      // Both V and A are symmetric on their own (each is a similarity
+      // transform of a diagonal), so (V·A)^T = A^T·V^T =
+      // A·V: computing A·V instead would swap m01 and m10, and
+      // re-mirroring m10 = m01 would collapse them together. Either bug
+      // is caught below because along != across here (velocityStretch !=
+      // 1) and a01 != 0.
+      expect(m.entry(0, 1), closeTo(along * a01, 1e-9));
+      expect(m.entry(1, 0), closeTo(across * a01, 1e-9));
+      expect(m.entry(0, 1), isNot(closeTo(m.entry(1, 0), 1e-6)));
+    },
+  );
 }

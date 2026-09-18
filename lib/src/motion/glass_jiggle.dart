@@ -60,10 +60,16 @@ class GlassJiggle {
 /// The transform a glass surface of [size] paints under, given [state].
 ///
 /// Composed in parent space as
-/// `translate(state.translation) · about-centre(press-stretch · velocity-
-/// stretch)`, so the surface both moves and deforms about its own middle —
-/// which is also where `ShapeGeometry.resolve` reads its basis from, so the
-/// matte deforms with the shape rather than sliding relative to it.
+/// `translate(state.translation) · about-centre(velocity-stretch ·
+/// press-stretch)`, so the surface both moves and deforms about its own
+/// middle — which is also where `ShapeGeometry.resolve` reads its basis
+/// from, so the matte deforms with the shape rather than sliding relative
+/// to it. Composition here reads right to left, same as ordinary matrix
+/// multiplication applied to a point: press-stretch (the rightmost factor)
+/// is applied first, then velocity-stretch, then the translation. Because
+/// the two 2x2s below do not commute in general (see why just below), that
+/// order is load-bearing — swapping it is a different transform, not an
+/// equivalent rewrite.
 ///
 /// Two deformations are folded into that single "about-centre" 2x2:
 ///
