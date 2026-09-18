@@ -17,7 +17,9 @@ import 'package:flutter/widgets.dart';
 /// ```dart
 /// GlassPresence(
 ///   presence: _sheetController,
-///   child: Glass(shape: const GlassRoundedRectangle(radius: 28)),
+///   child: Glass(
+///     shape: GlassRoundedRectangle(radius: BorderRadius.circular(28)),
+///   ),
 /// )
 /// ```
 class GlassPresence extends StatelessWidget {

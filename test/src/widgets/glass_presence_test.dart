@@ -25,8 +25,9 @@ void main() {
     expect((shape as RenderGlassShape).presence!.value, 0.4);
   });
 
-  testWidgets('a glass with no presence above it is fully present',
-      (tester) async {
+  testWidgets('a glass with no presence above it is fully present', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: GlassLayer(
@@ -39,5 +40,8 @@ void main() {
     );
     await tester.pump();
     expect(tester.takeException(), isNull);
+
+    final shape = tester.renderObject(find.byType(Glass).first);
+    expect((shape as RenderGlassShape).presence, isNull);
   });
 }

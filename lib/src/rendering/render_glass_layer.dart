@@ -538,20 +538,6 @@ class RenderGlassLayer extends RenderProxyBox {
       }
     }
 
-    // Every pass whose material could draw at all, independent of this
-    // frame's presence -- a presence-driven pass sitting at 0 is still
-    // capable, it is just not asked to render this frame. Refreshing these
-    // regardless of whether they are currently visible is what keeps a
-    // matte warm through the whole time its glass is faded out, so the
-    // frame it first crosses back above the epsilon needs no fresh bake.
-    // See `GlassPresence`'s own doc comment: animating it "costs a rebuilt
-    // image filter per frame and never a rebaked matte," for the driver's
-    // whole life, not just once it happens to already be visible.
-    final capablePasses = <_GlassPass>[
-      for (final pass in _passes.values)
-        if (GlassComposition.willRender(pass.material, 1)) pass,
-    ];
-
     // Everything that decides whether a pass renders at all has to be known
     // *now*, before anything is pushed: a `BackdropFilterLayer` forces a
     // saveLayer and a full backdrop read the moment it exists, so pushing
@@ -562,16 +548,33 @@ class RenderGlassLayer extends RenderProxyBox {
     // none of them can move while the subtree below paints. What *can* move
     // there, and the whole reason the filters are built afterwards, is where
     // each shape is.
-    final passes = <_GlassPass>[
-      for (final pass in capablePasses)
-        if (GlassComposition.willRender(pass.material, pass.presence)) pass,
-    ];
+    //
+    // `dormant` is every other pass whose material could still draw at full
+    // presence -- a presence-driven pass sitting at 0 is capable, it is
+    // just not asked to render this frame. Warming these (see [_warmMatte])
+    // regardless of whether they are currently visible is what keeps a
+    // matte ready for the frame a pass first crosses back above the
+    // epsilon. See `GlassPresence`'s own doc comment: animating it "costs a
+    // rebuilt image filter per frame and never a rebaked matte," for the
+    // driver's whole life, not just once it happens to already be visible.
+    final passes = <_GlassPass>[];
+    final dormant = <_GlassPass>[];
+    for (final pass in _passes.values) {
+      if (!GlassComposition.willRender(pass.material, 1)) {
+        continue;
+      }
+      if (GlassComposition.willRender(pass.material, pass.presence)) {
+        passes.add(pass);
+      } else {
+        dormant.add(pass);
+      }
+    }
     if (passes.isEmpty) {
       // No shapes, nothing any of their materials would draw, or every
       // capable pass is currently at presence 0. Upstream pushes a full
       // backdrop even when its blur is zero.
       _paintSubtree(context, offset);
-      capablePasses.forEach(_refreshMatte);
+      dormant.forEach(_warmMatte);
       return;
     }
 
@@ -591,7 +594,7 @@ class RenderGlassLayer extends RenderProxyBox {
       _clipChain.collect(firstShape, this);
     }
 
-    _pushGlassLayers(context, offset, passes, capablePasses);
+    _pushGlassLayers(context, offset, passes, dormant);
   }
 
   /// Paints the subtree, flagged so a descendant shape can tell that this
@@ -633,7 +636,7 @@ class RenderGlassLayer extends RenderProxyBox {
     PaintingContext context,
     Offset offset,
     List<_GlassPass> passes,
-    List<_GlassPass> capablePasses,
+    List<_GlassPass> dormant,
   ) {
     void pushBackdrop(PaintingContext innerContext, Offset innerOffset) {
       // The clip is computed in this layer's own local space — the offset
@@ -649,7 +652,7 @@ class RenderGlassLayer extends RenderProxyBox {
           clippedOffset,
           offset,
           passes,
-          capablePasses,
+          dormant,
         );
       });
     }
@@ -777,7 +780,7 @@ class RenderGlassLayer extends RenderProxyBox {
     Offset offset,
     Offset layerOffset,
     List<_GlassPass> passes,
-    List<_GlassPass> capablePasses,
+    List<_GlassPass> dormant,
   ) {
     final pushed = <BackdropFilterLayer>[];
     for (var i = 0; i < passes.length; i++) {
@@ -801,15 +804,10 @@ class RenderGlassLayer extends RenderProxyBox {
       pushed[i].filter = _buildFilter(passes[i], mapping);
     }
 
-    // Capable passes not being pushed this frame -- a material rendering
-    // alongside a still-faded-out `GlassPresence` pass -- still get their
-    // matte kept warm, off the backdrop-push path entirely.
-    final pushedSet = passes.toSet();
-    for (final pass in capablePasses) {
-      if (!pushedSet.contains(pass)) {
-        _refreshMatte(pass);
-      }
-    }
+    // Dormant passes -- a material rendering alongside a still-faded-out
+    // `GlassPresence` pass -- get their matte warmed, off the
+    // backdrop-push path entirely. See [_warmMatte].
+    dormant.forEach(_warmMatte);
   }
 
   static void _paintNothing(PaintingContext context, Offset offset) {}
@@ -839,6 +837,33 @@ class RenderGlassLayer extends RenderProxyBox {
     // an identity rather than a crashed frame.
     assert(false, 'willRender() accepted a material build() then refused');
     return ui.ImageFilter.matrix(Matrix4.identity().storage);
+  }
+
+  /// Bakes [pass]'s matte only if it does not have one yet.
+  ///
+  /// For a dormant pass -- not pushed this frame, whether because nothing
+  /// in this layer is currently visible or because this pass sits
+  /// alongside one that is -- this is what keeps a matte ready for the
+  /// frame it first becomes visible, without paying for a fresh bake on
+  /// every frame it stays invisible in between. That distinction matters:
+  /// `RenderGlassShape.paint` re-registers a shape's geometry whenever its
+  /// transform changes, unconditionally on presence, so a dormant pass
+  /// whose shapes keep moving -- a sheet whose presence hits 0 before it
+  /// finishes translating off-screen, or one pre-mounted at presence 0
+  /// above content still animating underneath it -- bumps the scene's
+  /// revision on every one of those frames regardless. Calling
+  /// [_refreshMatte] directly there would rebake on every one of them,
+  /// full `PictureRecorder`-to-`toImageSync` cost, indefinitely, for a
+  /// pass nobody can see. Motion has always cost a rebake while visible;
+  /// going invisible does not make it free. What `GlassPresence` promises
+  /// is that its own *value* ticking costs nothing once a matte exists,
+  /// which checking for one here, before ever calling [_refreshMatte], is
+  /// what actually delivers.
+  void _warmMatte(_GlassPass pass) {
+    if (pass.matte != null) {
+      return;
+    }
+    _refreshMatte(pass);
   }
 
   void _refreshMatte(_GlassPass pass) {

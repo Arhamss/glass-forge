@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge/src/diagnostics/render_counters.dart';
+import 'package:glass_forge/src/shaders/shader_library.dart';
 
 void main() {
+  setUpAll(ShaderLibrary.instance.warmUp);
+  setUp(GlassRenderCounters.instance.reset);
+
   testWidgets('animating presence bakes no new mattes', (tester) async {
     final controller = AnimationController(
       vsync: tester,
@@ -48,6 +52,15 @@ void main() {
   });
 
   testWidgets('presence 0 pushes no backdrop filter', (tester) async {
+    // Asserted straight off the one real paint `pumpWidget` triggers, with
+    // no reset-then-pump-again afterward: a static tree does not repaint
+    // on a later pump() (see `invalidation_test.dart`'s "scrolling bakes no
+    // new mattes"), so resetting the counter and pumping again would just
+    // measure a pump that never repaints anything -- an erroneous push on
+    // this one real paint would be invisible to it. `setUp` above already
+    // reset the counter before this test started, and `setUpAll` already
+    // warmed the shaders, so this first paint is a real one, not the
+    // shaders-not-ready fallback.
     await tester.pumpWidget(
       const MaterialApp(
         home: GlassLayer(
@@ -61,10 +74,7 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
 
-    GlassRenderCounters.instance.reset();
-    await tester.pump();
     expect(GlassRenderCounters.instance.backdropPushCount, 0);
   });
 }
