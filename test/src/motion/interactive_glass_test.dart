@@ -8,6 +8,7 @@ import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/motion/glass_jiggle.dart';
 import 'package:glass_forge/src/motion/glass_motion.dart';
 import 'package:glass_forge/src/motion/glass_overdrag.dart';
+import 'package:glass_forge/src/motion/glass_press_stretch.dart';
 import 'package:glass_forge/src/motion/interactive_glass.dart';
 import 'package:glass_forge/src/motion/render_glass_motion.dart';
 import 'package:glass_forge/src/rendering/render_glass_layer.dart';
@@ -51,10 +52,18 @@ const GlassMaterial _inert = GlassMaterial(
 );
 
 /// A glass surface in a layer that composes nothing.
+///
+/// [pressStretch] defaults to [GlassPressStretch.none], unlike
+/// [InteractiveGlass]'s own default: it is a second deformation channel
+/// that every test predating it was written against a world without, and
+/// leaving it active by default here would quietly perturb their geometry.
+/// The press-stretch tests below opt into a real one explicitly.
 Widget _harness({
   GlassDrag drag = const GlassDrag.none(),
   double pressScale = 0.96,
   GlassJiggle jiggle = const GlassJiggle(),
+  GlassPressStretch pressStretch = const GlassPressStretch.none(),
+  Size size = const Size(100, 100),
   VoidCallback? onTap,
 }) {
   return Directionality(
@@ -64,13 +73,14 @@ Widget _harness({
       material: _inert,
       child: Center(
         child: SizedBox(
-          width: 100,
-          height: 100,
+          width: size.width,
+          height: size.height,
           child: _BuildCounter(
             child: InteractiveGlass(
               drag: drag,
               pressScale: pressScale,
               jiggle: jiggle,
+              pressStretch: pressStretch,
               onTap: onTap,
               child: const Glass(
                 shape: GlassRoundedRectangle(
@@ -90,6 +100,18 @@ RenderGlassMotion _motionOf(WidgetTester tester) =>
 
 RenderGlassLayer _layerOf(WidgetTester tester) =>
     tester.renderObject<RenderGlassLayer>(find.byType(GlassLayer));
+
+/// The transform [motion] is painting under right now — the exact function
+/// `RenderGlassMotion.paint` calls, rebuilt from its public getters so the
+/// test reads what the render object would actually paint rather than
+/// duplicating the maths.
+Matrix4 _transformOf(RenderGlassMotion motion) => glassSurfaceTransform(
+  size: motion.size,
+  state: motion.controller.value,
+  jiggle: motion.jiggle,
+  pressStretch: motion.pressStretch,
+  pressScale: motion.pressScale,
+);
 
 Future<void> _settle(WidgetTester tester, RenderGlassMotion motion) async {
   var frames = 0;
@@ -311,6 +333,104 @@ void main() {
     // ticker would otherwise keep scheduling frames forever.
     expect(first.isAnimating, isFalse);
   });
+
+  testWidgets(
+    'a held pointer stretches the surface toward it, and releasing '
+    'returns it to identity',
+    (tester) async {
+      await tester.pumpWidget(
+        // pressStretch is turned on explicitly (the harness defaults it
+        // off) and pressScale: 1 isolates the reach from the surface's
+        // separate, unrelated press-depth scale, the same way the existing
+        // drag and hit-testing tests above isolate the channel they are
+        // about.
+        _harness(
+          size: const Size(200, 80),
+          pressScale: 1,
+          pressStretch: const GlassPressStretch(),
+        ),
+      );
+      final motion = _motionOf(tester);
+
+      final centre = tester.getCenter(find.byType(InteractiveGlass));
+      final gesture = await tester.startGesture(centre + const Offset(80, 0));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 160));
+
+      // Elongated along x, the anchor's own axis, rather than checked via
+      // raw translation: scaling about the surface's centre moves its
+      // top-left the *opposite* way it grows, so `getTranslation().x` for
+      // this default `GlassPressStretch` is negative throughout the press
+      // even though the surface is visibly reaching toward the finger.
+      // `glass_press_stretch_test.dart` only gets a clean, positive
+      // translation by isolating `travel` with `intensity: 0`; the default
+      // used here carries both.
+      expect(_transformOf(motion).entry(0, 0), greaterThan(1));
+
+      await gesture.up();
+      await _settle(tester, motion);
+      expect(_transformOf(motion), equals(Matrix4.identity()));
+    },
+  );
+
+  testWidgets('Reduce Motion stretches nothing while held', (tester) async {
+    // The singleton caches the last value it saw, so a test value left set
+    // would be visible to whichever test ran next.
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+
+    await tester.pumpWidget(
+      _harness(
+        size: const Size(200, 80),
+        pressScale: 1,
+        pressStretch: const GlassPressStretch(),
+      ),
+    );
+    final motion = _motionOf(tester);
+
+    final centre = tester.getCenter(find.byType(InteractiveGlass));
+    final gesture = await tester.startGesture(centre + const Offset(80, 0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 160));
+
+    // Without the explicit `GlassPressStretch.none()` resolution under
+    // Reduce Motion, `press` would still snap straight to 1 while the
+    // anchor is live, and this would come back stretched, not identity.
+    expect(_transformOf(motion), equals(Matrix4.identity()));
+
+    await gesture.up();
+    await _settle(tester, motion);
+  });
+
+  testWidgets(
+    'the press anchor reaches the render object without rebuilding a '
+    'widget',
+    (tester) async {
+      await tester.pumpWidget(_harness(size: const Size(200, 80)));
+      final motion = _motionOf(tester);
+      final buildsAfterFirstFrame = _BuildCounterState.builds;
+
+      final centre = tester.getCenter(find.byType(InteractiveGlass));
+      final gesture = await tester.startGesture(centre + const Offset(80, 0));
+      await tester.pump();
+
+      // The anchor is not sprung, so it reaches the controller's published
+      // state on the very next frame — no extra pump, no rebuild.
+      expect(motion.controller.value.pressAnchor, const Offset(80, 0));
+
+      var frames = 0;
+      while (motion.controller.isAnimating && frames < 400) {
+        await tester.pump(const Duration(milliseconds: 8));
+        frames++;
+      }
+      await gesture.up();
+      await _settle(tester, motion);
+
+      expect(frames, greaterThan(5), reason: 'the press never animated');
+      expect(_BuildCounterState.builds, buildsAfterFirstFrame);
+    },
+  );
 }
 
 void _retuneTests() {

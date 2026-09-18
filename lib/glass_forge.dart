@@ -27,6 +27,7 @@ export 'src/motion/glass_motion.dart';
 export 'src/motion/glass_motion_controller.dart';
 export 'src/motion/glass_motion_state.dart';
 export 'src/motion/glass_overdrag.dart';
+export 'src/motion/glass_press_stretch.dart' show GlassPressStretch;
 export 'src/motion/interactive_glass.dart';
 export 'src/motion/reduce_motion.dart';
 export 'src/platform/glass_forge_platform_interface.dart'

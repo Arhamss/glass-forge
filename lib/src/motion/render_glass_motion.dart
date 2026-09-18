@@ -22,11 +22,13 @@ class RenderGlassMotion extends RenderProxyBox {
     required this._controller,
     required this._jiggle,
     required this._pressScale,
+    required this._pressStretch,
   });
 
   GlassMotionController _controller;
   GlassJiggle _jiggle;
   double _pressScale;
+  GlassPressStretch _pressStretch;
 
   /// The controller driving this surface.
   GlassMotionController get controller => _controller;
@@ -65,6 +67,18 @@ class RenderGlassMotion extends RenderProxyBox {
     markNeedsPaint();
   }
 
+  /// How far the surface reaches toward a held finger.
+  GlassPressStretch get pressStretch => _pressStretch;
+  set pressStretch(GlassPressStretch value) {
+    if (_pressStretch.intensity == value.intensity &&
+        _pressStretch.squash == value.squash &&
+        _pressStretch.travel == value.travel) {
+      return;
+    }
+    _pressStretch = value;
+    markNeedsPaint();
+  }
+
   Matrix4 get _transform {
     if (!hasSize) {
       return Matrix4.identity();
@@ -73,9 +87,7 @@ class RenderGlassMotion extends RenderProxyBox {
       size: size,
       state: _controller.value,
       jiggle: _jiggle,
-      // TODO(task-7): wire the real value once InteractiveGlass and the
-      // pointer feed a live press anchor into GlassMotionState.
-      pressStretch: const GlassPressStretch.none(),
+      pressStretch: _pressStretch,
       pressScale: _pressScale,
     );
   }

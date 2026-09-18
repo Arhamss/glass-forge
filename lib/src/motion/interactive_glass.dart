@@ -4,6 +4,8 @@ import 'package:glass_forge/src/motion/glass_jiggle.dart';
 import 'package:glass_forge/src/motion/glass_motion.dart';
 import 'package:glass_forge/src/motion/glass_motion_controller.dart';
 import 'package:glass_forge/src/motion/glass_overdrag.dart';
+import 'package:glass_forge/src/motion/glass_press_stretch.dart';
+import 'package:glass_forge/src/motion/reduce_motion.dart';
 import 'package:glass_forge/src/motion/render_glass_motion.dart';
 
 /// Whether a surface can be dragged, and what happens when it is let go.
@@ -76,6 +78,7 @@ class InteractiveGlass extends StatefulWidget {
   const InteractiveGlass({
     required this.child,
     this.pressScale = 0.96,
+    this.pressStretch = const GlassPressStretch(),
     this.drag = const GlassDrag.none(),
     this.jiggle = const GlassJiggle(),
     this.followMotion = const GlassMotion.interactive(),
@@ -97,6 +100,11 @@ class InteractiveGlass extends StatefulWidget {
   /// Small on purpose. A press on glass reads as the surface settling
   /// *toward* the layer, not as a button shrinking.
   final double pressScale;
+
+  /// How far the surface reaches toward a held finger.
+  ///
+  /// Resolves to [GlassPressStretch.none] under Reduce Motion.
+  final GlassPressStretch pressStretch;
 
   /// Whether and how this surface can be dragged.
   final GlassDrag drag;
@@ -124,15 +132,16 @@ class InteractiveGlass extends StatefulWidget {
 }
 
 class _InteractiveGlassState extends State<InteractiveGlass>
-    // Plural, not `SingleTickerProviderStateMixin`. Retuning a spring
-    // replaces the controller (see `didUpdateWidget`), and therefore asks
-    // for a second ticker. The single-ticker mixin asserts on that
-    // unconditionally — its guard fires if a ticker was *ever* created, not
-    // if one is still live, so disposing the old controller first does not
-    // satisfy it — and the result was that changing any spring at runtime
-    // threw "multiple tickers were created". Found by the workbench's motion
-    // playground, which exists to do exactly that.
-    with TickerProviderStateMixin {
+        // Plural, not `SingleTickerProviderStateMixin`. Retuning a spring
+        // replaces the controller (see `didUpdateWidget`), and therefore asks
+        // for a second ticker. The single-ticker mixin asserts on that
+        // unconditionally — its guard fires if a ticker was *ever* created,
+        // not if one is still live, so disposing the old controller first does
+        // not satisfy it — and the result was that changing any spring at
+        // runtime threw "multiple tickers were created". Found by the
+        // workbench's motion playground, which exists to do exactly that.
+        with
+        TickerProviderStateMixin {
   late GlassMotionController _controller;
 
   /// Pointer travel since this gesture began, before any rubber band.
@@ -194,20 +203,54 @@ class _InteractiveGlassState extends State<InteractiveGlass>
     null => value,
   };
 
+  /// Whether the press channel does anything visible.
+  ///
+  /// It drives two independent effects — the uniform depth scale
+  /// ([InteractiveGlass.pressScale]) and how far press-stretch reaches
+  /// toward the anchor — so it has to spring even when
+  /// [InteractiveGlass.pressScale] is `1` and depth is off, as long as a
+  /// reach is still configured. Gating on `pressScale` alone left a surface
+  /// with `pressScale: 1` and an active [InteractiveGlass.pressStretch]
+  /// never pressing at all: the press channel would sit at `0` forever and
+  /// `pressAnchor * press` would always be zero.
+  bool get _pressChannelIsUsed =>
+      widget.pressScale != 1 || widget.pressStretch.isActive;
+
   void _onPointerDown(PointerDownEvent event) {
     _pointersDown.add(event.pointer);
-    if (widget.pressScale != 1) {
+    if (_pressChannelIsUsed) {
       _controller.setPressed(pressed: true);
     }
+    _controller.setPressAnchor(_anchorFor(event.localPosition));
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    _controller.setPressAnchor(_anchorFor(event.localPosition));
   }
 
   void _onPointerUp(int pointer) {
     _pointersDown.remove(pointer);
-    if (_pointersDown.isEmpty && widget.pressScale != 1) {
-      // Only when the last finger leaves: a second finger landing on a
-      // surface should not un-press it when it lifts again.
-      _controller.setPressed(pressed: false);
+    if (_pointersDown.isEmpty) {
+      if (_pressChannelIsUsed) {
+        // Only when the last finger leaves: a second finger landing on a
+        // surface should not un-press it when it lifts again.
+        _controller.setPressed(pressed: false);
+      }
+      _controller.setPressAnchor(Offset.zero);
     }
+  }
+
+  /// [localPosition], relative to this surface's own centre rather than its
+  /// top-left corner.
+  ///
+  /// `RenderGlassMotion.hitTestChildren` hands every pointer inside it a
+  /// position already put back into the box's laid-out coordinate space —
+  /// that is the whole point of the inverse transform it hit-tests through
+  /// — so this is stable through a drag or a press, not relative to wherever
+  /// the surface currently is on screen.
+  Offset _anchorFor(Offset localPosition) {
+    final size = context.size ?? Size.zero;
+    return localPosition - Offset(size.width / 2, size.height / 2);
   }
 
   void _onPanStart(DragStartDetails details) {
@@ -260,10 +303,20 @@ class _InteractiveGlassState extends State<InteractiveGlass>
     result = Listener(
       behavior: widget.behavior,
       onPointerDown: _onPointerDown,
+      onPointerMove: _onPointerMove,
       onPointerUp: (event) => _onPointerUp(event.pointer),
       onPointerCancel: (event) => _onPointerUp(event.pointer),
       child: result,
     );
+
+    // Reduce Motion neutralises the reach the same way it neutralises every
+    // other spring here: press-stretch is read off `state.press`, and
+    // `_settleEverythingNow` snaps that to its target instead of easing it,
+    // so without this an under-Reduce-Motion press would deform at full
+    // strength, just instantly instead of springing into it.
+    final pressStretch = GlassReduceMotion.instance.value
+        ? const GlassPressStretch.none()
+        : widget.pressStretch;
 
     // The transform wraps the gestures, not the other way round, so hit
     // testing passes through `RenderGlassMotion`'s inverse and lands on the
@@ -272,6 +325,7 @@ class _InteractiveGlassState extends State<InteractiveGlass>
       controller: _controller,
       jiggle: widget.jiggle,
       pressScale: widget.pressScale,
+      pressStretch: pressStretch,
       child: result,
     );
   }
@@ -282,12 +336,14 @@ class _RawGlassMotion extends SingleChildRenderObjectWidget {
     required this.controller,
     required this.jiggle,
     required this.pressScale,
+    required this.pressStretch,
     required Widget super.child,
   });
 
   final GlassMotionController controller;
   final GlassJiggle jiggle;
   final double pressScale;
+  final GlassPressStretch pressStretch;
 
   @override
   RenderGlassMotion createRenderObject(BuildContext context) {
@@ -295,6 +351,7 @@ class _RawGlassMotion extends SingleChildRenderObjectWidget {
       controller: controller,
       jiggle: jiggle,
       pressScale: pressScale,
+      pressStretch: pressStretch,
     );
   }
 
@@ -306,6 +363,7 @@ class _RawGlassMotion extends SingleChildRenderObjectWidget {
     renderObject
       ..controller = controller
       ..jiggle = jiggle
-      ..pressScale = pressScale;
+      ..pressScale = pressScale
+      ..pressStretch = pressStretch;
   }
 }

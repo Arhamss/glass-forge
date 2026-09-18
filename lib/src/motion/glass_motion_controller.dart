@@ -125,6 +125,7 @@ class GlassMotionController extends Animation<GlassMotionState>
   GlassMotionPhase _phase = GlassMotionPhase.idle;
   GlassMotionState _value = GlassMotionState.rest;
   AnimationStatus _status = AnimationStatus.dismissed;
+  Offset _pressAnchor = Offset.zero;
 
   @override
   GlassMotionState get value => _value;
@@ -139,8 +140,7 @@ class GlassMotionController extends Animation<GlassMotionState>
   GlassMotionPhase get phase => _phase;
 
   /// Whether the platform is currently asking for reduced motion.
-  bool get isReduced =>
-      respectReduceMotion && GlassReduceMotion.instance.value;
+  bool get isReduced => respectReduceMotion && GlassReduceMotion.instance.value;
 
   /// Moves the surface's target to [rawDisplacement], rubber-banded.
   ///
@@ -228,6 +228,18 @@ class GlassMotionController extends Animation<GlassMotionState>
     _begin();
   }
 
+  /// Records where the finger is, relative to the surface's centre.
+  ///
+  /// Not sprung: it is multiplied by the press depth wherever it is read,
+  /// and that is already sprung. See `GlassPressStretch`.
+  void setPressAnchor(Offset anchor) {
+    if (_pressAnchor == anchor) {
+      return;
+    }
+    _pressAnchor = anchor;
+    _publish();
+  }
+
   /// Stops everything where it is, keeping the current displacement.
   void halt() {
     _x
@@ -264,6 +276,7 @@ class GlassMotionController extends Animation<GlassMotionState>
     _x.settleInstantly();
     _y.settleInstantly();
     _press.settleInstantly();
+    _pressAnchor = Offset.zero;
     _phase = GlassMotionPhase.idle;
     _publish();
   }
@@ -325,6 +338,7 @@ class GlassMotionController extends Animation<GlassMotionState>
       translation: Offset(_x.position, _y.position),
       velocity: Offset(_x.velocity, _y.velocity),
       press: _press.position,
+      pressAnchor: _pressAnchor,
     );
     if (next != _value) {
       _value = next;
