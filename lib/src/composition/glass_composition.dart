@@ -58,7 +58,7 @@ class GlassComposition {
   /// is the refraction, not the pass.
   ///
   /// Kept in step with [build] by construction: this returns false for
-  /// exactly the two cases [build] returns null for.
+  /// exactly the three cases [build] returns null for.
   static bool willRender(GlassMaterial material, double presence) {
     if (presence < _presenceEpsilon) {
       return false;
