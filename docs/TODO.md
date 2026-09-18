@@ -1,4 +1,4 @@
-# Where glass_forge stands — 2026-09-17
+# Where glass_forge stands — 2026-09-18
 
 Resume file. Updated at the end of a working session; read it first.
 
@@ -31,22 +31,42 @@ benchmark/ hook/ android/ ios/ macos/ example/ docs/` with `pubspec.yaml`,
 - The example runs on the iPhone 17e simulator
   (`2473CC29-B74E-43FC-B4C5-7162629E0DFC`) and renders correctly.
 
-## Waiting on Arham — four decisions
+## The four decisions — answered 2026-09-18
 
-From `docs/superpowers/specs/2026-09-14-glass-widgets-design.md`. No code is
-written until these are answered; then each sub-project gets its own
-implementation plan (A → B → C → D).
+Arham signed off the widget spec. Recorded in full in
+`docs/superpowers/specs/2026-09-14-glass-widgets-design.md` under
+"Decisions made — 2026-09-18":
 
-1. **The widget list.** Four controls (button, switch, slider, segmented
-   control), four pieces of chrome (tab bar, app bar, sheet, scaffold). Text
-   fields, menus/morph, toasts, minimize-on-scroll are deferred. Add or drop
-   anything?
-2. **Touch glow: shader or painted?** Recommended: shader — only that version
-   spreads to neighbouring glass the way Apple's does, and costs one uniform.
-3. **Glass-over-glass overlap check: debug warning or assert?** Recommended:
-   warning, because an assert would throw mid-transition.
-4. **Names.** `GlassButton` etc. also exist in `liquid_glass_widgets`.
-   Recommended: keep the plain names.
+1. **The widget list:** the eight, **plus a text field**. Five controls
+   (button, switch, slider, segmented control, text field) and four pieces
+   of chrome (tab bar, app bar, sheet, scaffold). B5 was added to the spec
+   for the field.
+2. **Touch glow in the shader**, not painted — only that version spreads to
+   neighbouring glass.
+3. **The overlap check warns in debug**, it does not assert.
+4. **Plain names** — `GlassButton` and the rest, colliding with
+   `liquid_glass_widgets`.
+
+## Added after sign-off
+
+**C5, `GlassDetentSheet`** — the Apple Maps sheet, requested the same day
+from an Expo write-up of the behaviour. Persistent rather than presented,
+dragged between detents, morphing from floating (inset, big radius) to flush
+(no gap, screen corners) as it rises, with a scroll handoff at the top detent
+and a presence handoff with the bottom bar it covers. Specced as C5; it is
+the hardest widget in the document.
+
+## Order, and where the plans are
+
+A1 → A4 → A2 → A3 → B1 → B2 → B3 → B4 → B5 → C4 → C1 → C2 → C3 → C5 → D.
+
+- **Sub-project A** — plan written:
+  `docs/superpowers/plans/2026-09-18-glass-widgets-a-foundations.md`.
+  Nine tasks: presence through `uSurface.z` (1–3), `GlassHostScope` and the
+  overlap warning (4–5), anchored press-stretch (6–7), the touch glow
+  uniform and its driver (8–9). **Not started — no code written yet.**
+- **Sub-projects B, C, D** — no plans yet. Write each one when the one
+  before it lands.
 
 ## Known problems, none of them fixed
 
