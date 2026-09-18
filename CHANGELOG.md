@@ -1,3 +1,35 @@
+## Unreleased
+
+### Presence
+
+- `GlassPresence` and `GlassPresenceScope` fade a `Glass` in and out —
+  driven by a controller, an `Animation<double>`, or a route transition —
+  without rebaking its matte on every frame.
+
+### Host awareness
+
+- `GlassHostScope` lets a control ask `GlassHostScope.isOnGlass(context)` so
+  it can adapt when it is drawn on top of glass instead of a plain
+  background.
+
+### Motion
+
+- Anchored press-stretch: `InteractiveGlass` elongates a surface toward the
+  finger that is holding it, via the new `GlassPressStretch` and
+  `GlassMotionState.pressAnchor`.
+- Touch glow: `GlassGlow` drives a per-pass shader uniform from the pointer,
+  reaching neighbouring shapes so a touch's glow is not clipped to the
+  surface under the finger.
+- Fixed a surface with no area (zero width or height) transforming to NaN
+  instead of resolving to a safe default.
+
+### Debug tooling
+
+- A debug-only warning fires when shapes in different render passes overlap
+  on screen, surfacing the artifact behind
+  [flutter/flutter#187820](https://github.com/flutter/flutter/issues/187820)
+  before it reaches a release build.
+
 ## 0.1.0
 
 First release.
