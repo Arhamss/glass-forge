@@ -12,7 +12,7 @@ uniform vec4 uTint;           // rgb, variant (0 regular, 1 clear)
 uniform vec4 uLighting;       // highlight, angleX, angleY, contour
 uniform vec4 uMapBasis;       // a, b, c, d
 uniform vec2 uMapOffset;      // tx, ty
-uniform vec4 uSurface;        // profile (0 edge band, 1 dome), thickness, 0, 0
+uniform vec4 uSurface;        // profile (0 edge band, 1 dome), thickness, presence, 0
 uniform sampler2D uBackdrop;
 uniform sampler2D uMatte;
 
@@ -89,7 +89,11 @@ void main() {
     // Displacement magnitude was encoded toward the maximum
     // (gfEncodeCompandedMax) -- see codec.glsl -- so it decodes with the
     // matching decoder, not the toward-zero one signed distance uses.
-    float magnitude = gfDecodeCompandedMax(encoded.a) * uOptical.x;
+    // uSurface.z is presence. Scaling the magnitude here rather than
+    // uOptical.x is deliberate: uOptical.x also decodes the signed distance
+    // above, which drives coverage and antialiasing, so scaling it would
+    // shrink the shape instead of fading its refraction.
+    float magnitude = gfDecodeCompandedMax(encoded.a) * uOptical.x * uSurface.z;
     vec2 displacement = normal * -magnitude;
 
     vec2 offsetUV = (frag + displacement) / uSize;

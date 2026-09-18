@@ -465,7 +465,9 @@ class RenderGlassLayer extends RenderProxyBox {
     // each shape is.
     final passes = <_GlassPass>[
       for (final pass in _passes.values)
-        if (GlassComposition.willRender(pass.material)) pass,
+        // Presence is a literal 1 until Task 2 plumbs the real per-pass
+        // value through.
+        if (GlassComposition.willRender(pass.material, 1)) pass,
     ];
     if (passes.isEmpty) {
       // No shapes, or nothing any of their materials would draw. Upstream
@@ -705,8 +707,14 @@ class RenderGlassLayer extends RenderProxyBox {
         devicePixelRatio: _devicePixelRatio,
         materialRevision: pass.material.revision,
         coordinateMapping: mapping,
+        // Presence is a literal 1 until Task 2 plumbs the real per-pass
+        // value through.
+        presence: 1,
       ),
       devicePixelRatio: _devicePixelRatio,
+      // Presence is a literal 1 until Task 2 plumbs the real per-pass value
+      // through.
+      presence: 1,
     );
     if (filter != null) {
       return filter;

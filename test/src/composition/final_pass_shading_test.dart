@@ -87,8 +87,10 @@ Future<ByteData> _render(GlassMaterial material, Color backdrop) async {
         devicePixelRatio: 1,
         materialRevision: material.revision,
         coordinateMapping: Float32List.fromList(<double>[1, 0, 0, 1, 0, 0]),
+        presence: 1,
       ),
       devicePixelRatio: 1,
+      presence: 1,
     )!;
     final recorder = ui.PictureRecorder();
     const bounds = Rect.fromLTWH(0, 0, _canvas, _canvas);
@@ -188,8 +190,10 @@ void main() {
           devicePixelRatio: 1,
           materialRevision: material.revision,
           coordinateMapping: Float32List.fromList(<double>[1, 0, 0, 1, 0, 0]),
+          presence: 1,
         ),
         devicePixelRatio: 1,
+        presence: 1,
       )!;
       final recorder = ui.PictureRecorder();
       const bounds = Rect.fromLTWH(0, 0, _canvas, _canvas);

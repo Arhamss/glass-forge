@@ -24,12 +24,14 @@ void main() {
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     final b = FilterSnapshot.of(
       matte: null,
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     expect(a, b);
     expect(a.hashCode, b.hashCode);
@@ -44,12 +46,14 @@ void main() {
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     final b = FilterSnapshot.of(
       matte: null,
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(12),
+      presence: 1,
     );
     expect(a, isNot(b));
   });
@@ -60,12 +64,14 @@ void main() {
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     final b = FilterSnapshot.of(
       matte: null,
       devicePixelRatio: 3,
       materialRevision: 2,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     expect(a, isNot(b));
   });
@@ -76,12 +82,14 @@ void main() {
       devicePixelRatio: 2,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     final b = FilterSnapshot.of(
       matte: null,
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     expect(a, isNot(b));
   });
@@ -100,12 +108,14 @@ void main() {
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     final b = FilterSnapshot.of(
       matte: matte,
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     expect(a, b);
     expect(a.hashCode, b.hashCode);
@@ -133,12 +143,14 @@ void main() {
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     final b = FilterSnapshot.of(
       matte: matte2,
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     expect(a, isNot(b));
     image1.dispose();
@@ -160,12 +172,14 @@ void main() {
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     final b = FilterSnapshot.of(
       matte: matte2,
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     expect(a, isNot(b));
     image.dispose();
@@ -185,12 +199,14 @@ void main() {
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     final withoutMatte = FilterSnapshot.of(
       matte: null,
       devicePixelRatio: 3,
       materialRevision: 1,
       coordinateMapping: _mapping(),
+      presence: 1,
     );
     expect(withMatte, isNot(withoutMatte));
     expect(withoutMatte, isNot(withMatte));

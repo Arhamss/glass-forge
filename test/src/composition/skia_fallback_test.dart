@@ -22,6 +22,7 @@ FilterSnapshot _snapshot({int materialRevision = 0}) => FilterSnapshot.of(
   devicePixelRatio: 2,
   materialRevision: materialRevision,
   coordinateMapping: _mapping(),
+  presence: 1,
 );
 
 void main() {
@@ -48,6 +49,7 @@ void main() {
       material: const GlassMaterial().copyWith(frost: 8, edgeRefraction: 30),
       snapshot: _snapshot(),
       devicePixelRatio: 2,
+      presence: 1,
     );
 
     expect(filter, isNotNull);
@@ -66,6 +68,7 @@ void main() {
         material: const GlassMaterial().copyWith(frost: 0, edgeRefraction: 30),
         snapshot: _snapshot(materialRevision: 1),
         devicePixelRatio: 2,
+        presence: 1,
       ),
       isNull,
     );

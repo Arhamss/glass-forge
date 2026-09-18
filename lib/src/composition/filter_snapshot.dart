@@ -25,6 +25,7 @@ class FilterSnapshot {
     required this.devicePixelRatio,
     required this.materialRevision,
     required Float32List coordinateMapping,
+    required this.presence,
   }) : coordinateMapping = Float32List.fromList(coordinateMapping);
 
   /// Captures the current state.
@@ -33,6 +34,7 @@ class FilterSnapshot {
     required double devicePixelRatio,
     required int materialRevision,
     required Float32List coordinateMapping,
+    required double presence,
   }) {
     return FilterSnapshot(
       texture: matte?.texture,
@@ -40,6 +42,7 @@ class FilterSnapshot {
       devicePixelRatio: devicePixelRatio,
       materialRevision: materialRevision,
       coordinateMapping: Float32List.fromList(coordinateMapping),
+      presence: presence,
     );
   }
 
@@ -59,6 +62,9 @@ class FilterSnapshot {
   /// `[a,b,c,d,tx,ty]`.
   final Float32List coordinateMapping;
 
+  /// How present this pass's glass is, 0 to 1. See `GlassPresence`.
+  final double presence;
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {
@@ -69,6 +75,7 @@ class FilterSnapshot {
         other.matteBounds == matteBounds &&
         other.devicePixelRatio == devicePixelRatio &&
         other.materialRevision == materialRevision &&
+        other.presence == presence &&
         _sameMapping(other.coordinateMapping, coordinateMapping);
   }
 
@@ -78,6 +85,7 @@ class FilterSnapshot {
         matteBounds,
         devicePixelRatio,
         materialRevision,
+        presence,
         Object.hashAll(coordinateMapping),
       );
 

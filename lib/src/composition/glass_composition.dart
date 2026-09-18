@@ -34,6 +34,13 @@ class GlassComposition {
   @visibleForTesting
   int get debugFilterBuildCount => _buildCount;
 
+  /// Below this, a pass is not worth a backdrop read and is dropped entirely.
+  ///
+  /// Not exactly zero: a spring settling toward 0 lands on values like 1e-9,
+  /// and a pass that costs a saveLayer and a full backdrop read to draw a
+  /// billionth of a refraction is a pass that should not be pushed.
+  static const double _presenceEpsilon = 0.001;
+
   /// Whether [material] can put anything on screen on this backend.
   ///
   /// Answerable without a matte, and that is the whole point: a
@@ -52,12 +59,15 @@ class GlassComposition {
   ///
   /// Kept in step with [build] by construction: this returns false for
   /// exactly the two cases [build] returns null for.
-  static bool willRender(GlassMaterial material) {
+  static bool willRender(GlassMaterial material, double presence) {
+    if (presence < _presenceEpsilon) {
+      return false;
+    }
     if (!material.rendersAnything) {
       return false;
     }
     if (!ui.ImageFilter.isShaderFilterSupported) {
-      return material.frost > 0;
+      return material.frost * presence > 0;
     }
     return true;
   }
@@ -68,7 +78,11 @@ class GlassComposition {
     required GlassMaterial material,
     required FilterSnapshot snapshot,
     required double devicePixelRatio,
+    required double presence,
   }) {
+    if (presence < _presenceEpsilon) {
+      return null;
+    }
     if (!material.rendersAnything) {
       return null;
     }
@@ -88,7 +102,7 @@ class GlassComposition {
       //
       // Cached against `snapshot` like the shader path, so a surface whose
       // frost never changes is not rebuilding a blur every frame.
-      _filter = _blurOnly(material, devicePixelRatio);
+      _filter = _blurOnly(material, devicePixelRatio, presence);
       _snapshot = snapshot;
       _buildCount++;
       return _filter;
@@ -98,10 +112,17 @@ class GlassComposition {
         ? GlassShaderId.finalRenderBilinearProbe
         : GlassShaderId.finalRender;
     final shader = _shader ??= ShaderLibrary.instance.acquire(shaderId);
-    _writeUniforms(shader, matte, material, snapshot, devicePixelRatio);
+    _writeUniforms(
+      shader,
+      matte,
+      material,
+      snapshot,
+      devicePixelRatio,
+      presence,
+    );
 
     final glass = ui.ImageFilter.shader(shader);
-    final frost = material.frost * devicePixelRatio;
+    final frost = material.frost * presence * devicePixelRatio;
     _filter = frost <= 0
         ? glass
         : ui.ImageFilter.compose(
@@ -125,8 +146,9 @@ class GlassComposition {
   static ui.ImageFilter? _blurOnly(
     GlassMaterial material,
     double devicePixelRatio,
+    double presence,
   ) {
-    final frost = material.frost * devicePixelRatio;
+    final frost = material.frost * presence * devicePixelRatio;
     if (frost <= 0) {
       return null;
     }
@@ -143,6 +165,7 @@ class GlassComposition {
     GlassMaterial material,
     FilterSnapshot snapshot,
     double devicePixelRatio,
+    double presence,
   ) {
     final bounds = matte?.bounds ?? Rect.zero;
     final tint = material.tint;
@@ -153,17 +176,17 @@ class GlassComposition {
       ..setFloat(i++, bounds.width)
       ..setFloat(i++, bounds.height)
       ..setFloat(i++, material.maxDisplacement * devicePixelRatio)
-      ..setFloat(i++, material.chromaticAberration)
-      ..setFloat(i++, material.tintOpacity)
-      ..setFloat(i++, material.saturation)
+      ..setFloat(i++, material.chromaticAberration * presence)
+      ..setFloat(i++, material.tintOpacity * presence)
+      ..setFloat(i++, 1 + (material.saturation - 1) * presence)
       ..setFloat(i++, tint.r)
       ..setFloat(i++, tint.g)
       ..setFloat(i++, tint.b)
       ..setFloat(i++, material.variant == GlassVariant.clear ? 1 : 0)
-      ..setFloat(i++, material.highlight)
+      ..setFloat(i++, material.highlight * presence)
       ..setFloat(i++, material.lightDirection.dx)
       ..setFloat(i++, material.lightDirection.dy)
-      ..setFloat(i++, material.contour)
+      ..setFloat(i++, material.contour * presence)
       ..setFloat(i++, snapshot.coordinateMapping[0])
       ..setFloat(i++, snapshot.coordinateMapping[1])
       ..setFloat(i++, snapshot.coordinateMapping[2])
@@ -174,7 +197,12 @@ class GlassComposition {
       // matte pixels, which sizes the dome's lit edge.
       ..setFloat(i++, material.profile == GlassProfile.dome ? 1 : 0)
       ..setFloat(i++, material.thickness * devicePixelRatio)
-      ..setFloat(i++, 0)
+      // uSurface.z is presence: the shader scales the decoded displacement
+      // magnitude by it and leaves the signed distance alone, so the
+      // refraction fades without the edge moving. Written as a constant 0
+      // before A1, which is why the shader edit and this one have to land
+      // together.
+      ..setFloat(i++, presence)
       ..setFloat(i++, 0)
       // uMatte (sampler index 1) is required: `ImageFilter.shader` demands
       // every declared sampler past index 0 be bound before construction,

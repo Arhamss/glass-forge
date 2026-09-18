@@ -33,8 +33,10 @@ void main() {
         devicePixelRatio: 1,
         materialRevision: 0,
         coordinateMapping: _mapping(),
+        presence: 1,
       ),
       devicePixelRatio: 1,
+      presence: 1,
     );
     expect(filter, isNotNull);
     expect(composition.debugFilterBuildCount, 1);
@@ -49,6 +51,7 @@ void main() {
           devicePixelRatio: 1,
           materialRevision: 0,
           coordinateMapping: _mapping(),
+          presence: 1,
         );
 
     composition
@@ -57,12 +60,14 @@ void main() {
         material: material,
         snapshot: snapshot(),
         devicePixelRatio: 1,
+        presence: 1,
       )
       ..build(
         matte: null,
         material: material,
         snapshot: snapshot(),
         devicePixelRatio: 1,
+        presence: 1,
       );
 
     expect(composition.debugFilterBuildCount, 1);
@@ -82,8 +87,10 @@ void main() {
           devicePixelRatio: 1,
           materialRevision: 0,
           coordinateMapping: _mapping(),
+          presence: 1,
         ),
         devicePixelRatio: 1,
+        presence: 1,
       )
       ..build(
         matte: null,
@@ -93,8 +100,10 @@ void main() {
           devicePixelRatio: 1,
           materialRevision: 0,
           coordinateMapping: _mapping(9),
+          presence: 1,
         ),
         devicePixelRatio: 1,
+        presence: 1,
       );
 
     expect(composition.debugFilterBuildCount, 2);
@@ -117,8 +126,10 @@ void main() {
         devicePixelRatio: 1,
         materialRevision: 0,
         coordinateMapping: _mapping(),
+        presence: 1,
       ),
       devicePixelRatio: 1,
+      presence: 1,
     );
     expect(filter, isNull);
     composition.dispose();
