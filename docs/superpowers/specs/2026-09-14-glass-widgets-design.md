@@ -230,6 +230,7 @@ What each control makes glass, depending on where it is drawn:
 | `GlassSwitch` | the knob — Apple's one lens-profile element — over a painted track | knob and track painted |
 | `GlassSlider` | the thumb, over a painted track and fill | all paint |
 | `GlassSegmentedControl` | the travelling selection pill | all paint |
+| `GlassTextField` | the field body | paint |
 
 ### B1. `GlassButton`
 
@@ -320,6 +321,49 @@ minimum; exactly one `Glass` when built on content and none when built under
 a `GlassHostScope`; Reduce Motion makes every transition instant; README
 snippet compiles.
 
+### B5. `GlassTextField`
+
+```dart
+const GlassTextField({
+  TextEditingController? controller,
+  String? placeholder,
+  Widget? leading,
+  Widget? trailing,
+  GlassShape? shape,                // defaults to a capsule
+  ValueChanged<String>? onChanged,
+  ValueChanged<String>? onSubmitted,
+  Color? backdrop,
+});
+```
+
+Added on 2026-09-18, against the spec's own recommendation to defer it. The
+reason it was deferred stands and is now work to be done rather than work to
+be avoided:
+
+- **Focus.** Focus is a state change on glass, not a painted ring bolted on
+  top. The field's material resolves brighter on focus and animates there on
+  the `settle` spring, so focus reads as the glass lighting up. A painted
+  ring would be a second edge fighting the lens profile.
+- **The caret and the selection.** Both are painted *inside* the glass, above
+  the refraction, never refracted by it — a refracted caret smears and reads
+  as a rendering bug. Their colour comes from the surface, as every other
+  control's label colour does.
+- **The keyboard inset.** The field scrolls clear of the keyboard through
+  `MediaQuery.viewInsets`, and when it sits in a `GlassScaffold` bottom bar
+  the bar rides the inset with it. The bar is still the only glass in that
+  region while it moves.
+- **IME and composing text** are `EditableText`'s job. `GlassTextField` wraps
+  it rather than reimplementing it, so composing underlines, autocorrect and
+  the system selection toolbar all keep working.
+
+On a glass surface the field body is painted, like every other control under
+a `GlassHostScope` (A4).
+
+**Tests, additionally.** Focus changes the material and restores it on blur;
+Reduce Motion makes that change instant; the caret is not inside the glass
+subtree; `viewInsets` moves the field clear of the keyboard; semantics
+expose a text field with its placeholder as the label.
+
 ## Sub-project C — chrome
 
 ### C1. `GlassTabBar`
@@ -397,6 +441,84 @@ to know:
   them.
 - Bar presence follows the route's secondary animation, for C3.
 
+### C5. `GlassDetentSheet` — the Apple Maps sheet
+
+C3 presents a sheet and takes it away. This is the other kind: a sheet that
+is always on screen, that the user drags between fixed heights, and that
+changes shape as it rises. Apple Maps, Find My and Apple's own
+`UISheetPresentationController` detents are the reference. Added on
+2026-09-18 from an Expo write-up of the same behaviour; that article is React
+Native (`formSheet`, TrueSheet) and none of its API ports, but it documents
+the behaviour precisely and its detent fractions are quoted below as a
+starting point to tune, not as measured Apple values.
+
+```dart
+const GlassDetentSheet({
+  required List<GlassDetent> detents,   // ascending; at least two
+  required Widget child,
+  int initialDetent = 0,
+  ValueChanged<int>? onDetentChanged,
+  GlassDetentSheetController? controller,
+  Color? backdrop,
+});
+
+const GlassDetent.fraction(double amount); // of the available height
+const GlassDetent.height(double logical);
+const GlassDetent.content();               // measured from the child
+```
+
+**Floating, then flush.** Below the top detent the sheet floats: inset from
+the screen's side and bottom edges by a gap, with a large radius on all four
+corners. As it rises the gap closes toward 0 and the radius interpolates
+toward the display's own corner radius, so at the top detent the sheet is
+flush and its corners match the screen's. The Expo article's example detents
+are 0.1, 0.5 and 1.0, and it describes exactly this: floating with a visible
+gap at the low detent, still floating but tighter at the middle, gap gone at
+the top.
+
+**The interpolation is driven by offset, not by detent index.** The gap and
+the radius are functions of the sheet's current top, continuous under a
+finger, so the morph tracks the drag rather than playing when a detent is
+reached. Only the *snap* is discrete.
+
+**Scroll handoff.** One gesture, two consumers, resolved by position and
+direction:
+
+- Below the top detent, a vertical drag moves the sheet and the inner
+  scrollable does not scroll.
+- At the top detent, the inner scrollable scrolls.
+- Scrolled back to its own zero and still dragging down, the sheet takes the
+  gesture back and descends.
+
+This is `NestedScrollView`'s problem shape but not its API; it needs a
+`ScrollPhysics` that reports its overscroll to the sheet's controller, so the
+handoff happens within one gesture without a lifted finger.
+
+**Release** snaps to the nearest detent on the `settle` spring, with fling
+velocity projected forward so a flick carries past the nearest detent to the
+next one. Reduce Motion makes the snap instant and the morph a step.
+
+**The glass, which is the part that is ours.** The sheet is a
+`GlassSurface.sheet`, and everything A1 and A4 exist for shows up here at
+once:
+
+- Where the sheet floats above a `GlassScaffold` bottom bar, both want to be
+  glass over the same region. They must not both render — stacked backdrop
+  filters are the bug. The bar's presence ramps to 0 as the sheet's bottom
+  edge reaches it, and the sheet's ramps up behind that, a handoff driven by
+  the same offset that drives the morph.
+- At the top detent the sheet covers the page entirely, so the page's chrome
+  is at presence 0 and costs nothing.
+- The A4 overlap check must stay quiet through the whole drag. If it warns
+  mid-drag, the handoff is wrong, and that is the test.
+
+**Tests.** Detent snapping from a drag and from a fling; the gap and radius
+at three sampled offsets; the scroll handoff in both directions within one
+gesture; `GlassRenderCounters` shows one matte produce for the whole drag,
+not one per frame; never two backdrop filters over the same region at any
+offset; Reduce Motion; semantics expose the sheet as a draggable with
+increase and decrease actions.
+
 ## Sub-project D — rebuild the example on the widgets
 
 Replace the example's hand-built `SegmentedControl` and `ValueSlider` with
@@ -407,12 +529,18 @@ the scrim's one-frame swap with a real presence handoff. Re-verify with the
 same simulator screenshots and pixel measurements used when the example was
 first built.
 
+Add one scene the example does not have today: a `GlassDetentSheet` over the
+System scene's content, with the tab bar beneath it, so the C5 handoff is
+something a reader can drag rather than read about. That scene is also the
+best demonstration the package has of why presence exists at all.
+
 ## Deferred
 
 Not in this round, each for a stated reason:
 
-- **Text fields and search bar** — input chrome brings focus, IME and
-  selection work of its own.
+- **The search bar** — a text field that is also chrome, with its own
+  expand-on-focus behaviour. B5 ships the field; the bar that hosts it waits
+  until C1 and C2 have settled how chrome resolves its material.
 - **Menus and morph** — Apple's teardrop morph needs shapes that change
   topology mid-animation; that deserves its own design once presence and
   blending are proven together.
@@ -422,24 +550,36 @@ Not in this round, each for a stated reason:
 
 ## Order and plans
 
-A1 → A4 → A2 → A3 → B1 → B2 → B3 → B4 → C4 → C1 → C2 → C3 → D.
+A1 → A4 → A2 → A3 → B1 → B2 → B3 → B4 → B5 → C4 → C1 → C2 → C3 → C5 → D.
 
-A1 comes first because C3 and D cannot be correct without it. A4 comes next
-because every control's glass-or-paint decision depends on it. C4 comes before
-the bars it hosts. One implementation plan per sub-project: A, B, C, D.
+A1 comes first because C3, C5 and D cannot be correct without it. A4 comes
+next because every control's glass-or-paint decision depends on it. C4 comes
+before the bars it hosts. C5 comes last of the chrome because it needs C4's
+bar presence to hand off to and C3's handoff pattern already proven on a
+simpler case. One implementation plan per sub-project: A, B, C, D.
 
-## Decisions needed
+## Decisions made — 2026-09-18
 
-1. **The widget list.** Four controls, four pieces of chrome, the deferrals
-   above. Anything to add or drop?
-2. **Touch glow in the shader or painted?** The shader version spreads to
-   neighbours as Apple's does and costs one uniform. Painted needs no shader
-   change but can never reach a neighbour. Recommendation: shader.
-3. **The overlap check in A4: debug warning or assert?** A warning keeps a
-   screen usable while it is being fixed. An assert makes it impossible to
-   miss. Recommendation: warning, because it can fire mid-animation where an
-   assert would throw during a transition.
-4. **Names.** `GlassButton`, `GlassSwitch` and the rest also exist in
-   `liquid_glass_widgets`. Separate packages can share names, but an app that
-   depends on both would need an import prefix. Recommendation: keep the
-   plain names; they are what a developer searches for.
+Answered by Arham. The spec above is amended to match; these are recorded so
+the reasoning is not lost.
+
+1. **The widget list: the eight, plus a text field.** Five controls (button,
+   switch, slider, segmented control, text field) and four pieces of chrome
+   (tab bar, app bar, sheet, scaffold). B5 was added for the field. Menus and
+   morph, toasts, the search bar and minimize-on-scroll stay deferred.
+2. **Touch glow in the shader.** As recommended: only the shader version
+   spreads to neighbouring glass the way Apple's does, and it costs one
+   uniform.
+3. **The overlap check warns in debug, it does not assert.** As recommended.
+   An assert would throw mid-transition, where overlap is legitimately
+   transient — and C5's handoff drags through exactly that window.
+4. **Plain names.** `GlassButton` and the rest, colliding with
+   `liquid_glass_widgets`. An app depending on both uses an import prefix.
+
+## Added after sign-off
+
+**C5, `GlassDetentSheet`** — the Apple Maps sheet: persistent, dragged
+between detents, morphing from floating to flush as it rises. Requested
+2026-09-18. It is the hardest thing in the document, because it is where
+presence (A1), the overlap rule (A4) and a two-consumer gesture all land in
+one widget.
