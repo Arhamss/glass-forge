@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
+import 'package:glass_forge/src/composition/glass_glow.dart';
 import 'package:glass_forge/src/geometry/matte_generation.dart';
 
 /// Everything the engine copies into a native `ImageFilter` when it first
@@ -26,6 +27,7 @@ class FilterSnapshot {
     required this.materialRevision,
     required Float32List coordinateMapping,
     required this.presence,
+    required this.glow,
   }) : coordinateMapping = Float32List.fromList(coordinateMapping);
 
   /// Captures the current state.
@@ -35,6 +37,7 @@ class FilterSnapshot {
     required int materialRevision,
     required Float32List coordinateMapping,
     required double presence,
+    required GlassGlow glow,
   }) {
     return FilterSnapshot(
       texture: matte?.texture,
@@ -43,6 +46,7 @@ class FilterSnapshot {
       materialRevision: materialRevision,
       coordinateMapping: Float32List.fromList(coordinateMapping),
       presence: presence,
+      glow: glow,
     );
   }
 
@@ -65,6 +69,9 @@ class FilterSnapshot {
   /// How present this pass's glass is, 0 to 1. See `GlassPresence`.
   final double presence;
 
+  /// The touch glow lit under a held finger, in layer-local pixels.
+  final GlassGlow glow;
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {
@@ -76,18 +83,20 @@ class FilterSnapshot {
         other.devicePixelRatio == devicePixelRatio &&
         other.materialRevision == materialRevision &&
         other.presence == presence &&
+        other.glow == glow &&
         _sameMapping(other.coordinateMapping, coordinateMapping);
   }
 
   @override
   int get hashCode => Object.hash(
-        texture,
-        matteBounds,
-        devicePixelRatio,
-        materialRevision,
-        presence,
-        Object.hashAll(coordinateMapping),
-      );
+    texture,
+    matteBounds,
+    devicePixelRatio,
+    materialRevision,
+    presence,
+    glow,
+    Object.hashAll(coordinateMapping),
+  );
 
   static bool _sameMapping(Float32List a, Float32List b) {
     if (a.length != b.length) {

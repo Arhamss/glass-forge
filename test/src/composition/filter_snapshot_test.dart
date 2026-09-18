@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/composition/filter_snapshot.dart';
+import 'package:glass_forge/src/composition/glass_glow.dart';
 import 'package:glass_forge/src/geometry/matte_codec.dart';
 import 'package:glass_forge/src/geometry/matte_generation.dart';
 
@@ -12,8 +13,10 @@ Float32List _mapping([double tx = 0]) =>
 
 ui.Image _testImage() {
   final recorder = ui.PictureRecorder();
-  ui.Canvas(recorder, const Rect.fromLTWH(0, 0, 10, 10))
-      .drawRect(const Rect.fromLTWH(0, 0, 10, 10), ui.Paint());
+  ui.Canvas(
+    recorder,
+    const Rect.fromLTWH(0, 0, 10, 10),
+  ).drawRect(const Rect.fromLTWH(0, 0, 10, 10), ui.Paint());
   return recorder.endRecording().toImageSync(10, 10);
 }
 
@@ -25,6 +28,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     final b = FilterSnapshot.of(
       matte: null,
@@ -32,6 +36,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     expect(a, b);
     expect(a.hashCode, b.hashCode);
@@ -47,6 +52,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     final b = FilterSnapshot.of(
       matte: null,
@@ -54,6 +60,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(12),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     expect(a, isNot(b));
   });
@@ -65,6 +72,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     final b = FilterSnapshot.of(
       matte: null,
@@ -72,6 +80,7 @@ void main() {
       materialRevision: 2,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     expect(a, isNot(b));
   });
@@ -83,6 +92,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     final b = FilterSnapshot.of(
       matte: null,
@@ -90,6 +100,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     expect(a, isNot(b));
   });
@@ -109,6 +120,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     final b = FilterSnapshot.of(
       matte: matte,
@@ -116,6 +128,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     expect(a, b);
     expect(a.hashCode, b.hashCode);
@@ -144,6 +157,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     final b = FilterSnapshot.of(
       matte: matte2,
@@ -151,6 +165,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     expect(a, isNot(b));
     image1.dispose();
@@ -173,6 +188,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     final b = FilterSnapshot.of(
       matte: matte2,
@@ -180,6 +196,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     expect(a, isNot(b));
     image.dispose();
@@ -200,6 +217,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     final withoutMatte = FilterSnapshot.of(
       matte: null,
@@ -207,6 +225,7 @@ void main() {
       materialRevision: 1,
       coordinateMapping: _mapping(),
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     expect(withMatte, isNot(withoutMatte));
     expect(withoutMatte, isNot(withMatte));

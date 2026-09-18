@@ -16,6 +16,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/composition/filter_snapshot.dart';
 import 'package:glass_forge/src/composition/glass_composition.dart';
+import 'package:glass_forge/src/composition/glass_glow.dart';
 import 'package:glass_forge/src/geometry/geometry_producer.dart';
 import 'package:glass_forge/src/geometry/matte_generation.dart';
 import 'package:glass_forge/src/geometry/runtime_geometry_producer.dart';
@@ -88,9 +89,11 @@ Future<ByteData> _render(GlassMaterial material, Color backdrop) async {
         materialRevision: material.revision,
         coordinateMapping: Float32List.fromList(<double>[1, 0, 0, 1, 0, 0]),
         presence: 1,
+        glow: const GlassGlow.none(),
       ),
       devicePixelRatio: 1,
       presence: 1,
+      glow: const GlassGlow.none(),
     )!;
     final recorder = ui.PictureRecorder();
     const bounds = Rect.fromLTWH(0, 0, _canvas, _canvas);
@@ -124,7 +127,8 @@ double _luma(ByteData bytes, int x, int y) {
 /// less the backdrop itself.
 Future<double> _rimGain(GlassProfile profile, Color backdrop) async {
   final bytes = await _render(_lit(profile), backdrop);
-  final base = 0.2126 * (backdrop.r * 255) +
+  final base =
+      0.2126 * (backdrop.r * 255) +
       0.7152 * (backdrop.g * 255) +
       0.0722 * (backdrop.b * 255);
   var peak = 0.0;
@@ -191,9 +195,11 @@ void main() {
           materialRevision: material.revision,
           coordinateMapping: Float32List.fromList(<double>[1, 0, 0, 1, 0, 0]),
           presence: 1,
+          glow: const GlassGlow.none(),
         ),
         devicePixelRatio: 1,
         presence: 1,
+        glow: const GlassGlow.none(),
       )!;
       final recorder = ui.PictureRecorder();
       const bounds = Rect.fromLTWH(0, 0, _canvas, _canvas);

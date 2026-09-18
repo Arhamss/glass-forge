@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:glass_forge/src/composition/filter_snapshot.dart';
+import 'package:glass_forge/src/composition/glass_glow.dart';
 import 'package:glass_forge/src/debug.dart';
 import 'package:glass_forge/src/geometry/matte_generation.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
@@ -79,6 +80,7 @@ class GlassComposition {
     required FilterSnapshot snapshot,
     required double devicePixelRatio,
     required double presence,
+    required GlassGlow glow,
   }) {
     if (presence < _presenceEpsilon) {
       return null;
@@ -119,6 +121,7 @@ class GlassComposition {
       snapshot,
       devicePixelRatio,
       presence,
+      glow,
     );
 
     final glass = ui.ImageFilter.shader(shader);
@@ -166,6 +169,7 @@ class GlassComposition {
     FilterSnapshot snapshot,
     double devicePixelRatio,
     double presence,
+    GlassGlow glow,
   ) {
     final bounds = matte?.bounds ?? Rect.zero;
     final tint = material.tint;
@@ -204,6 +208,17 @@ class GlassComposition {
       // together.
       ..setFloat(i++, presence)
       ..setFloat(i++, 0)
+      // uGlow, in MATTE space -- layer-local physical pixels, the same
+      // space `uMatteRect` is expressed in and the space the shader
+      // compares against `matteSpace`. The centre arrives in layer-local
+      // LOGICAL pixels, so it converts by the device pixel ratio, and so
+      // does the radius. Comparing against filter space instead would
+      // slide the glow away from the finger the moment an ancestor
+      // scrolls or scales the layer.
+      ..setFloat(i++, glow.centre.dx * devicePixelRatio)
+      ..setFloat(i++, glow.centre.dy * devicePixelRatio)
+      ..setFloat(i++, glow.radius * devicePixelRatio)
+      ..setFloat(i++, glow.strength * presence)
       // uMatte (sampler index 1) is required: `ImageFilter.shader` demands
       // every declared sampler past index 0 be bound before construction,
       // even one the shader itself will not sample from. With no matte,

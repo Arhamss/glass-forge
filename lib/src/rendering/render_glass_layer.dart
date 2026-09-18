@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:glass_forge/src/composition/filter_snapshot.dart';
 import 'package:glass_forge/src/composition/glass_composition.dart';
+import 'package:glass_forge/src/composition/glass_glow.dart';
 import 'package:glass_forge/src/composition/pixel_buckets.dart';
 import 'package:glass_forge/src/composition/retained_clip_chain.dart';
 import 'package:glass_forge/src/diagnostics/render_counters.dart';
@@ -916,6 +917,9 @@ class RenderGlassLayer extends RenderProxyBox {
 
   ui.ImageFilter _buildFilter(_GlassPass pass, Float32List mapping) {
     _refreshMatte(pass);
+    // Task 9 replaces this stub with the glow driven from the held
+    // pointer; this task only makes the shader capable of it.
+    const glow = GlassGlow.none();
     final filter = pass.composition.build(
       matte: pass.matte,
       material: pass.material,
@@ -925,9 +929,11 @@ class RenderGlassLayer extends RenderProxyBox {
         materialRevision: pass.material.revision,
         coordinateMapping: mapping,
         presence: pass.presence,
+        glow: glow,
       ),
       devicePixelRatio: _devicePixelRatio,
       presence: pass.presence,
+      glow: glow,
     );
     if (filter != null) {
       return filter;

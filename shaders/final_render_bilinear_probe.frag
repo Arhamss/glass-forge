@@ -23,6 +23,7 @@ uniform vec4 uLighting;       // highlight, angleX, angleY, contour
 uniform vec4 uMapBasis;       // a, b, c, d
 uniform vec2 uMapOffset;      // tx, ty
 uniform vec4 uSurface;        // profile (0 edge band, 1 dome), thickness, presence, 0
+uniform vec4 uGlow;           // centre.xy in MATTE space, radius, strength
 uniform sampler2D uBackdrop;
 uniform sampler2D uMatte;
 
@@ -117,6 +118,21 @@ void main() {
     // Shaded exactly as final_render.frag shades it -- common/shading.glsl.
     refracted = gfShade(refracted, normal, max(0.0, -signedDistance), luma,
                         uOptical.x, uLighting, uSurface);
+
+    // The touch glow. Added after shading and before the coverage multiply,
+    // so it is masked by coverage for free: it lights every shape in this
+    // pass -- the neighbours Apple describes -- and none of the gaps
+    // between them.
+    if (uGlow.w > 0.0) {
+        // Measured in MATTE space, not against `frag`. `frag` is filter
+        // space; the glow centre arrives in layer-local pixels, and the
+        // two coincide only when no ancestor has scrolled or scaled this
+        // layer. `uMapBasis`/`uMapOffset` exist to relate them, and
+        // `uMatteRect` is already compared in matte space above.
+        float glowDistance = distance(matteSpace, uGlow.xy);
+        float falloff = 1.0 - smoothstep(0.0, max(uGlow.z, 1.0), glowDistance);
+        refracted += uGlow.w * falloff * falloff;
+    }
 
     fragColor = vec4(refracted * coverage, coverage);
 }

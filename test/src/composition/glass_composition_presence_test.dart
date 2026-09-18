@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/composition/filter_snapshot.dart';
 import 'package:glass_forge/src/composition/glass_composition.dart';
+import 'package:glass_forge/src/composition/glass_glow.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 
 void main() {
@@ -25,6 +26,7 @@ void main() {
       materialRevision: 7,
       coordinateMapping: mapping,
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     final half = FilterSnapshot.of(
       matte: null,
@@ -32,6 +34,7 @@ void main() {
       materialRevision: 7,
       coordinateMapping: mapping,
       presence: 0.5,
+      glow: const GlassGlow.none(),
     );
     expect(full, isNot(equals(half)));
     expect(full.presence, 1);

@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/composition/filter_snapshot.dart';
 import 'package:glass_forge/src/composition/glass_composition.dart';
+import 'package:glass_forge/src/composition/glass_glow.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 
 /// Deliberately **not** tagged `impeller`.
@@ -14,8 +15,7 @@ import 'package:glass_forge/src/material/glass_material.dart';
 /// backend *without* shader filter support, and that backend is exactly the
 /// one the untagged lane runs on. Tagging this file would skip it in the
 /// only environment where it asserts anything.
-Float32List _mapping() =>
-    Float32List.fromList(<double>[1, 0, 0, 1, 0, 0]);
+Float32List _mapping() => Float32List.fromList(<double>[1, 0, 0, 1, 0, 0]);
 
 FilterSnapshot _snapshot({int materialRevision = 0}) => FilterSnapshot.of(
   matte: null,
@@ -23,6 +23,7 @@ FilterSnapshot _snapshot({int materialRevision = 0}) => FilterSnapshot.of(
   materialRevision: materialRevision,
   coordinateMapping: _mapping(),
   presence: 1,
+  glow: const GlassGlow.none(),
 );
 
 void main() {
@@ -37,7 +38,8 @@ void main() {
     expect(
       ui.ImageFilter.isShaderFilterSupported,
       isFalse,
-      reason: 'this lane must run on a backend without shader filters, or '
+      reason:
+          'this lane must run on a backend without shader filters, or '
           'the rest of this file asserts nothing',
     );
 
@@ -50,6 +52,7 @@ void main() {
       snapshot: _snapshot(),
       devicePixelRatio: 2,
       presence: 1,
+      glow: const GlassGlow.none(),
     );
 
     expect(filter, isNotNull);
@@ -69,6 +72,7 @@ void main() {
         snapshot: _snapshot(materialRevision: 1),
         devicePixelRatio: 2,
         presence: 1,
+        glow: const GlassGlow.none(),
       ),
       isNull,
     );

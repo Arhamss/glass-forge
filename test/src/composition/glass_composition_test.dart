@@ -11,6 +11,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/composition/filter_snapshot.dart';
 import 'package:glass_forge/src/composition/glass_composition.dart';
+import 'package:glass_forge/src/composition/glass_glow.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
 
@@ -34,9 +35,11 @@ void main() {
         materialRevision: 0,
         coordinateMapping: _mapping(),
         presence: 1,
+        glow: const GlassGlow.none(),
       ),
       devicePixelRatio: 1,
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     expect(filter, isNotNull);
     expect(composition.debugFilterBuildCount, 1);
@@ -47,12 +50,13 @@ void main() {
     final composition = GlassComposition();
     const material = GlassMaterial();
     FilterSnapshot snapshot() => FilterSnapshot.of(
-          matte: null,
-          devicePixelRatio: 1,
-          materialRevision: 0,
-          coordinateMapping: _mapping(),
-          presence: 1,
-        );
+      matte: null,
+      devicePixelRatio: 1,
+      materialRevision: 0,
+      coordinateMapping: _mapping(),
+      presence: 1,
+      glow: const GlassGlow.none(),
+    );
 
     composition
       ..build(
@@ -61,6 +65,7 @@ void main() {
         snapshot: snapshot(),
         devicePixelRatio: 1,
         presence: 1,
+        glow: const GlassGlow.none(),
       )
       ..build(
         matte: null,
@@ -68,6 +73,7 @@ void main() {
         snapshot: snapshot(),
         devicePixelRatio: 1,
         presence: 1,
+        glow: const GlassGlow.none(),
       );
 
     expect(composition.debugFilterBuildCount, 1);
@@ -88,9 +94,11 @@ void main() {
           materialRevision: 0,
           coordinateMapping: _mapping(),
           presence: 1,
+          glow: const GlassGlow.none(),
         ),
         devicePixelRatio: 1,
         presence: 1,
+        glow: const GlassGlow.none(),
       )
       ..build(
         matte: null,
@@ -101,9 +109,11 @@ void main() {
           materialRevision: 0,
           coordinateMapping: _mapping(9),
           presence: 1,
+          glow: const GlassGlow.none(),
         ),
         devicePixelRatio: 1,
         presence: 1,
+        glow: const GlassGlow.none(),
       );
 
     expect(composition.debugFilterBuildCount, 2);
@@ -127,9 +137,11 @@ void main() {
         materialRevision: 0,
         coordinateMapping: _mapping(),
         presence: 1,
+        glow: const GlassGlow.none(),
       ),
       devicePixelRatio: 1,
       presence: 1,
+      glow: const GlassGlow.none(),
     );
     expect(filter, isNull);
     composition.dispose();
