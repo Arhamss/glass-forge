@@ -5,6 +5,7 @@ import 'package:glass_forge/src/scene/blend_group_link.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/tier/glass_tier_scope.dart';
 import 'package:glass_forge/src/widgets/glass_blend_group.dart';
+import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 import 'package:glass_forge/src/widgets/glass_layer.dart';
 import 'package:glass_forge/src/widgets/glass_presence.dart';
 
@@ -66,16 +67,29 @@ class Glass extends StatelessWidget {
       return GlassLayer(child: this);
     }
 
+    assert(
+      !GlassHostScope.isOnGlass(context),
+      "glass_forge: this Glass was built somewhere inside another Glass's "
+      'child — not necessarily as its direct child, but anywhere in that '
+      'subtree. Two refractions over the same pixels is a stacked backdrop '
+      'filter (flutter#187820), which samples a stale previous-frame '
+      'backdrop including its own output and white-washes over time. Put '
+      'both shapes in one GlassLayer instead, or join them with a '
+      'GlassBlendGroup.',
+    );
+
     final group = GlassBlendGroupScope.maybeOf(context)?.link;
     return _RawGlass(
       shape: shape,
       group: group,
       presence: GlassPresenceScope.maybeOf(context),
       material: _resolveMaterialFor(context, material),
-      child: ClipPath(
-        clipper: GlassShapeClipper(shape),
-        clipBehavior: clipBehavior,
-        child: child ?? const SizedBox.shrink(),
+      child: GlassHostScope(
+        child: ClipPath(
+          clipper: GlassShapeClipper(shape),
+          clipBehavior: clipBehavior,
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
     );
   }
