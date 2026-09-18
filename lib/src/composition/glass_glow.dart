@@ -31,6 +31,16 @@ class GlassGlow {
   final double strength;
 
   /// Whether this puts any light on screen.
+  ///
+  /// `GlassComposition._writeUniforms` is the only place a [GlassGlow]
+  /// reaches the shader, and it forces the uniform's strength to 0
+  /// whenever this is false -- so a `radius: 0` glow, even with nonzero
+  /// [strength], cannot disagree with what gets drawn. That choke point is
+  /// deliberately in Dart rather than in `final_render.frag`'s own
+  /// `uGlow.w > 0.0` gate: the shader gate only ever sees what
+  /// `_writeUniforms` sends it, so fixing it there covers every future
+  /// caller for free, without a per-fragment radius check duplicated
+  /// across both `.frag` files.
   bool get isActive => radius > 0 && strength > 0;
 
   @override

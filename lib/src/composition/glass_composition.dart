@@ -215,10 +215,24 @@ class GlassComposition {
       // does the radius. Comparing against filter space instead would
       // slide the glow away from the finger the moment an ancestor
       // scrolls or scales the layer.
+      //
+      // Strength is gated on `glow.isActive`, not written as
+      // `glow.strength * presence` unconditionally. The shader's own gate
+      // is `uGlow.w > 0.0` -- strength only -- so a caller-supplied
+      // `GlassGlow(radius: 0, strength: > 0)`, which `isActive` reports as
+      // putting no light on screen, would otherwise still reach the
+      // shader's `max(uGlow.z, 1.0)` radius floor and draw a real
+      // ~1-physical-pixel falloff at the centre. Forcing strength to 0
+      // here is the single choke point: `_writeUniforms` is the only
+      // place a `GlassGlow` ever reaches the shader, so every future
+      // caller -- including one that ramps radius up from 0 on press-down
+      // -- is covered without touching either `.frag` file (which would
+      // also cost a per-fragment `&& uGlow.z > 0.0` and, being a shader
+      // change, would require re-running the SkSL web gate).
       ..setFloat(i++, glow.centre.dx * devicePixelRatio)
       ..setFloat(i++, glow.centre.dy * devicePixelRatio)
       ..setFloat(i++, glow.radius * devicePixelRatio)
-      ..setFloat(i++, glow.strength * presence)
+      ..setFloat(i++, glow.isActive ? glow.strength * presence : 0)
       // uMatte (sampler index 1) is required: `ImageFilter.shader` demands
       // every declared sampler past index 0 be bound before construction,
       // even one the shader itself will not sample from. With no matte,
