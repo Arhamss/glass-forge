@@ -66,9 +66,42 @@ void main() {
     );
   });
 
-  test('value semantics', () {
-    expect(const GlassDecay(), const GlassDecay());
-    expect(const GlassDecay().hashCode, const GlassDecay().hashCode);
-    expect(const GlassDecay(drag: 0.2), isNot(const GlassDecay()));
+  group('value semantics', () {
+    // `const` objects with identical literal fields are canonicalised to
+    // one runtime instance at compile time, independent of any custom
+    // `operator==` -- so comparing two `const GlassDecay()` literals would
+    // pass even if `==`/`hashCode` were deleted outright. Plain (non-const)
+    // constructor calls always allocate distinct instances, so `identical`
+    // being false here is what proves this test actually exercises
+    // `operator==` rather than object identity.
+    GlassDecay decayWith({
+      double drag = 0.135,
+      double settleVelocity = 8,
+    }) => GlassDecay(drag: drag, settleVelocity: settleVelocity);
+
+    test('two distinct instances with equal fields compare equal', () {
+      final a = decayWith();
+      final b = decayWith();
+
+      expect(identical(a, b), isFalse);
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('differing drag compares unequal', () {
+      final a = decayWith();
+      final b = decayWith(drag: 0.2);
+
+      expect(identical(a, b), isFalse);
+      expect(a, isNot(equals(b)));
+    });
+
+    test('differing settleVelocity compares unequal', () {
+      final a = decayWith();
+      final b = decayWith(settleVelocity: 1);
+
+      expect(identical(a, b), isFalse);
+      expect(a, isNot(equals(b)));
+    });
   });
 }

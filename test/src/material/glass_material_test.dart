@@ -80,7 +80,25 @@ void main() {
   });
 
   test('equal materials share a revision so the filter can be reused', () {
-    expect(const GlassMaterial().revision, const GlassMaterial().revision);
+    // Two independently constructed materials with equal fields is what a
+    // widget rebuild produces every frame. Comparing `const GlassMaterial()`
+    // on both sides would canonicalise to one instance and compare its
+    // `revision` with itself, passing even if `hashCode` -- which
+    // `revision` reuses -- were broken. Building through a helper whose
+    // argument is a parameter, not a literal, keeps the analyzer from
+    // const-folding the call back into one canonical instance, so
+    // `identical` being false here is what proves this test actually
+    // exercises the cache-reuse case rather than object identity.
+    GlassMaterial materialWith({double frost = 5.0}) =>
+        GlassMaterial(frost: frost);
+
+    final a = materialWith();
+    final b = materialWith();
+
+    expect(identical(a, b), isFalse);
+    expect(a, equals(b));
+    expect(a.hashCode, equals(b.hashCode));
+    expect(a.revision, equals(b.revision));
   });
 
   test('a changed field changes the revision', () {
@@ -194,8 +212,7 @@ void main() {
       );
     });
 
-    test('maxDisplacement is covered transitively through edgeRefraction',
-        () {
+    test('maxDisplacement is covered transitively through edgeRefraction', () {
       final changed = base.copyWith(edgeRefraction: base.edgeRefraction + 1);
       expect(changed.maxDisplacement, isNot(base.maxDisplacement));
       expect(changed.revision, isNot(base.revision));

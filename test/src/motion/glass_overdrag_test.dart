@@ -95,9 +95,42 @@ void main() {
     expect(tight.applyToScalar(100), lessThan(loose.applyToScalar(100)));
   });
 
-  test('value semantics', () {
-    expect(const GlassOverdrag(), const GlassOverdrag());
-    expect(const GlassOverdrag().hashCode, const GlassOverdrag().hashCode);
-    expect(const GlassOverdrag(limit: 10), isNot(const GlassOverdrag()));
+  group('value semantics', () {
+    // `const` objects with identical literal fields are canonicalised to
+    // one runtime instance at compile time, independent of any custom
+    // `operator==` -- so comparing two `const GlassOverdrag()` literals
+    // would pass even if `==`/`hashCode` were deleted outright. Plain
+    // (non-const) constructor calls always allocate distinct instances, so
+    // `identical` being false here is what proves this test actually
+    // exercises `operator==` rather than object identity.
+    GlassOverdrag overdragWith({
+      double limit = 56,
+      double resistance = 0.55,
+    }) => GlassOverdrag(limit: limit, resistance: resistance);
+
+    test('two distinct instances with equal fields compare equal', () {
+      final a = overdragWith();
+      final b = overdragWith();
+
+      expect(identical(a, b), isFalse);
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('differing limit compares unequal', () {
+      final a = overdragWith();
+      final b = overdragWith(limit: 10);
+
+      expect(identical(a, b), isFalse);
+      expect(a, isNot(equals(b)));
+    });
+
+    test('differing resistance compares unequal', () {
+      final a = overdragWith();
+      final b = overdragWith(resistance: 0.2);
+
+      expect(identical(a, b), isFalse);
+      expect(a, isNot(equals(b)));
+    });
   });
 }
