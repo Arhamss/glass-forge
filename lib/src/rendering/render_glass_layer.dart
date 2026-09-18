@@ -31,18 +31,55 @@ void debugResetAcceleratedProducerRegistration() {
   ProducerRegistry.debugReset();
 }
 
+/// What makes two shapes share one backdrop pass.
+///
+/// The material, by value, as it always was — and the identity of whatever
+/// drives their presence. Identity, not value, is the whole point: a
+/// presence animating from 0 to 1 over sixty frames has sixty different
+/// *values* and one `Animation` object, so keying on the object means the
+/// pass, its scene and its matte all survive the animation untouched. The
+/// value lives on [_GlassPass.presence] instead, where changing it costs a
+/// rebuilt `ImageFilter` and nothing more.
+@immutable
+class _PassKey {
+  const _PassKey(this.material, this.presenceScope);
+
+  /// The material every shape sharing this key renders with.
+  final GlassMaterial material;
+
+  /// The identity of whatever drives this key's shapes' presence, or null.
+  final Object? presenceScope;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _PassKey &&
+      other.material == material &&
+      identical(other.presenceScope, presenceScope);
+
+  @override
+  int get hashCode => Object.hash(material, identityHashCode(presenceScope));
+}
+
 /// One backdrop pass: every shape in this layer that renders with the same
-/// material, and the single filter they share.
+/// material and presence driver, and the single filter they share.
 ///
 /// Grouping is by material rather than by shape because a backdrop filter is
 /// the expensive thing, not a shape. N materials cost N passes; the common
 /// case of one material still costs exactly one, which is what the
 /// `GlassComposition` invariant is really about.
 class _GlassPass {
-  _GlassPass(this.material);
+  _GlassPass(this.key);
+
+  /// What this pass is keyed by.
+  final _PassKey key;
 
   /// The material every shape in [scene] renders with.
-  final GlassMaterial material;
+  GlassMaterial get material => key.material;
+
+  /// How present this pass's glass is this frame, 0 to 1.
+  ///
+  /// Mutable and outside the key on purpose. See [_PassKey].
+  double presence = 1;
 
   /// Just this pass's shapes, in registration order.
   ///
@@ -72,6 +109,8 @@ class _ShapeRecord {
     required this.geometry,
     required this.declared,
     required this.group,
+    required this.presenceScope,
+    required this.presence,
   });
 
   ShapeGeometry geometry;
@@ -82,8 +121,14 @@ class _ShapeRecord {
   /// The blend group this shape joined, held only for identity.
   Object? group;
 
+  /// The identity of whatever drives this shape's presence, or null.
+  Object? presenceScope;
+
+  /// This shape's presence this frame, 0 to 1.
+  double presence;
+
   /// The pass this shape is currently registered into.
-  GlassMaterial? assigned;
+  _PassKey? assigned;
 }
 
 /// Owns one backdrop capture per distinct material, and the scene they are
@@ -138,10 +183,9 @@ class RenderGlassLayer extends RenderProxyBox {
   /// What every registered shape declared, in registration order.
   final Map<Object, _ShapeRecord> _records = <Object, _ShapeRecord>{};
 
-  /// One pass per distinct material among [_records], in the order each
-  /// material's first shape registered.
-  final Map<GlassMaterial, _GlassPass> _passes =
-      <GlassMaterial, _GlassPass>{};
+  /// One pass per distinct material and presence-driver identity among
+  /// [_records], in the order each key's first shape registered.
+  final Map<_PassKey, _GlassPass> _passes = <_PassKey, _GlassPass>{};
 
   /// Whether [_reassignPasses] has work to do.
   ///
@@ -306,12 +350,16 @@ class RenderGlassLayer extends RenderProxyBox {
   /// Registers [key]'s geometry, and what it asked to render with.
   ///
   /// [material] null means "whatever this layer's is"; [group] is the blend
-  /// group the shape joined, held only for identity.
+  /// group the shape joined, held only for identity. [presenceScope] is the
+  /// identity of whatever drives this shape's presence, or null, and
+  /// [presence] is its current value, 0 to 1.
   void registerShape(
     Object key,
     ShapeGeometry geometry,
     GlassMaterial? material,
     Object? group,
+    Object? presenceScope,
+    double presence,
   ) {
     scene.register(key, geometry);
 
@@ -321,23 +369,31 @@ class RenderGlassLayer extends RenderProxyBox {
         geometry: geometry,
         declared: material,
         group: group,
+        presenceScope: presenceScope,
+        presence: presence,
       );
       _assignmentsDirty = true;
       return;
     }
 
     existing.geometry = geometry;
-    if (existing.declared != material || !identical(existing.group, group)) {
+    if (existing.declared != material ||
+        !identical(existing.group, group) ||
+        !identical(existing.presenceScope, presenceScope)) {
       existing
         ..declared = material
-        ..group = group;
+        ..group = group
+        ..presenceScope = presenceScope
+        ..presence = presence;
       _assignmentsDirty = true;
       return;
     }
 
-    // The hot path: a shape that only moved. Its pass is already decided, so
-    // the new geometry goes straight in -- this runs for every shape on
-    // every animating frame, from inside this layer's own subtree paint.
+    // The hot path: a shape that only moved, or whose presence value ticked.
+    // Its pass is already decided, so the new geometry goes straight in --
+    // this runs for every shape on every animating frame, from inside this
+    // layer's own subtree paint.
+    existing.presence = presence;
     final assigned = existing.assigned;
     if (assigned != null) {
       _passes[assigned]?.scene.register(key, geometry);
@@ -357,6 +413,20 @@ class RenderGlassLayer extends RenderProxyBox {
     }
     // A pass whose last shape just left still holds a matte and a shader.
     _assignmentsDirty = true;
+  }
+
+  /// Updates one shape's presence without disturbing its pass.
+  ///
+  /// Called from `RenderGlassShape`'s presence listener, which ticks in the
+  /// animation phase — before paint — so the value read at the top of
+  /// [paint] is this frame's.
+  void updateShapePresence(Object key, double presence) {
+    final record = _records[key];
+    if (record == null || record.presence == presence) {
+      return;
+    }
+    record.presence = presence;
+    markNeedsPaint();
   }
 
   /// Sorts every registered shape into the pass that will render it.
@@ -390,11 +460,11 @@ class RenderGlassLayer extends RenderProxyBox {
     for (final entry in _records.entries) {
       final record = entry.value;
       final group = record.group;
-      final target = group == null
+      final material = group == null
           ? record.declared ?? _material
           : groupMaterials[group]!;
       assert(() {
-        if (record.declared != null && record.declared != target) {
+        if (record.declared != null && record.declared != material) {
           debugPrint(
             'glass_forge: a Glass inside a GlassBlendGroup asked for its '
             'own material, but the group already renders with the one its '
@@ -405,6 +475,7 @@ class RenderGlassLayer extends RenderProxyBox {
         }
         return true;
       }(), 'debug-only warning; always true');
+      final target = _PassKey(material, record.presenceScope);
       final assigned = record.assigned;
       if (assigned != null && assigned != target) {
         _passes[assigned]?.scene.unregister(entry.key);
@@ -416,7 +487,7 @@ class RenderGlassLayer extends RenderProxyBox {
       );
     }
 
-    _passes.removeWhere((material, pass) {
+    _passes.removeWhere((key, pass) {
       if (pass.scene.shapes.isNotEmpty) {
         return false;
       }
@@ -453,6 +524,20 @@ class RenderGlassLayer extends RenderProxyBox {
       _reassignPasses();
     }
 
+    // Fold each pass's shapes' presence into the pass. A pass is one
+    // surface: the highest presence among its shapes wins rather than an
+    // average, so a pass is fully present as soon as any shape in it is,
+    // and reaches zero only when every shape has.
+    for (final pass in _passes.values) {
+      pass.presence = 0;
+    }
+    for (final record in _records.values) {
+      final pass = _passes[record.assigned];
+      if (pass != null && record.presence > pass.presence) {
+        pass.presence = record.presence;
+      }
+    }
+
     // Everything that decides whether a pass renders at all has to be known
     // *now*, before anything is pushed: a `BackdropFilterLayer` forces a
     // saveLayer and a full backdrop read the moment it exists, so pushing
@@ -465,9 +550,7 @@ class RenderGlassLayer extends RenderProxyBox {
     // each shape is.
     final passes = <_GlassPass>[
       for (final pass in _passes.values)
-        // Presence is a literal 1 until Task 2 plumbs the real per-pass
-        // value through.
-        if (GlassComposition.willRender(pass.material, 1)) pass,
+        if (GlassComposition.willRender(pass.material, pass.presence)) pass,
     ];
     if (passes.isEmpty) {
       // No shapes, or nothing any of their materials would draw. Upstream
@@ -707,14 +790,10 @@ class RenderGlassLayer extends RenderProxyBox {
         devicePixelRatio: _devicePixelRatio,
         materialRevision: pass.material.revision,
         coordinateMapping: mapping,
-        // Presence is a literal 1 until Task 2 plumbs the real per-pass
-        // value through.
-        presence: 1,
+        presence: pass.presence,
       ),
       devicePixelRatio: _devicePixelRatio,
-      // Presence is a literal 1 until Task 2 plumbs the real per-pass value
-      // through.
-      presence: 1,
+      presence: pass.presence,
     );
     if (filter != null) {
       return filter;

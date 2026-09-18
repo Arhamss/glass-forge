@@ -1,3 +1,4 @@
+import 'package:flutter/animation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
@@ -101,6 +102,39 @@ class RenderGlassShape extends RenderProxyBox {
     _syncGeometry();
   }
 
+  /// What drives this shape's presence, or null for fully present.
+  ///
+  /// The animation's *identity* is what the layer keys this shape's pass
+  /// by — see `RenderGlassLayer`'s `_PassKey` — so a value tick here never
+  /// re-registers this shape into a different pass. Only a changed driver
+  /// does, through [_syncGeometry] below, because that is a genuine change
+  /// of which pass this shape belongs to.
+  Animation<double>? get presence => _presence;
+  Animation<double>? _presence;
+  set presence(Animation<double>? value) {
+    if (identical(_presence, value)) {
+      return;
+    }
+    if (attached) {
+      _presence?.removeListener(_onPresenceChanged);
+    }
+    _presence = value;
+    if (attached) {
+      value?.addListener(_onPresenceChanged);
+    }
+    // A changed *driver* re-keys the pass, unlike a changed value.
+    _syncGeometry();
+  }
+
+  /// Reports this frame's presence value to the layer without re-syncing
+  /// this shape's full geometry.
+  ///
+  /// Fires from the animation phase, before paint, so the value the layer
+  /// folds into its pass at the top of `paint` is always this frame's.
+  void _onPresenceChanged() {
+    _layer?.updateShapePresence(this, _presence!.value);
+  }
+
   void _joinGroup() {
     _group?.add(this);
     _group?.addListener(_onGroupChanged);
@@ -150,6 +184,7 @@ class RenderGlassShape extends RenderProxyBox {
   void attach(PipelineOwner owner) {
     super.attach(owner);
     _joinGroup();
+    _presence?.addListener(_onPresenceChanged);
     _layer = _findAncestorLayer();
     _syncGeometry();
   }
@@ -162,6 +197,7 @@ class RenderGlassShape extends RenderProxyBox {
     _lastSyncedTransform = null;
     _justSyncedFromLayout = false;
     _leaveGroup();
+    _presence?.removeListener(_onPresenceChanged);
     super.detach();
   }
 
@@ -210,6 +246,8 @@ class RenderGlassShape extends RenderProxyBox {
       ),
       _material,
       _group,
+      _presence,
+      _presence?.value ?? 1.0,
     );
   }
 
