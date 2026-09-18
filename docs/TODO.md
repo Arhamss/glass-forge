@@ -21,15 +21,24 @@ benchmark/ hook/ android/ ios/ macos/ example/ docs/` with `pubspec.yaml`,
 `example/` resolves on its own through `path: ../`. `.pubignore` keeps
 `CLAUDE.md`, `PROJECT_BRIEF.md` and `docs/` out of the published archive.
 
-## Verified on a clean checkout of `a522eb4`
+## Verified
+
+The `a522eb4` checkout this section originally described is now 31 commits
+behind `main`. `flutter analyze` and both `flutter test` runs below were
+re-run against current `main` on 2026-09-19; the web build and simulator
+checks were not re-verified this session and may also be stale — re-run
+them before trusting those two.
 
 - `flutter analyze` — clean.
-- `flutter test` — **480 passed, 23 skipped, 0 failed**.
+- `flutter test` — **527 passed, 24 skipped, 0 failed**.
 - `flutter test --tags impeller --run-skipped --enable-impeller` —
-  79 passed, 2 skipped, **1 failed** (see below).
-- The example's web build (CI's SkSL gate) succeeds.
-- The example runs on the iPhone 17e simulator
-  (`2473CC29-B74E-43FC-B4C5-7162629E0DFC`) and renders correctly.
+  **81 passed, 2 skipped, 1 failed** (see below).
+- The example's web build (CI's SkSL gate) succeeds. *(Carried over from
+  the `a522eb4` checkout, not re-verified this session.)*
+- The example runs on the iPhone 17e simulator and renders correctly.
+  *(Carried over, not re-verified this session.)* Simulator UUIDs are
+  regenerated per machine, so resolve the current one at run time instead
+  of pinning it here: `xcrun simctl list devices | grep '17e'`.
 
 ## The four decisions — answered 2026-09-18
 
@@ -64,7 +73,11 @@ A1 → A4 → A2 → A3 → B1 → B2 → B3 → B4 → B5 → C4 → C1 → C2 
   `docs/superpowers/plans/2026-09-18-glass-widgets-a-foundations.md`.
   Nine tasks: presence through `uSurface.z` (1–3), `GlassHostScope` and the
   overlap warning (4–5), anchored press-stretch (6–7), the touch glow
-  uniform and its driver (8–9). **Not started — no code written yet.**
+  uniform and its driver (8–9). **Essentially complete — all nine tasks
+  have landed in `lib/`** (`GlassPresence`/`GlassPresenceScope`,
+  `GlassHostScope`, the debug-only cross-pass overlap warning,
+  `GlassPressStretch`/`GlassMotionState.pressAnchor` wired through
+  `InteractiveGlass`, and `GlassGlow`).
 - **Sub-projects B, C, D** — no plans yet. Write each one when the one
   before it lands.
 
