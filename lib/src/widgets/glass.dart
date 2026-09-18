@@ -67,6 +67,15 @@ class Glass extends StatelessWidget {
       return GlassLayer(child: this);
     }
 
+    // A nested Glass B only ever reaches this line inside the subtree that
+    // an outer Glass A returns, and A only returns that subtree once it has
+    // resolved a non-null GlassLayerScope of its own — real or the implicit
+    // one it just created above. GlassLayerScope is an ordinary
+    // InheritedWidget, so it reaches every descendant regardless of
+    // intervening StatelessWidgets: B always inherits a non-null scope and
+    // can never land on the scope == null branch above. The
+    // implicit-layer/nested-Glass combination is therefore unreachable, not
+    // merely untested.
     assert(
       !GlassHostScope.isOnGlass(context),
       "glass_forge: this Glass was built somewhere inside another Glass's "

@@ -54,7 +54,10 @@ void main() {
         ),
       ),
     );
-    expect(tester.takeException(), isAssertionError);
+    expect(
+      tester.takeException().toString(),
+      contains("another Glass's"),
+    );
   });
 
   testWidgets('a Glass nested a few widgets deep inside another Glass '
@@ -79,6 +82,9 @@ void main() {
         ),
       ),
     );
-    expect(tester.takeException(), isAssertionError);
+    expect(
+      tester.takeException().toString(),
+      contains("another Glass's"),
+    );
   });
 }
