@@ -538,6 +538,20 @@ class RenderGlassLayer extends RenderProxyBox {
       }
     }
 
+    // Every pass whose material could draw at all, independent of this
+    // frame's presence -- a presence-driven pass sitting at 0 is still
+    // capable, it is just not asked to render this frame. Refreshing these
+    // regardless of whether they are currently visible is what keeps a
+    // matte warm through the whole time its glass is faded out, so the
+    // frame it first crosses back above the epsilon needs no fresh bake.
+    // See `GlassPresence`'s own doc comment: animating it "costs a rebuilt
+    // image filter per frame and never a rebaked matte," for the driver's
+    // whole life, not just once it happens to already be visible.
+    final capablePasses = <_GlassPass>[
+      for (final pass in _passes.values)
+        if (GlassComposition.willRender(pass.material, 1)) pass,
+    ];
+
     // Everything that decides whether a pass renders at all has to be known
     // *now*, before anything is pushed: a `BackdropFilterLayer` forces a
     // saveLayer and a full backdrop read the moment it exists, so pushing
@@ -549,13 +563,15 @@ class RenderGlassLayer extends RenderProxyBox {
     // there, and the whole reason the filters are built afterwards, is where
     // each shape is.
     final passes = <_GlassPass>[
-      for (final pass in _passes.values)
+      for (final pass in capablePasses)
         if (GlassComposition.willRender(pass.material, pass.presence)) pass,
     ];
     if (passes.isEmpty) {
-      // No shapes, or nothing any of their materials would draw. Upstream
-      // pushes a full backdrop even when its blur is zero.
+      // No shapes, nothing any of their materials would draw, or every
+      // capable pass is currently at presence 0. Upstream pushes a full
+      // backdrop even when its blur is zero.
       _paintSubtree(context, offset);
+      capablePasses.forEach(_refreshMatte);
       return;
     }
 
@@ -575,7 +591,7 @@ class RenderGlassLayer extends RenderProxyBox {
       _clipChain.collect(firstShape, this);
     }
 
-    _pushGlassLayers(context, offset, passes);
+    _pushGlassLayers(context, offset, passes, capablePasses);
   }
 
   /// Paints the subtree, flagged so a descendant shape can tell that this
@@ -617,6 +633,7 @@ class RenderGlassLayer extends RenderProxyBox {
     PaintingContext context,
     Offset offset,
     List<_GlassPass> passes,
+    List<_GlassPass> capablePasses,
   ) {
     void pushBackdrop(PaintingContext innerContext, Offset innerOffset) {
       // The clip is computed in this layer's own local space — the offset
@@ -627,7 +644,13 @@ class RenderGlassLayer extends RenderProxyBox {
         clippedContext,
         clippedOffset,
       ) {
-        _pushBackdropPasses(clippedContext, clippedOffset, offset, passes);
+        _pushBackdropPasses(
+          clippedContext,
+          clippedOffset,
+          offset,
+          passes,
+          capablePasses,
+        );
       });
     }
 
@@ -754,6 +777,7 @@ class RenderGlassLayer extends RenderProxyBox {
     Offset offset,
     Offset layerOffset,
     List<_GlassPass> passes,
+    List<_GlassPass> capablePasses,
   ) {
     final pushed = <BackdropFilterLayer>[];
     for (var i = 0; i < passes.length; i++) {
@@ -775,6 +799,16 @@ class RenderGlassLayer extends RenderProxyBox {
     final mapping = _coordinateMapping(layerOffset);
     for (var i = 0; i < passes.length; i++) {
       pushed[i].filter = _buildFilter(passes[i], mapping);
+    }
+
+    // Capable passes not being pushed this frame -- a material rendering
+    // alongside a still-faded-out `GlassPresence` pass -- still get their
+    // matte kept warm, off the backdrop-push path entirely.
+    final pushedSet = passes.toSet();
+    for (final pass in capablePasses) {
+      if (!pushedSet.contains(pass)) {
+        _refreshMatte(pass);
+      }
     }
   }
 

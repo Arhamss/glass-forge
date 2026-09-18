@@ -6,6 +6,7 @@ import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/tier/glass_tier_scope.dart';
 import 'package:glass_forge/src/widgets/glass_blend_group.dart';
 import 'package:glass_forge/src/widgets/glass_layer.dart';
+import 'package:glass_forge/src/widgets/glass_presence.dart';
 
 /// One glass surface.
 class Glass extends StatelessWidget {
@@ -69,6 +70,7 @@ class Glass extends StatelessWidget {
     return _RawGlass(
       shape: shape,
       group: group,
+      presence: GlassPresenceScope.maybeOf(context),
       material: _resolveMaterialFor(context, material),
       child: ClipPath(
         clipper: GlassShapeClipper(shape),
@@ -139,12 +141,14 @@ class _RawGlass extends SingleChildRenderObjectWidget {
   const _RawGlass({
     required this.shape,
     required this.group,
+    required this.presence,
     required this.material,
     required Widget super.child,
   });
 
   final GlassShape shape;
   final BlendGroupLink? group;
+  final Animation<double>? presence;
   final GlassMaterial? material;
 
   @override
@@ -152,6 +156,7 @@ class _RawGlass extends SingleChildRenderObjectWidget {
     return RenderGlassShape(
       shape: shape,
       group: group,
+      presence: presence,
       material: material,
     );
   }
@@ -164,6 +169,7 @@ class _RawGlass extends SingleChildRenderObjectWidget {
     renderObject
       ..shape = shape
       ..group = group
+      ..presence = presence
       ..material = material;
   }
 }

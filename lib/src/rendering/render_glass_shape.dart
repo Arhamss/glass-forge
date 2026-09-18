@@ -19,6 +19,7 @@ class RenderGlassShape extends RenderProxyBox {
   RenderGlassShape({
     required this._shape,
     required this._group,
+    this._presence,
     this._material,
   });
 

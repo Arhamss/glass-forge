@@ -31,6 +31,14 @@ void main() {
     for (var i = 0; i < 20; i++) {
       await tester.pump(const Duration(milliseconds: 10));
     }
+    // The 20 pumps above land the controller just short of `completed`
+    // (the first pump only primes its ticker's start reference; the
+    // other 19 each advance it by 10ms, for 190ms of the 200ms duration),
+    // so its ticker is still active here. Stopping it directly, rather
+    // than pumping a 21st frame, keeps this test's frame count exactly
+    // what the brief specifies and leaves nothing for the framework's
+    // end-of-test "was every ticker disposed" check to catch.
+    controller.stop();
 
     expect(
       GlassRenderCounters.instance.matteProduceCount,
@@ -41,11 +49,11 @@ void main() {
 
   testWidgets('presence 0 pushes no backdrop filter', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: GlassLayer(
           child: GlassPresence(
-            presence: const AlwaysStoppedAnimation<double>(0),
-            child: const Glass(
+            presence: AlwaysStoppedAnimation<double>(0),
+            child: Glass(
               shape: GlassOval(),
               child: SizedBox(width: 120, height: 48),
             ),

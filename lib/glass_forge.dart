@@ -44,3 +44,4 @@ export 'src/tier/tier_resolver.dart';
 export 'src/widgets/glass.dart';
 export 'src/widgets/glass_blend_group.dart';
 export 'src/widgets/glass_layer.dart';
+export 'src/widgets/glass_presence.dart';
