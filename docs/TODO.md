@@ -90,46 +90,99 @@ A1 → A4 → A2 → A3 → B1 → B2 → B3 → B4 → B5 → C4 → C1 → C2 
   photographic gradient — consistent with the RGBA8 matte quantising
   displacement. Visible at 2× zoom, not at phone scale.
 - **A4's new cross-pass overlap warning (Task 5) fires on every tab switch
-  in the example**, on the iPhone 17e simulator. Two distinct things, found
-  together:
-  - **The transient overlap itself.** `Stage._sceneFor` swaps to a whole
-    new scene widget on `setState(() => _index = i)` — exactly what
-    `_SceneTabs`'s `onChanged` calls on a real tap — and for one frame the
-    outgoing scene's glass and the incoming scene's glass both show up in
-    `RenderGlassLayer._records` with real, non-degenerate bounds (not the
-    zero-size placeholder a genuinely unmounted shape would leave). This is
-    the legitimately-transient case the warning was designed not to assert
-    on, but it is worth fixing properly rather than living with the
-    print, since nothing here is a deliberate `GlassPresence` handoff —
-    it is every ordinary tab switch. The very first frame of the app (any
-    scene, before any tap) also warns once, for the same reason: the
-    control-panel sheet and the bottom tab bar both register with
-    `origin.y == 0` on that first frame, before the Column has assigned
-    their real offsets — `Rect.fromLTRB(0.0, 0.0, 1050.0, 156.0)` and
-    `Rect.fromLTRB(0.0, 0.0, 1050.0, 432.0)` at 3x, reproduced on every
-    cold launch and every hot restart.
-  - **A related, louder bug in the Blend scene's teardown**, surfaced by
-    the same interaction: switching away from Blend throws (caught and
-    reported, not fatal) `RenderGlassLayer#... NEEDS-PAINT
-    NEEDS-COMPOSITING-BITS-UPDATE and RenderGlassShape#... are not in the
-    same render tree`. `RenderGlassShape.detach()` unregisters itself from
-    the layer first, which is correct, but then calls `_leaveGroup()`,
-    whose `BlendGroupLink.remove()` synchronously `notifyListeners()`s —
+  in the example**, on the iPhone 17e simulator. Mechanism confirmed by
+  direct instrumentation (fix round 1 — a temporary dump of every
+  `RenderGlassLayer._records` entry's geometry, per paint, reverted before
+  commit; see task-5-report.md). Two distinct things, found together:
+  - **The overlap is a one-frame, self-correcting fresh-mount artifact —
+    not old/new scenes coexisting, and not a persistent settled overlap.**
+    Switching Blend → Motion was traced end to end:
+    - At the exact paint that warns, `_records` holds **three** entries —
+      the tab bar, Motion's own sheet, Motion's own specimen — never four
+      or five, so none of Blend's two ovals are still registered. Old and
+      new scenes do **not** coexist; `Element.deactivateChild` really does
+      detach (and `RenderGlassShape.detach()` really does
+      `unregisterShape`) the outgoing subtree synchronously, before this
+      frame's layout or paint, exactly as a straightforward reading of
+      the framework predicts.
+    - Motion's sheet registers at `origin=(195, 121.5)` and its specimen
+      at `origin=(104, 141)` on that one paint — both wrong. On every
+      subsequent repaint (confirmed both by the transition's own
+      settle-animation frames and by forced no-op repaints seconds later,
+      scene unchanged) they read `(195, 671.5)` and `(195, 386)` — their
+      real, final, **non-overlapping** positions — and stay there. The
+      warning never recurs once settled, including under repeated forced
+      repaints long after the transition. This rules out a persistent
+      design-level overlap: the settled layout is fine.
+    - The wrong-then-corrected values match a mechanism
+      `RenderGlassShape` already documents and defends against, just one
+      step too late for this check: `RenderGlassShape.performLayout` calls
+      `_syncGeometry()` (registers via `getTransformTo`), but — per the
+      doc comment on `_syncGeometryIfTransformChanged` —
+      `getTransformTo` read from inside a shape's own `performLayout` can
+      be missing an ancestor's contribution entirely, because some
+      ancestors (the doc's own example is `Positioned` inside `Stack`;
+      the same ordering applies to a `Column` positioning a
+      freshly-mounted child) assign the child's offset only *after*
+      laying it out. `RenderGlassShape.paint` calls
+      `_syncGeometryIfTransformChanged()`, which *does* always register
+      the fresh, correct transform — but that runs during the subtree's
+      paint, which is *after* `_debugWarnOnCrossPassOverlap()` (per this
+      task's decision 1, deliberately placed before the subtree paints).
+      So the check is, by construction, reading exactly the one value
+      `RenderGlassShape` itself calls "the stale one," one paint before
+      the shape's own paint-time call corrects it. This is not a new bug
+      introduced by this task; it is the same documented staleness
+      window the brief already named ("every shape's geometry is from
+      last frame's registration ... good enough for a diagnostic"),
+      just observed on a *fresh mount* rather than only on frame one of
+      the whole app.
+    - The app's very-first-frame case (finding recorded here originally)
+      is almost certainly the same mechanism at its most severe: on that
+      frame *every* ancestor in the chain is still on its pre-layout
+      default, not just the freshly-mounted subtree's own immediate
+      parent, so the registered geometry degenerates all the way to
+      `origin == halfExtent` (as if the shape's own top-left sat at the
+      layer's literal `(0, 0)`) rather than merely landing at a
+      wrong-but-plausible offset. Not re-verified with the same
+      per-record dump as the tab-switch case, so held to a slightly lower
+      confidence than the tab-switch finding above, but the values fit
+      exactly and no other explanation was found.
+    - **A `GlassPresence` crossfade between scenes would not fix this.**
+      That was the original guess in this entry and it is wrong: nothing
+      here is two scenes' content coexisting, so there is nothing for a
+      crossfade to sequence. The actual fix, if this is worth fixing at
+      the package level rather than accepted as inherent to a debug-only
+      diagnostic, is in the check's own timing or in
+      `RenderGlassShape`'s registration path — not in the example.
+  - **A related, louder, and separately-confirmed bug in the Blend
+    scene's teardown**, surfaced by the same interaction: switching away
+    from Blend throws (caught and reported, not fatal)
+    `RenderGlassLayer#... NEEDS-PAINT NEEDS-COMPOSITING-BITS-UPDATE and
+    RenderGlassShape#... are not in the same render tree`.
+    `RenderGlassShape.detach()` unregisters itself from the layer first,
+    which is correct, but then calls `_leaveGroup()`, whose
+    `BlendGroupLink.remove()` synchronously `notifyListeners()`s —
     reaching the *other* circle still mid-teardown, whose
-    `_onGroupChanged` re-syncs geometry via `getTransformTo(_layer)` against
-    an ancestor chain that is disturbed by the same detach cascade.
-    `ChangeNotifier.notifyListeners()` catches and reports this per
-    listener rather than rethrowing, so the frame survives, but it is a
-    real ordering bug in `RenderGlassShape`/`BlendGroupLink`, not an
-    example bug, and it is exactly the kind of thing that could leave a
-    blend-group shape's geometry stale.
+    `_onGroupChanged` re-syncs geometry via `getTransformTo(_layer)`
+    against an ancestor chain that is disturbed by the same detach
+    cascade. `ChangeNotifier.notifyListeners()` catches and reports this
+    per listener rather than rethrowing, so the frame survives, but it is
+    a real ordering bug in `RenderGlassShape`/`BlendGroupLink`, not an
+    example bug. This finding is unaffected by the mechanism correction
+    above — it was confirmed independently, from its own stack trace.
   - Not fixed here: task 5 was "add the diagnostic," and the check is
-    correctly refusing to stay quiet about a real, reproducible cross-pass
-    overlap rather than being softened to hide it (see task-5-report.md).
-    Fixing the transition order — most likely giving `Stage` a real
-    crossfade between scenes via `GlassPresence`, and fixing
-    `RenderGlassShape.detach()`/`BlendGroupLink` to finish this shape's
-    own teardown before notifying group siblings — is follow-up work.
+    correctly refusing to stay quiet about a real, reproducible artifact
+    rather than being softened to hide it (see task-5-report.md, "Fix
+    round 1"). Follow-up, if wanted: decide whether the check should read
+    geometry *after* the subtree paints instead of before (trading "never
+    misses a frame that pushed backdrop layers" for "never warns on a
+    fresh mount's stale layout-time geometry" — a real design tradeoff,
+    not an obvious win either way), or accept the one-frame fresh-mount
+    false-positive-shaped print as inherent to a diagnostic that is
+    explicitly documented as reading possibly-stale geometry; and,
+    separately, fix `RenderGlassShape.detach()`/`BlendGroupLink` to
+    finish this shape's own teardown before notifying group siblings.
 
 ## The finding the widget spec is built on
 
