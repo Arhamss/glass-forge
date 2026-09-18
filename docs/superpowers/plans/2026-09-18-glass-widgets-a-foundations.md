@@ -295,7 +295,23 @@ Expected: no issues.
 Run: `flutter test`
 Expected: all pass (the pre-existing Impeller failure is not in this lane).
 
-Run: `cd example && flutter build web && cd ..`
+Run the SkSL gate the way CI runs it — `flutter build web` on its own
+fails with "This project is not configured for the web", because the example
+is a phone demo with no `web/` folder checked in:
+
+```bash
+cd example
+flutter create --platforms=web .
+flutter build web --release
+rm -rf web && rm -f test/widget_test.dart && git checkout .metadata
+cd ..
+```
+
+The cleanup line is not optional. `flutter create` scaffolds `web/`, writes a
+template `test/widget_test.dart` referring to a `MyApp` this app does not
+have, and rewrites `example/.metadata`; leaving any of them behind breaks
+`flutter analyze`. See `.github/workflows/shaders.yaml`, which does the same
+thing and explains why the gate runs before analyze.
 Expected: succeeds. This is the SkSL gate; a malformed shader fails here.
 
 - [ ] **Step 9: Commit**
@@ -1808,7 +1824,23 @@ site for now; Task 9 replaces it.
 Run: `flutter test`
 Expected: PASS
 
-Run: `cd example && flutter build web && cd ..`
+Run the SkSL gate the way CI runs it — `flutter build web` on its own
+fails with "This project is not configured for the web", because the example
+is a phone demo with no `web/` folder checked in:
+
+```bash
+cd example
+flutter create --platforms=web .
+flutter build web --release
+rm -rf web && rm -f test/widget_test.dart && git checkout .metadata
+cd ..
+```
+
+The cleanup line is not optional. `flutter create` scaffolds `web/`, writes a
+template `test/widget_test.dart` referring to a `MyApp` this app does not
+have, and rewrites `example/.metadata`; leaving any of them behind breaks
+`flutter analyze`. See `.github/workflows/shaders.yaml`, which does the same
+thing and explains why the gate runs before analyze.
 Expected: succeeds. **If it fails here, the uniform layout is the cause** —
 check the `uGlow` declaration order against the `setFloat` order.
 
@@ -1986,7 +2018,23 @@ Add `export 'src/composition/glass_glow.dart' show GlassGlow;` to
 Run: `flutter analyze`
 Run: `flutter test`
 Run: `flutter test --tags impeller --run-skipped --enable-impeller`
-Run: `cd example && flutter build web && cd ..`
+Run the SkSL gate the way CI runs it — `flutter build web` on its own
+fails with "This project is not configured for the web", because the example
+is a phone demo with no `web/` folder checked in:
+
+```bash
+cd example
+flutter create --platforms=web .
+flutter build web --release
+rm -rf web && rm -f test/widget_test.dart && git checkout .metadata
+cd ..
+```
+
+The cleanup line is not optional. `flutter create` scaffolds `web/`, writes a
+template `test/widget_test.dart` referring to a `MyApp` this app does not
+have, and rewrites `example/.metadata`; leaving any of them behind breaks
+`flutter analyze`. See `.github/workflows/shaders.yaml`, which does the same
+thing and explains why the gate runs before analyze.
 
 - [ ] **Step 7: Look at it**
 
