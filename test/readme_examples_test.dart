@@ -2,16 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
 
-/// Every code block in README.md, compiled.
+/// Every `dart` code block in README.md, plus every `dart` code block in a
+/// `lib/` doc comment, compiled.
 ///
-/// A README is the one piece of a package that is read far more often than
-/// it is run, so its examples rot silently: a constructor gains a required
-/// argument, a name changes, and nothing fails until someone copies the
-/// snippet and it does not build. These are the same snippets, kept here so
-/// the analyzer and the test run see them.
+/// A README — or a doc comment — is the one piece of a package that is read
+/// far more often than it is run, so its examples rot silently: a
+/// constructor gains a required argument, a name changes, and nothing fails
+/// until someone copies the snippet and it does not build. These are the
+/// same snippets, kept here so the analyzer and the test run see them.
 ///
-/// Keep this file and the README in lockstep. If a snippet changes there,
-/// change it here.
+/// Keep this file, the README and the `lib/` doc comments in lockstep. If a
+/// snippet changes there, change it here. Where the original names a
+/// hypothetical caller type (`YourContent`, `NavBarContents`...), the copy
+/// here substitutes a real, equivalent widget so it actually compiles —
+/// same shape as the README section above.
 void main() {
   testWidgets('the quick-start example builds', (tester) async {
     await tester.pumpWidget(
@@ -94,5 +98,126 @@ void main() {
       ),
       isA<GlassShape>(),
     );
+  });
+
+  // -- lib/ doc-comment examples -------------------------------------------
+
+  testWidgets('the GlassSurface.navigationBar doc example builds', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: GlassLayer(
+          child: GlassSurface.navigationBar(child: SizedBox(height: 56)),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  test('the GlassThemeData one-field-override doc example builds', () {
+    expect(
+      const GlassThemeData(
+        tokens: GlassTokens(blur: GlassBlurScale(thick: 18)),
+      ),
+      isA<GlassThemeData>(),
+    );
+  });
+
+  testWidgets(
+    'the GlassTheme brightness-follows-Material doc example builds',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return GlassTheme(
+                data: GlassThemeData(brightness: Theme.of(context).brightness),
+                child: const SizedBox(),
+              );
+            },
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('the InteractiveGlass one-line doc example builds', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          child: InteractiveGlass(
+            child: Glass(
+              shape: GlassRoundedRectangle(radius: BorderRadius.circular(999)),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the InteractiveGlass draggable doc example builds', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          child: InteractiveGlass(
+            drag: const GlassDrag(overdrag: GlassOverdrag(limit: 80)),
+            child: Glass(
+              shape: GlassRoundedRectangle(radius: BorderRadius.circular(999)),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the GlassHostScope.isOnGlass doc example builds', (
+    tester,
+  ) async {
+    Widget painted() => const SizedBox();
+    const shape = GlassOval();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          child: Builder(
+            builder: (context) {
+              final onGlass = GlassHostScope.isOnGlass(context);
+              return onGlass
+                  ? painted()
+                  : Glass(shape: shape, child: painted());
+            },
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the GlassPresence doc example builds', (tester) async {
+    final sheetController = AnimationController(
+      vsync: const TestVSync(),
+      value: 1,
+    );
+    addTearDown(sheetController.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          child: GlassPresence(
+            presence: sheetController,
+            child: Glass(
+              shape: GlassRoundedRectangle(radius: BorderRadius.circular(28)),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
   });
 }
