@@ -2,6 +2,7 @@ import 'package:flutter/rendering.dart';
 import 'package:glass_forge/src/motion/glass_jiggle.dart';
 import 'package:glass_forge/src/motion/glass_motion_controller.dart';
 import 'package:glass_forge/src/motion/glass_motion_state.dart';
+import 'package:glass_forge/src/motion/glass_press_stretch.dart';
 
 /// Applies a [GlassMotionController]'s live deformation to its child.
 ///
@@ -72,6 +73,9 @@ class RenderGlassMotion extends RenderProxyBox {
       size: size,
       state: _controller.value,
       jiggle: _jiggle,
+      // TODO(task-7): wire the real value once InteractiveGlass and the
+      // pointer feed a live press anchor into GlassMotionState.
+      pressStretch: const GlassPressStretch.none(),
       pressScale: _pressScale,
     );
   }

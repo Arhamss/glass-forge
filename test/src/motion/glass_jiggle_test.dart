@@ -4,6 +4,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/motion/glass_jiggle.dart';
 import 'package:glass_forge/src/motion/glass_motion_state.dart';
+import 'package:glass_forge/src/motion/glass_press_stretch.dart';
 
 const Size _size = Size(120, 80);
 
@@ -33,6 +34,7 @@ Matrix4 _transformFor(
     press: press,
   ),
   jiggle: jiggle,
+  pressStretch: const GlassPressStretch.none(),
   pressScale: pressScale,
 );
 
@@ -182,6 +184,7 @@ void main() {
           press: 0,
         ),
         jiggle: const GlassJiggle(),
+        pressStretch: const GlassPressStretch.none(),
         pressScale: 0.96,
       );
       expect(MatrixUtils.getAsTranslation(transform), const Offset(17, -23));
