@@ -108,7 +108,7 @@ Matrix4 glassSurfaceTransform({
   final double v00;
   final double v01;
   final double v11;
-  if (stretch == 1 || speed == 0) {
+  if (stretch == 1 || speed == 0 || !speed.isFinite) {
     v00 = press;
     v01 = 0;
     v11 = press;
@@ -125,9 +125,29 @@ Matrix4 glassSurfaceTransform({
   // The press anchor, as a fraction of the surface's own half-extent, so a
   // finger at the edge of a small button reaches as far proportionally as
   // one at the edge of a large one.
-  final anchor = state.pressAnchor * state.press;
+  //
+  // A surface with no area is guarded rather than divided by. Dart doubles
+  // do not throw on division by zero — they produce `Infinity`, and the
+  // `reach.dx / reachDistance` below then evaluates `Infinity / Infinity`,
+  // which is NaN. A NaN transform is much worse than a wrong one: element-
+  // wise `Matrix4.==` compares NaN against itself and reports *not equal*,
+  // so `RenderGlassShape`'s "has this transform changed" check can never
+  // answer no again, and the shape re-registers its geometry and schedules
+  // a repaint every frame for as long as the condition lasts. It also
+  // survives into `ShapeGeometry.resolve`, whose producer then refuses the
+  // non-finite bounds and drops the matte for *every* shape sharing that
+  // material pass. A surface with no area has nothing to reach across
+  // anyway, so identity is both the safe answer and the honest one. The
+  // anchor itself is zeroed rather than just the division guarded, so the
+  // `travel` translation below goes inert with it — a surface with no area
+  // should not slide toward the finger either.
+  final halfWidth = size.width / 2;
+  final halfHeight = size.height / 2;
+  // `!(x > 0)` rather than `x <= 0`, so a NaN extent is degenerate too.
+  final hasArea = !(!(halfWidth > 0) || !(halfHeight > 0));
+  final anchor = hasArea ? state.pressAnchor * state.press : Offset.zero;
   final reach = pressStretch.isActive && anchor != Offset.zero
-      ? Offset(anchor.dx / (size.width / 2), anchor.dy / (size.height / 2))
+      ? Offset(anchor.dx / halfWidth, anchor.dy / halfHeight)
       : Offset.zero;
   final reachDistance = reach.distance;
 
@@ -135,7 +155,7 @@ Matrix4 glassSurfaceTransform({
   final double m01;
   final double m10;
   final double m11;
-  if (reachDistance == 0) {
+  if (reachDistance == 0 || !reachDistance.isFinite) {
     // No anchor deformation: the anchor 2x2 is the identity, so the
     // product is just the velocity matrix, still symmetric.
     m00 = v00;

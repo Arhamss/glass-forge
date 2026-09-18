@@ -33,6 +33,54 @@ void main() {
     expect(m, equals(Matrix4.identity()));
   });
 
+  test(
+    'a surface with no area is identity, not NaN',
+    () {
+      // A pointer cannot land on a zero-size box, but an anchor can outlive
+      // the size that accepted it: press a normal surface, then let layout
+      // collapse it (an AnimatedSize, a shrinking list item, a constraint
+      // change). Both the anchor and the press depth survive that frame.
+      //
+      // Dividing by the resulting zero half-extent yields Infinity, and then
+      // Infinity/Infinity is NaN. This asserts the guard rather than the
+      // symptom, because the symptom is invisible: a NaN matrix does not
+      // compare equal even to itself, so nothing downstream reports it.
+      for (final size in const <Size>[
+        Size.zero,
+        Size(0, 80),
+        Size(200, 0),
+      ]) {
+        final m = glassSurfaceTransform(
+          size: size,
+          state: const GlassMotionState(
+            translation: Offset.zero,
+            velocity: Offset.zero,
+            press: 1,
+            pressAnchor: Offset(50, 50),
+          ),
+          jiggle: const GlassJiggle.none(),
+          pressStretch: const GlassPressStretch(),
+          pressScale: 1,
+        );
+        expect(
+          m,
+          equals(Matrix4.identity()),
+          reason: 'a $size surface has nothing to reach across',
+        );
+        for (final entry in <double>[
+          m.entry(0, 0),
+          m.entry(0, 1),
+          m.entry(1, 0),
+          m.entry(1, 1),
+          m.getTranslation().x,
+          m.getTranslation().y,
+        ]) {
+          expect(entry.isNaN, isFalse, reason: 'NaN leaked from $size');
+        }
+      }
+    },
+  );
+
   test('none() is the identity for any anchor', () {
     final m = transformFor(
       const GlassMotionState(
