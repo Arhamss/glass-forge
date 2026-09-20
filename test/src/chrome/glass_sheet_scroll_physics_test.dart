@@ -337,6 +337,134 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('a sibling scrollable does not end another one drag', (
+    tester,
+  ) async {
+    // Two lists in one sheet. Only one of them is under the finger; the other
+    // is idle, and an idle `ScrollPosition` answers the dimension change that
+    // every frame of the drag causes with `goBallistic(0)`.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          tier: GeometryTier.none,
+          child: Stack(
+            children: <Widget>[
+              const SizedBox.expand(),
+              GlassDetentSheet(
+                controller: controller,
+                detents: const <GlassDetent>[
+                  GlassDetent.fraction(0.2),
+                  GlassDetent.fraction(1),
+                ],
+                child: Row(
+                  children: <Widget>[
+                    for (final side in <String>['a', 'b'])
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: 60,
+                          itemBuilder: (context, i) => SizedBox(
+                            height: 40,
+                            child: Text('$side row $i'),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(Scrollable), findsNWidgets(2));
+
+    final gesture = await armedGestureOn(tester, find.text('a row 0'));
+    var previous = controller.value;
+    for (var i = 0; i < 3; i++) {
+      await gesture.moveBy(const Offset(0, -40));
+      await tester.pump();
+      expect(
+        controller.isDragging,
+        isTrue,
+        reason: 'the finger is still down after move ${i + 1}',
+      );
+      expect(
+        controller.value,
+        greaterThan(previous),
+        reason: 'and the sheet is still rising on move ${i + 1}',
+      );
+      previous = controller.value;
+    }
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(controller.isDragging, isFalse);
+    expect(controller.detents, contains(controller.value));
+  });
+
+  testWidgets('a rebuild in the middle of a drag does not orphan it', (
+    tester,
+  ) async {
+    late StateSetter rebuildAboveTheSheet;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          tier: GeometryTier.none,
+          child: Stack(
+            children: <Widget>[
+              const SizedBox.expand(),
+              StatefulBuilder(
+                builder: (context, setState) {
+                  rebuildAboveTheSheet = setState;
+                  return GlassDetentSheet(
+                    controller: controller,
+                    detents: const <GlassDetent>[
+                      GlassDetent.fraction(0.2),
+                      GlassDetent.fraction(1),
+                    ],
+                    child: ListView.builder(
+                      itemCount: 60,
+                      itemBuilder: (context, i) =>
+                          SizedBox(height: 40, child: Text('row $i')),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final gesture = await armedGestureOn(tester, find.text('row 0'));
+    await gesture.moveBy(const Offset(0, -80));
+    await tester.pump();
+    expect(controller.isDragging, isTrue);
+    expect(controller.value, closeTo(200, 0.5));
+
+    // Something above the sheet rebuilds for a reason of its own — an
+    // ancestor's `setState`, an inherited widget, a theme change. The sheet
+    // rebuilds with it, and the drag is not supposed to notice.
+    rebuildAboveTheSheet(() {});
+    await tester.pump();
+    expect(controller.isDragging, isTrue, reason: 'the finger is still down');
+    expect(
+      controller.value,
+      closeTo(200, 0.5),
+      reason: 'and the sheet did not jump',
+    );
+
+    // The release has to find its way to the sheet through whatever the
+    // rebuild left behind.
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(controller.isDragging, isFalse);
+    expect(controller.detents, contains(controller.value));
+  });
+
   testWidgets('a widget in the content can reach the sheet controller', (
     tester,
   ) async {

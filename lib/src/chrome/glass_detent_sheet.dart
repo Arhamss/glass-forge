@@ -127,6 +127,9 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
 
   List<double> _resolved = const <double>[];
 
+  /// See [_physicsFor].
+  GlassSheetScrollPhysics? _physics;
+
   GlassDetentSheetController _createController() =>
       GlassDetentSheetController(vsync: this);
 
@@ -343,13 +346,44 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
       controller: _controller,
       child: ScrollConfiguration(
         behavior: behavior.copyWith(
-          physics: GlassSheetScrollPhysics(
-            controller: _controller,
-            parent: behavior.getScrollPhysics(context),
-          ),
+          physics: _physicsFor(behavior.getScrollPhysics(context)),
         ),
         child: widget.child,
       ),
+    );
+  }
+
+  /// The one [GlassSheetScrollPhysics] instance this sheet hands out.
+  ///
+  /// Kept across rebuilds, not rebuilt with the widget, and both halves of
+  /// that matter.
+  ///
+  /// The physics carries the identity of whichever scrollable is currently
+  /// dragging the sheet — a mid-gesture fact. A fresh instance per build
+  /// would arrive not knowing it, and since
+  /// `_WrappedScrollBehavior.shouldNotify` compares its `physics` by
+  /// identity, a fresh instance is also a changed dependency, so
+  /// `ScrollableState.didChangeDependencies` would swap the
+  /// `ScrollPosition` for a new one carrying the new, empty physics. The old
+  /// one would be left holding the live drag with nothing referencing it, and
+  /// the release would reach the new physics, which would decline to end a
+  /// drag it has no record of — leaving the controller dragging forever and
+  /// the sheet parked between detents. The sheet rebuilds on every frame of
+  /// its own animation, so this is not a rare window.
+  ///
+  /// Reused only while it is still the right object: a swapped controller or
+  /// a different ambient physics (a platform change) rebuilds it, and neither
+  /// happens inside a gesture.
+  GlassSheetScrollPhysics _physicsFor(ScrollPhysics parent) {
+    final existing = _physics;
+    if (existing != null &&
+        identical(existing.controller, _controller) &&
+        identical(existing.parent, parent)) {
+      return existing;
+    }
+    return _physics = GlassSheetScrollPhysics(
+      controller: _controller,
+      parent: parent,
     );
   }
 

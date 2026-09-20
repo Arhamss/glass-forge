@@ -42,11 +42,13 @@ class GlassSheetScrollPhysics extends ScrollPhysics {
   /// Creates physics that hand their vertical deltas to [controller] whenever
   /// the sheet, rather than the list, is what the finger is moving.
   ///
-  /// Not a `const` constructor, unlike most of the framework's physics, and
-  /// the reason is [_carry]: an instance has to remember, between the two
-  /// overrides below, whether *it* was the one that took the sheet over. Two
-  /// identical `const` instances would be canonicalised into one and would
-  /// then share that bit.
+  /// Not a `const` constructor, unlike most of the framework's physics —
+  /// which is a deliberate departure from the signature this class was
+  /// specified with, so it is written down here rather than left to be found.
+  /// The reason is [_carry]: an instance has to remember, between the two
+  /// overrides below, *which scrollable* took the sheet over. Two identical
+  /// `const` instances would be canonicalised into one and would then share
+  /// that memory, which is the one thing it must not do.
   GlassSheetScrollPhysics({required this.controller, super.parent})
     : _carry = _SheetCarry();
 
@@ -61,19 +63,37 @@ class GlassSheetScrollPhysics extends ScrollPhysics {
   /// The sheet this scrollable is inside.
   final GlassDetentSheetController controller;
 
-  /// Whether this physics is the thing currently carrying the sheet.
+  /// Which scrollable, if any, is currently carrying the sheet.
   ///
-  /// [GlassDetentSheetController.isDragging] cannot answer that question: it
-  /// is equally true when the sheet's own handle is being dragged, and a
-  /// handle drag resizes the sheet, which resizes the inner list's viewport,
-  /// which is a dimension change, which an idle `ScrollPosition` answers with
-  /// `goBallistic(0)` — landing in [createBallisticSimulation] on the first
-  /// frame of every handle drag over a scrollable child. Ending a drag this
-  /// object never started is what that used to do.
+  /// The question [createBallisticSimulation] has to answer is not "is the
+  /// sheet being dragged" but "is the sheet being dragged *by the scrollable
+  /// now asking*", and it takes a scrollable's identity to answer it.
+  /// [GlassDetentSheetController.isDragging] is too coarse — it is equally
+  /// true of a drag on the sheet's own handle — and so is a plain flag, which
+  /// is equally true of a drag on a *sibling* scrollable.
+  ///
+  /// Both of those matter for the same reason. Carrying the sheet resizes it
+  /// every frame, which resizes the viewport of every scrollable inside it,
+  /// which is a dimension change. The scrollable under the finger is immune,
+  /// because its `DragScrollActivity.applyNewDimensions` is the inherited
+  /// no-op — but any *other* one is idle, and
+  /// `IdleScrollActivity.applyNewDimensions` answers a dimension change with
+  /// `goBallistic(0)`. So a handle drag, or a drag on a neighbouring list,
+  /// arrives here on the next frame asking to end a drag it has nothing to do
+  /// with, under a finger that is still down.
+  ///
+  /// `ScrollPosition implements ScrollMetrics`, so the object handed to
+  /// [applyPhysicsToUserOffset] is the same object handed to
+  /// [createBallisticSimulation], and `identical` settles it.
   ///
   /// A mutable cell rather than a field because `ScrollPhysics` is
-  /// `@immutable`, and shared by reference through [applyTo] so the whole
-  /// chain agrees on one answer.
+  /// `@immutable`. One cell serves every scrollable in one sheet, which is
+  /// why it has to name one: `GlassDetentSheet` builds a single instance of
+  /// these physics and its `ScrollConfiguration` hands that same instance to
+  /// every descendant — `_WrappedScrollBehavior.getScrollPhysics` returns the
+  /// stored object directly, and a scrollable that does not override
+  /// `physics` never calls [applyTo] at all. The cell is threaded through
+  /// [applyTo] anyway, for the case that does.
   final _SheetCarry _carry;
 
   @override
@@ -129,7 +149,7 @@ class GlassSheetScrollPhysics extends ScrollPhysics {
       // it is safe to ask on every delta.
       controller.beginDrag();
     }
-    _carry.value = true;
+    _carry.owner = position;
     controller.dragBy(-fingerDelta);
     // Nothing is left over for the list. A delta that raises the sheet past
     // its top detent is clamped away by `dragBy` rather than spilling into
@@ -147,12 +167,19 @@ class GlassSheetScrollPhysics extends ScrollPhysics {
     // `ScrollPhysics` has no other hook for it, and a sheet left wherever the
     // finger stopped is not a detent sheet.
     //
-    // Gated on [_carry] and not on the controller's own `isDragging`, so that
-    // the sheet's handle drags, the ordinary end of a list scroll, and every
-    // other route into `goBallistic` are left alone. This ends the drag it
-    // began, and only that one.
-    if (_carry.value) {
-      _carry.value = false;
+    // `goBallistic` is a much busier road than "a drag just ended", though —
+    // every idle scrollable in the sheet drives down it on every frame the
+    // sheet resizes. So this ends the drag it began, identified by the
+    // scrollable that began it, and nothing else. See [_carry].
+    if (position.axis != Axis.vertical) {
+      // Unreachable while [applyPhysicsToUserOffset] refuses to take a
+      // horizontal scrollable's deltas, and stated anyway: the two gates say
+      // the same thing, and a later edit that loosens one should have to
+      // notice the other.
+      return super.createBallisticSimulation(position, velocity);
+    }
+    if (identical(position, _carry.owner)) {
+      _carry.owner = null;
       // [velocity] is in scroll pixels per second — positive means `pixels`
       // rising, which is the finger going up in a normal viewport and down in
       // a reversed one. The sheet counts upward as positive either way.
@@ -163,10 +190,10 @@ class GlassSheetScrollPhysics extends ScrollPhysics {
   }
 }
 
-/// One bit of drag ownership, shared by reference across a physics chain.
+/// Which scrollable is carrying the sheet, if one is.
 ///
 /// Exists only because `ScrollPhysics` is `@immutable` and this one honestly
 /// is not: see [GlassSheetScrollPhysics._carry].
 class _SheetCarry {
-  bool value = false;
+  ScrollMetrics? owner;
 }
