@@ -116,6 +116,28 @@ sheet being useful:
 3. There is no overdrag past the top detent. `dragBy` clamps.
    `GlassOverdrag` is the right tool the day a rubber band past the top, or
    a drag-to-dismiss below the bottom, becomes a wanted gesture.
+4. `GlassDetentSheet.gap` is **one number for the left, right and bottom
+   edges**, and that turns out to cost width. Clearing a 52 pt bottom bar
+   needs a 64 pt gap, which also insets both sides by 64 and leaves the
+   sheet 128 pt narrower than the frame — fine on a desktop, narrow on a
+   phone. The example's sheet scene pays exactly that today. Splitting it
+   into a side inset and a bottom inset is a public-API change, which is why
+   it was not done inside a fix; it is the right shape for whoever touches
+   this next. Found while fixing the scene, not designed in.
+5. `GlassDetentSheetController.settleMotion` carries the **`present`** role's
+   spring, not `GlassMotionRole.settle`'s. That is deliberate and correct —
+   `GlassSurfaces.sheet` names `present`, and `settle` defaults to
+   `bouncy()`, which would spring the sheet past its detent — but the field's
+   name says otherwise and its own doc never mentions `present`. The clash is
+   explained only on the private `_syncSettleMotion`. One sentence on the
+   public field closes it.
+6. `_GlassDetentSheetState._releaseSettleMotion` compares springs **by
+   value**, so on dispose it clears a caller's pinned spring whenever that
+   pin happens to equal what the widget pushed. Under a retuned theme such a
+   caller's controller then falls back to the untuned default rather than to
+   what they asked for. Contrived and self-inflicted; the alternative is a
+   second ownership flag on a public class, which was judged the worse
+   trade.
 
 ## Order, and where the plans are
 
