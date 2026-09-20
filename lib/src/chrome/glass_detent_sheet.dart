@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/chrome/detent_geometry.dart';
 import 'package:glass_forge/src/chrome/glass_detent.dart';
 import 'package:glass_forge/src/chrome/glass_detent_sheet_controller.dart';
+import 'package:glass_forge/src/chrome/glass_sheet_scroll_physics.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/design/glass_tokens.dart';
@@ -271,6 +272,16 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
         final available = constraints.maxHeight - padding.top;
         _syncDetents(available);
 
+        // Built here rather than inside the `AnimatedBuilder`, and threaded
+        // down as a value. The sheet rebuilds on every frame of a drag, and
+        // a `ScrollConfiguration` rebuilt that often would hand a descendant
+        // `Scrollable` a new `ScrollBehavior` each frame, which is a changed
+        // dependency, which recreates its `ScrollPosition` — underneath the
+        // very drag this class exists to route. Hoisting it makes the widget
+        // identical across those rebuilds, and an identical widget is a
+        // subtree `Element.updateChild` skips outright.
+        final content = _buildContent(context);
+
         return AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {
@@ -301,7 +312,13 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
                 ),
                 child: SizedBox(
                   height: metrics.height,
-                  child: _buildSheet(context, constraints, metrics, padding),
+                  child: _buildSheet(
+                    context,
+                    constraints,
+                    metrics,
+                    padding,
+                    content,
+                  ),
                 ),
               ),
             );
@@ -311,11 +328,37 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
     );
   }
 
+  /// The caller's child, with everything that must reach it from the sheet.
+  ///
+  /// The `ScrollConfiguration` is how [GlassSheetScrollPhysics] gets onto a
+  /// scrollable the caller wrote and this widget never sees: descendants read
+  /// their physics from the behaviour above them, so installing them here
+  /// needs no lookup, no attachment call and nothing from the caller. The
+  /// ambient behaviour is copied rather than replaced, so scrollbars, the
+  /// overscroll indicator and the platform's own physics — which become this
+  /// one's parent — all survive.
+  Widget _buildContent(BuildContext context) {
+    final behavior = ScrollConfiguration.of(context);
+    return GlassDetentSheetScope(
+      controller: _controller,
+      child: ScrollConfiguration(
+        behavior: behavior.copyWith(
+          physics: GlassSheetScrollPhysics(
+            controller: _controller,
+            parent: behavior.getScrollPhysics(context),
+          ),
+        ),
+        child: widget.child,
+      ),
+    );
+  }
+
   Widget _buildSheet(
     BuildContext context,
     BoxConstraints constraints,
     GlassDetentSheetMetrics metrics,
     EdgeInsets padding,
+    Widget content,
   ) {
     // The role's style, but not the role's shape: the radius morphs
     // continuously, and the ladder has steps. Everything else — material,
@@ -383,7 +426,7 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
                         padding: EdgeInsets.only(
                           bottom: padding.bottom * metrics.progress,
                         ),
-                        child: widget.child,
+                        child: content,
                       ),
                     ),
                   ),
@@ -395,6 +438,44 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
       ),
     );
   }
+}
+
+/// Carries a [GlassDetentSheet]'s controller down to its content.
+///
+/// For the *caller's* widgets, not for this package's own plumbing. The
+/// scroll handoff does not go through here and must not be "simplified" into
+/// it: [GlassSheetScrollPhysics] is installed on descendant scrollables
+/// directly, through a `ScrollConfiguration`, which reaches them without
+/// anything having to look anything up. This scope exists for the things a
+/// lookup is the only answer to — a row deep in the content that drives its
+/// own `GlassPresence` from the sheet's height, or a button in the content
+/// that calls [GlassDetentSheetController.animateToDetent] on the sheet it is
+/// sitting in.
+class GlassDetentSheetScope extends InheritedWidget {
+  /// Creates a scope.
+  const GlassDetentSheetScope({
+    required this.controller,
+    required super.child,
+    super.key,
+  });
+
+  /// The sheet's controller.
+  final GlassDetentSheetController controller;
+
+  /// The nearest enclosing sheet's controller, or null outside one.
+  ///
+  /// Nullable rather than asserting: a widget that is written to work both
+  /// inside a sheet and on a page of its own is the ordinary case, and the
+  /// answer "there is no sheet" is one it can act on.
+  static GlassDetentSheetController? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<GlassDetentSheetScope>()
+        ?.controller;
+  }
+
+  @override
+  bool updateShouldNotify(GlassDetentSheetScope oldWidget) =>
+      !identical(oldWidget.controller, controller);
 }
 
 /// The grab indicator.
