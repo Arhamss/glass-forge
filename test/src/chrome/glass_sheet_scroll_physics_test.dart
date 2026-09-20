@@ -465,6 +465,88 @@ void main() {
     expect(controller.detents, contains(controller.value));
   });
 
+  // `TestGesture.moveBy` defaults to a zero-duration timestamp, so every drag
+  // test above releases at no velocity at all and `ClampingScrollPhysics`
+  // answers with null. A real flick does not, and it is the only way to see
+  // what the two consumers do with one velocity between them.
+  testWidgets('a fling the sheet took does not also scroll the list', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+
+    final position = positionOf(tester);
+    expect(position.pixels, 0);
+
+    await tester.fling(find.text('row 0'), const Offset(0, -200), 2000);
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.value,
+      controller.top,
+      reason: 'the flick belongs to the sheet below the top detent',
+    );
+    expect(
+      position.pixels,
+      0,
+      reason: 'and a list that never scrolled must not arrive pre-scrolled',
+    );
+  });
+
+  // The other half of the same rule, and the reason the physics records which
+  // consumer took the *last* delta rather than only whether the sheet ever
+  // took one. A gesture that raises the sheet and then keeps going is handed
+  // to the list at the top detent, and the list is entitled to the flick that
+  // ends it.
+  testWidgets('a fling handed back to the list mid-gesture still flings it', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+
+    final position = positionOf(tester);
+    final gesture = await armedGestureOn(tester, find.text('row 0'));
+
+    // Every `moveBy` carries its own timestamp, because the default is
+    // `Duration.zero` and a gesture whose moves all happen at time zero has
+    // no velocity to hand anyone. That is exactly why the drag tests above
+    // cannot see this rule at all.
+    var clock = Duration.zero;
+    Future<void> move(double dy) async {
+      clock += const Duration(milliseconds: 16);
+      await gesture.moveBy(Offset(0, dy), timeStamp: clock);
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+
+    // Up to the top detent — 480 points from the lowest detent, in the even
+    // steps a finger actually makes. One big jump instead would leave the
+    // velocity tracker fitting a curve through a cliff and reporting a
+    // velocity pointing the other way, which is a fact about the fixture and
+    // not about the sheet.
+    for (var i = 0; i < 12; i++) {
+      await move(-40);
+    }
+    expect(controller.value, controller.top);
+    expect(position.pixels, 0);
+
+    // Past it: the list owns them now, and owns the release with them.
+    for (var i = 0; i < 4; i++) {
+      await move(-40);
+    }
+    final beforeRelease = position.pixels;
+    expect(beforeRelease, greaterThan(0));
+
+    await gesture.up(timeStamp: clock + const Duration(milliseconds: 16));
+    await tester.pumpAndSettle();
+
+    expect(
+      position.pixels,
+      greaterThan(beforeRelease),
+      reason: 'the list kept the velocity of the gesture it was holding',
+    );
+    expect(controller.value, controller.top);
+  });
+
   testWidgets('a widget in the content can reach the sheet controller', (
     tester,
   ) async {

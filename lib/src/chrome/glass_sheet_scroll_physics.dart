@@ -139,6 +139,13 @@ class GlassSheetScrollPhysics extends ScrollPhysics {
 
     if (!sheetOwnsIt) {
       // Rule 2: the list scrolls, and the sheet is not told about it.
+      //
+      // Recorded, though, when this is the scrollable carrying the sheet: the
+      // gesture has crossed back to the list, and whoever holds the *last*
+      // delta is who the release belongs to. See [_SheetCarry.sheetTookLast].
+      if (identical(position, _carry.owner)) {
+        _carry.sheetTookLast = false;
+      }
       return super.applyPhysicsToUserOffset(position, offset);
     }
 
@@ -149,7 +156,9 @@ class GlassSheetScrollPhysics extends ScrollPhysics {
       // it is safe to ask on every delta.
       controller.beginDrag();
     }
-    _carry.owner = position;
+    _carry
+      ..owner = position
+      ..sheetTookLast = true;
     controller.dragBy(-fingerDelta);
     // Nothing is left over for the list. A delta that raises the sheet past
     // its top detent is clamped away by `dragBy` rather than spilling into
@@ -178,22 +187,66 @@ class GlassSheetScrollPhysics extends ScrollPhysics {
       // notice the other.
       return super.createBallisticSimulation(position, velocity);
     }
-    if (identical(position, _carry.owner)) {
-      _carry.owner = null;
+    final owner = _carry.owner;
+    if (owner != null &&
+        !identical(position, owner) &&
+        !controller.isDragging) {
+      // A remembered owner with no drag behind it is a scrollable that went
+      // away, or whose drag was ended by a route other than its own release
+      // — the sheet's own `onVerticalDragCancel`, a caller's `endDrag`. It
+      // will never come back to be cleared below, so it is dropped here, on
+      // the first frame any scrollable in the sheet ticks. Otherwise the
+      // physics outlives the sheet holding a disposed `ScrollPosition`, and
+      // a later release from that stale identity would end a drag that is
+      // no longer its own.
+      _carry
+        ..owner = null
+        ..sheetTookLast = false;
+    }
+
+    if (identical(position, owner)) {
+      final sheetTookLast = _carry.sheetTookLast;
+      _carry
+        ..owner = null
+        ..sheetTookLast = false;
       // [velocity] is in scroll pixels per second — positive means `pixels`
       // rising, which is the finger going up in a normal viewport and down in
       // a reversed one. The sheet counts upward as positive either way.
       final reversed = axisDirectionIsReversed(position.axisDirection);
-      controller.endDrag(velocity: reversed ? -velocity : velocity);
+      controller.endDrag(
+        velocity: sheetTookLast ? (reversed ? -velocity : velocity) : 0,
+      );
+      // One gesture, one velocity, one consumer. Whichever of the two took
+      // the last delta gets it and the other gets zero — because the list
+      // was frozen for every delta the sheet took, and a list that never
+      // moved must not arrive already flung. Zero rather than null so the
+      // parent can still spring a genuinely out-of-range position back.
+      //
+      // `DraggableScrollableSheet` resolves the same collision the same way:
+      // `_DraggableScrollableSheetScrollPosition.goBallistic` runs the
+      // sheet's own simulation and hands the scrollable either
+      // `super.goBallistic(0)` or a velocity it re-derives, never both.
+      return super.createBallisticSimulation(
+        position,
+        sheetTookLast ? 0 : velocity,
+      );
     }
     return super.createBallisticSimulation(position, velocity);
   }
 }
 
-/// Which scrollable is carrying the sheet, if one is.
+/// Which scrollable is carrying the sheet, and which consumer moved last.
 ///
 /// Exists only because `ScrollPhysics` is `@immutable` and this one honestly
 /// is not: see [GlassSheetScrollPhysics._carry].
 class _SheetCarry {
+  /// The scrollable whose deltas the sheet is taking, if one is carrying it.
   ScrollMetrics? owner;
+
+  /// Whether the sheet, rather than the list, took [owner]'s last delta.
+  ///
+  /// One gesture can change hands twice — the sheet up to its top detent,
+  /// the list from there — so "did the sheet ever take a delta" is the wrong
+  /// question at release time. This is the right one.
+  bool sheetTookLast = false;
 }
