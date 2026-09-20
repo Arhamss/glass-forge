@@ -29,7 +29,15 @@ Widget _host({
   int initialDetent = 0,
   Widget? child,
   EdgeInsets viewPadding = EdgeInsets.zero,
+  GlassMotionDefaults? motion,
 }) {
+  final layer = _layer(
+    detents: detents,
+    controller: controller,
+    onDetentChanged: onDetentChanged,
+    initialDetent: initialDetent,
+    child: child,
+  );
   return MaterialApp(
     home: Builder(
       builder: (context) => MediaQuery(
@@ -38,13 +46,12 @@ Widget _host({
         data: MediaQuery.of(
           context,
         ).copyWith(padding: viewPadding, viewPadding: viewPadding),
-        child: _layer(
-          detents: detents,
-          controller: controller,
-          onDetentChanged: onDetentChanged,
-          initialDetent: initialDetent,
-          child: child,
-        ),
+        child: motion == null
+            ? layer
+            : GlassTheme(
+                data: GlassThemeData(motion: motion),
+                child: layer,
+              ),
       ),
     ),
   );
@@ -205,6 +212,91 @@ void main() {
     );
   });
 
+  // One `GlassLayer`, one sheet, one distinct material — so one backdrop
+  // capture per frame, whatever the sheet is doing. This is the claim that
+  // replaced the spec's "one matte produce for the whole drag", which a
+  // resizing, radius-morphing shape cannot honour: see the plan's correction
+  // section. Two pushes over one region would be flutter#187820, and it is
+  // the reason `GlassRenderCounters` exists.
+  testWidgets('one backdrop pass per frame of a drag, never two', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host());
+    await tester.pumpAndSettle();
+
+    final gesture = await tester.startGesture(tester.getCenter(_sheet));
+    final counts = <int>[];
+    for (var i = 0; i < 20; i++) {
+      GlassRenderCounters.instance.reset();
+      await gesture.moveBy(const Offset(0, -20));
+      await tester.pump(const Duration(milliseconds: 8));
+      counts.add(GlassRenderCounters.instance.backdropPushCount);
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(counts, everyElement(1), reason: counts.join(', '));
+  });
+
+  // The branch's stated constraint: springs come from the theme by role, not
+  // written out by hand. The sheet role names `GlassMotionRole.present`, so
+  // retuning that one spring has to retune this sheet — which is exactly the
+  // promise `GlassMotionDefaults` makes in its own doc.
+  testWidgets("the snap spring is the theme's, by role", (tester) async {
+    const retuned = GlassMotion.smooth(duration: Duration(milliseconds: 1200));
+    final controller = GlassDetentSheetController(vsync: const TestVSync());
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      _host(
+        controller: controller,
+        motion: const GlassMotionDefaults(present: retuned),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.settleMotion, retuned);
+  });
+
+  testWidgets('a retuned theme spring changes how long the snap takes', (
+    tester,
+  ) async {
+    Future<int> framesToSettle(GlassMotionDefaults? motion) async {
+      final controller = GlassDetentSheetController(vsync: const TestVSync());
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        _host(controller: controller, motion: motion),
+      );
+      await tester.pumpAndSettle();
+
+      controller.animateToDetent(2);
+      var frames = 0;
+      while (controller.isAnimating && frames < 600) {
+        await tester.pump(const Duration(milliseconds: 16));
+        frames++;
+      }
+      await tester.pumpAndSettle();
+      // Torn down here rather than at the end of the test: the second call
+      // mounts a second sheet over the first, and a controller still driving
+      // an unmounted one is not what the next measurement should inherit.
+      await tester.pumpWidget(const SizedBox.shrink());
+      return frames;
+    }
+
+    final byDefault = await framesToSettle(null);
+    final slowed = await framesToSettle(
+      const GlassMotionDefaults(
+        present: GlassMotion.smooth(duration: Duration(milliseconds: 1600)),
+      ),
+    );
+
+    expect(
+      slowed,
+      greaterThan(byDefault * 2),
+      reason: 'default $byDefault frames, retuned $slowed',
+    );
+  });
+
   testWidgets('Reduce Motion makes the snap instant', (tester) async {
     tester.platformDispatcher.accessibilityFeaturesTestValue =
         const FakeAccessibilityFeatures(reduceMotion: true);
@@ -345,9 +437,11 @@ void main() {
     await tester.pumpWidget(_host(controller: controller));
     await tester.pumpAndSettle();
 
-    // Throws 'no detent at index 1; there are 0' if the hand-over left the
-    // new controller with nothing: `_syncDetents` only speaks up when the
+    // A no-op that leaves the sheet at 60 if the hand-over left the new
+    // controller with nothing: `_syncDetents` only speaks up when the
     // resolved heights change, and a controller swap does not change them.
+    // `animateToDetent` no longer throws on an empty list — it is a legal
+    // call before the first layout — so the height below is what catches it.
     controller.animateToDetent(1);
     await tester.pumpAndSettle();
 

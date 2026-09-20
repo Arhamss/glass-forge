@@ -40,7 +40,11 @@ class GlassDetentFraction extends GlassDetent {
 
   @override
   double resolve({required double available, required double contentHeight}) =>
-      available * amount;
+      // Clamped, although the constructor already asserts `amount <= 1`: the
+      // assert is compiled out in release, and [GlassDetent.resolve] promises
+      // a height never taller than [available] to every caller, not only to
+      // debug ones. The other two kinds clamp for the same reason.
+      clampDouble(available * amount, 0, available);
 
   @override
   bool operator ==(Object other) =>

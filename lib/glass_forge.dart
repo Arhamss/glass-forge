@@ -9,7 +9,6 @@
 /// for how the pieces fit together.
 library;
 
-export 'src/chrome/detent_geometry.dart' show GlassDetentSheetMetrics;
 export 'src/chrome/glass_detent.dart';
 export 'src/chrome/glass_detent_sheet.dart';
 export 'src/chrome/glass_detent_sheet_controller.dart';

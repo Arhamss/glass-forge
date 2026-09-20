@@ -166,6 +166,27 @@ void main() {
     expect(controller.value, caught);
   });
 
+  // Detents are resolved inside `GlassDetentSheet`'s `LayoutBuilder`, so a
+  // controller can legitimately be asked to move before it has anywhere to
+  // move to: `initState`, a post-frame callback, a deep link restoring a
+  // saved detent. `dragBy` and `endDrag` have always taken that; this one
+  // used to index an empty list, which is an assert in debug and a bare
+  // `RangeError` in the release build nobody runs the tests in.
+  testWidgets('animating before the first layout is a no-op', (tester) async {
+    controller = GlassDetentSheetController(vsync: const TestVSync());
+    addTearDown(controller.dispose);
+
+    controller.animateToDetent(1);
+
+    expect(controller.value, 0);
+    expect(controller.detent, 0);
+    expect(controller.isAnimating, isFalse);
+
+    // And the sheet still works once it has laid out.
+    controller.setDetents(const <double>[80, 400, 800]);
+    expect(controller.value, 80);
+  });
+
   group('the presence handoff with covered chrome', () {
     // A bottom bar 88 px tall sitting on the bottom edge: its top edge is at
     // 88, and the sheet has fully covered it by the time its own top edge
@@ -181,7 +202,7 @@ void main() {
 
       controller
         ..beginDrag()
-        ..dragBy(34); // height 74, three-quarters of the way through the ramp
+        ..dragBy(34); // height 74, half way through the 60-to-88 ramp
       expect(presence.value, closeTo(0.5, 1e-9));
 
       controller.dragBy(40); // height 114, past the end

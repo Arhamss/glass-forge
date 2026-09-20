@@ -4,9 +4,11 @@ import 'package:glass_forge/src/chrome/detent_geometry.dart';
 import 'package:glass_forge/src/chrome/glass_detent.dart';
 import 'package:glass_forge/src/chrome/glass_detent_sheet_controller.dart';
 import 'package:glass_forge/src/chrome/glass_sheet_scroll_physics.dart';
+import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/design/glass_tokens.dart';
+import 'package:glass_forge/src/motion/glass_motion.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 
@@ -74,6 +76,13 @@ class GlassDetentSheet extends StatefulWidget {
   final int initialDetent;
 
   /// Called when the resting detent changes.
+  ///
+  /// This, rather than [GlassDetentSheetController.onDetentChanged]: that
+  /// field is a single slot, and a mounted sheet claims it for as long as it
+  /// is attached to the controller — so a handler set on the controller
+  /// directly is overwritten without a word, and setting one there after the
+  /// sheet has mounted takes this callback out of the loop instead. The two
+  /// are the same notification; only one of them has an owner.
   final ValueChanged<int>? onDetentChanged;
 
   /// Drives the sheet from outside. Created internally when null, and only
@@ -133,10 +142,63 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
   GlassDetentSheetController _createController() =>
       GlassDetentSheetController(vsync: this);
 
+  /// The spring this state last pushed onto the controller.
+  ///
+  /// Kept so a caller's own choice can be told from one this widget made.
+  /// See [_syncSettleMotion].
+  GlassMotion? _pushedMotion;
+
   @override
   void initState() {
     super.initState();
     _controller.onDetentChanged = _onDetentChanged;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncSettleMotion();
+  }
+
+  /// Gives the controller the spring the theme names for the sheet role.
+  ///
+  /// The role's spring, not one named here: `GlassSurfaces.sheet` says a
+  /// sheet moves on [GlassMotionRole.present], and the theme says what that
+  /// is worth. Reading it through both is what makes a designer's retune of
+  /// `GlassMotionDefaults.present` reach this sheet, which is the promise
+  /// that class's own doc makes. A stiffness written out here would quietly
+  /// opt the one widget with the longest travel out of it.
+  ///
+  /// Not through [GlassTheme.surfaceOf], although the build already resolves
+  /// that style: the full resolve needs a size, and this runs before there
+  /// are constraints. The spring does not depend on the size, so the role is
+  /// asked for it directly.
+  ///
+  /// Called again on every dependency change, so a theme swapped at runtime
+  /// — light to dark, a designer's live retune — retunes a sheet that is
+  /// already on screen. A controller whose own
+  /// [GlassDetentSheetController.settleMotion] the caller set is left alone:
+  /// it holds something this widget did not put there, and that is a
+  /// decision, not a default.
+  void _syncSettleMotion() {
+    final theme = GlassTheme.of(context);
+    final motion = theme.motion.of(
+      theme.surfaces.of(GlassSurfaceRole.sheet).motion,
+    );
+    final controller = _controller;
+    if (controller.settleMotion != null &&
+        controller.settleMotion != _pushedMotion) {
+      return;
+    }
+    controller.settleMotion = motion;
+    _pushedMotion = motion;
+  }
+
+  /// Hands [controller]'s spring back, if this widget is what set it.
+  void _releaseSettleMotion(GlassDetentSheetController? controller) {
+    if (controller != null && controller.settleMotion == _pushedMotion) {
+      controller.settleMotion = null;
+    }
   }
 
   @override
@@ -150,6 +212,8 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
     final wasAt = (oldWidget.controller ?? _internal)?.detent;
 
     oldWidget.controller?.onDetentChanged = null;
+    _releaseSettleMotion(oldWidget.controller);
+    _pushedMotion = null;
     if (widget.controller != null && _internal != null) {
       // The sheet made one before the caller supplied theirs. Nothing can
       // reach it now, and it holds a listener on the global
@@ -169,6 +233,7 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
       WidgetsBinding.instance.addPostFrameCallback((_) => _disposeRetiring());
     }
     _controller.onDetentChanged = _onDetentChanged;
+    _syncSettleMotion();
     if (_resolved.isNotEmpty) {
       // A controller handed over mid-life has never been told this sheet's
       // detents, and [_syncDetents] will not tell it: that only speaks up
@@ -207,6 +272,7 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
     _disposeRetiring();
     _internal?.dispose();
     widget.controller?.onDetentChanged = null;
+    _releaseSettleMotion(widget.controller);
     super.dispose();
   }
 

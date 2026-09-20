@@ -1,8 +1,9 @@
 import 'package:flutter/animation.dart';
 import 'package:flutter/foundation.dart' show ValueChanged;
-import 'package:flutter/physics.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:glass_forge/src/chrome/detent_geometry.dart';
+import 'package:glass_forge/src/design/glass_motion_defaults.dart';
+import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/motion/glass_decay.dart';
 import 'package:glass_forge/src/motion/glass_motion.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
@@ -27,26 +28,42 @@ class GlassDetentSheetController extends Animation<double>
   /// Creates a controller with no detents yet. Call [setDetents] before use.
   GlassDetentSheetController({
     required TickerProvider vsync,
-    this.settleMotion = const GlassMotion.smooth(
-      duration: Duration(milliseconds: 400),
-    ),
+    this.settleMotion,
     this.decay = const GlassDecay(),
     this.respectReduceMotion = true,
   }) {
     _ticker = vsync.createTicker(_tick);
-    _spring = settleMotion.spring;
-    _tolerance = settleMotion.tolerance;
     if (respectReduceMotion) {
       GlassReduceMotion.instance.addListener(_onReduceMotionChanged);
     }
   }
 
-  /// The spring the snap runs on.
+  /// The spring the snap runs on, or null to let the sheet's theme decide.
   ///
-  /// Defaults to the same values `GlassMotionDefaults.present` carries, and
-  /// for the same reason stated there: a sheet that springs past its detent
-  /// and comes back reads as a mistake rather than as liveliness.
-  final GlassMotion settleMotion;
+  /// Null is the usual answer, and it is not "no spring": a
+  /// `GlassDetentSheet` fills this in from the theme, with the spring the
+  /// sheet *role* names, as soon as it has a `BuildContext` — and again
+  /// whenever the theme changes. That is the whole point of the role layer,
+  /// and it is why this is not a hand-written stiffness: a designer who
+  /// retunes `GlassMotionDefaults.present` retunes this sheet with it.
+  ///
+  /// Naming a spring here instead pins it, and the sheet leaves it alone
+  /// afterwards — a caller who says which spring they want has said it for a
+  /// reason. Assigning takes effect on the next frame of any snap already in
+  /// flight, because the spring is read per tick rather than baked into a
+  /// simulation.
+  GlassMotion? settleMotion;
+
+  /// The spring actually used, with [settleMotion] unset standing for the
+  /// untuned value of the same theme lookup the sheet performs — so a
+  /// controller driven outside a sheet moves exactly like one inside a sheet
+  /// under the default theme, rather than like a second opinion written out
+  /// by hand here.
+  GlassMotion get _effectiveMotion => settleMotion ?? _defaultMotion;
+
+  static final GlassMotion _defaultMotion = const GlassMotionDefaults().of(
+    const GlassSurfaces().of(GlassSurfaceRole.sheet).motion,
+  );
 
   /// How a fling's velocity is projected forward before the snap is chosen.
   final GlassDecay decay;
@@ -55,6 +72,19 @@ class GlassDetentSheetController extends Animation<double>
   final bool respectReduceMotion;
 
   /// Called when the resting detent changes, never on every frame.
+  ///
+  /// One slot, and a mounted `GlassDetentSheet` owns it: the widget claims
+  /// this field while it is attached to the controller and clears it on the
+  /// way out, so a handler assigned here before or during that time is
+  /// silently replaced. Callers inside a sheet want
+  /// `GlassDetentSheet.onDetentChanged`, which is the same notification
+  /// routed through the owner. This field is for a controller driven with no
+  /// sheet attached to it.
+  ///
+  /// A single slot rather than a listener list because that is the whole of
+  /// the need today — the sheet is the one consumer, and a list would be an
+  /// API to keep rather than a convenience to use. Worth revisiting if a
+  /// second consumer ever appears.
   ValueChanged<int>? onDetentChanged;
 
   /// The longest step the physics is advanced by in one frame.
@@ -66,8 +96,6 @@ class GlassDetentSheetController extends Animation<double>
   static const double _maxStep = 1 / 30;
 
   late final Ticker _ticker;
-  late final SpringDescription _spring;
-  late final Tolerance _tolerance;
 
   final SpringAxis _axis = SpringAxis();
   List<double> _detents = const <double>[];
@@ -165,12 +193,25 @@ class GlassDetentSheetController extends Animation<double>
   }
 
   /// Springs to [index].
+  ///
+  /// A call before the sheet has laid out is a no-op rather than an error.
+  /// Detents are resolved inside `GlassDetentSheet`'s `LayoutBuilder`, so
+  /// `initState`, a post-frame callback and a deep link restoring a saved
+  /// detent all legitimately arrive before there is anywhere to go — which
+  /// is why the assert below excuses the empty list and why [dragBy] and
+  /// [endDrag] carry the same guard. An out-of-range index with detents
+  /// present is the genuine programming error, and is still asserted; in
+  /// release it is clamped, because a bare `RangeError` out of a sheet is a
+  /// worse answer than the nearest detent.
   void animateToDetent(int index) {
     assert(
-      index >= 0 && index < _detents.length,
+      _detents.isEmpty || (index >= 0 && index < _detents.length),
       'no detent at index $index; there are ${_detents.length}',
     );
-    _goTo(index);
+    if (_detents.isEmpty) {
+      return;
+    }
+    _goTo(index.clamp(0, _detents.length - 1));
   }
 
   void _goTo(int index) {
@@ -217,10 +258,11 @@ class GlassDetentSheetController extends Animation<double>
     if (dt <= 0) {
       return;
     }
+    final motion = _effectiveMotion;
     final moving = _axis.advance(
       dt: dt,
-      spring: _spring,
-      tolerance: _tolerance,
+      spring: motion.spring,
+      tolerance: motion.tolerance,
     );
     _publish();
     if (!moving) {
