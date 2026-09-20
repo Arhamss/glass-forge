@@ -55,18 +55,28 @@ class _SheetSceneState extends State<SheetScene>
     super.dispose();
   }
 
-  /// Builds the tab row's presence ramp against [available] — the same
-  /// height the sheet itself resolves its own detents against.
+  /// Builds the tab row's presence ramp against [available] — which the
+  /// caller must already have reduced by the top safe-area inset, exactly
+  /// as `GlassDetentSheet` itself does before resolving its detents
+  /// (`constraints.maxHeight - MediaQuery.paddingOf(context).top`). Passing
+  /// the raw `LayoutBuilder` height instead leaves this ramp's `end`
+  /// strictly above the sheet's real top-detent height on any device with a
+  /// top inset — a status bar, a Dynamic Island — so presence would still
+  /// read nonzero once the sheet is fully flush: both surfaces rendering at
+  /// once, which is exactly the flutter#187820 artifact this scene exists
+  /// to disprove.
   ///
   /// Built once per [available] rather than on every build: the ramp is an
   /// `Animation`, and `GlassPresence` holds it by identity, so a fresh one
   /// every frame would rebuild the tab row's backdrop pass every frame
   /// instead of moving a value through the one pass already warm.
   ///
-  /// The ramp ends exactly at the top detent's own height, never after it,
-  /// so the tabs are provably at zero presence by the time the sheet goes
-  /// flush, and it starts a quarter of the way below that, so nothing
-  /// happens to them while the sheet is only at Peek or Half.
+  /// The ramp ends exactly at the top detent's own height, so presence
+  /// reaches zero the frame the sheet goes flush — provided [available] is
+  /// the sheet's real available height, which is the precondition this
+  /// method leans on rather than re-derives. It starts a quarter of the way
+  /// below that, so nothing happens to the tabs while the sheet is only at
+  /// Peek or Half.
   void _syncPresenceRamp(double available) {
     if (_rampFor == available) {
       return;
@@ -85,7 +95,10 @@ class _SheetSceneState extends State<SheetScene>
       specimen: SizedBox.expand(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            _syncPresenceRamp(constraints.maxHeight);
+            // The same subtraction `GlassDetentSheet` makes internally
+            // before resolving its own detents — see `_syncPresenceRamp`.
+            final topInset = MediaQuery.paddingOf(context).top;
+            _syncPresenceRamp(constraints.maxHeight - topInset);
             return Stack(
               fit: StackFit.expand,
               children: [
