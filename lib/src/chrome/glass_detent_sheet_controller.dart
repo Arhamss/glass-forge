@@ -239,6 +239,27 @@ class GlassDetentSheetController extends Animation<double>
     _publish();
   }
 
+  /// How present glass chrome between [start] and [end] should be.
+  ///
+  /// 1 while the sheet's top edge is below [start], 0 once it has reached
+  /// [end], linear in between — both measured, like the height itself, from
+  /// the bottom of the sheet's available area.
+  ///
+  /// This is the handoff, not a cross-fade. Where the sheet floats above a
+  /// bottom bar, both want to be glass over the same pixels, and two backdrop
+  /// filters over one region is flutter#187820: the upper pass samples the
+  /// lower one's output and white-washes over time. So the bar's presence
+  /// reaches 0 *before* the sheet's glass arrives, driven by the same height
+  /// that drives the morph, which is what keeps the two in step through a
+  /// drag that stops and reverses half way.
+  Animation<double> presenceUnder({
+    required double start,
+    required double end,
+  }) {
+    assert(end >= start, 'the ramp ends above where it starts');
+    return drive(_CoverTween(start: start, end: end));
+  }
+
   @override
   void dispose() {
     if (respectReduceMotion) {
@@ -252,4 +273,25 @@ class GlassDetentSheetController extends Animation<double>
   String toString() =>
       'GlassDetentSheetController(${value.toStringAsFixed(1)}px, '
       'detent $_detent of ${_detents.length})';
+}
+
+/// Maps a sheet height to how present the chrome under it should be.
+class _CoverTween extends Animatable<double> {
+  const _CoverTween({required this.start, required this.end});
+
+  final double start;
+  final double end;
+
+  @override
+  double transform(double height) {
+    if (height <= start) {
+      return 1;
+    }
+    if (end <= start || height >= end) {
+      // A zero-width ramp is a step. Dividing by the span would be a divide
+      // by zero, and NaN in a presence uniform paints nothing at all.
+      return 0;
+    }
+    return 1 - (height - start) / (end - start);
+  }
 }

@@ -165,4 +165,57 @@ void main() {
     expect(controller.isAnimating, isFalse);
     expect(controller.value, caught);
   });
+
+  group('the presence handoff with covered chrome', () {
+    // A bottom bar 88 px tall sitting on the bottom edge: its top edge is at
+    // 88, and the sheet has fully covered it by the time its own top edge
+    // reaches 88. The ramp starts a little earlier so the bar is gone before
+    // the sheet's glass reaches it, never during.
+    testWidgets('ramps to zero as the sheet covers the bar', (tester) async {
+      controller = GlassDetentSheetController(vsync: const TestVSync())
+        ..setDetents(const <double>[40, 400, 800]);
+      addTearDown(controller.dispose);
+
+      final presence = controller.presenceUnder(start: 60, end: 88);
+      expect(presence.value, 1);
+
+      controller
+        ..beginDrag()
+        ..dragBy(34); // height 74, three-quarters of the way through the ramp
+      expect(presence.value, closeTo(0.5, 1e-9));
+
+      controller.dragBy(40); // height 114, past the end
+      expect(presence.value, 0);
+    });
+
+    testWidgets('the presence animation notifies its own listeners', (
+      tester,
+    ) async {
+      controller = GlassDetentSheetController(vsync: const TestVSync())
+        ..setDetents(const <double>[40, 400, 800]);
+      addTearDown(controller.dispose);
+
+      final presence = controller.presenceUnder(start: 60, end: 88);
+      var notifications = 0;
+      presence.addListener(() => notifications++);
+
+      controller
+        ..beginDrag()
+        ..dragBy(30);
+      expect(notifications, greaterThan(0));
+    });
+
+    testWidgets('a degenerate ramp is a step, not a divide by zero', (
+      tester,
+    ) async {
+      build();
+      final presence = controller.presenceUnder(start: 88, end: 88);
+      expect(presence.value, 1);
+
+      controller
+        ..beginDrag()
+        ..dragBy(20); // height 100, past the step
+      expect(presence.value, 0);
+    });
+  });
 }
