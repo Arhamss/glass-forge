@@ -110,6 +110,82 @@ Future<int> _centreGreen(GlassGlow glow) async {
   }
 }
 
+const double _pairCanvas = 480;
+
+/// Bakes two shapes into a single pass, 160 logical pixels apart centre to
+/// centre, and reads back the centre texel of the *far* one.
+///
+/// Both shapes share one matte, which is what makes this a test of the
+/// glow's reach rather than of two independent surfaces: the shader gates
+/// on coverage from the shared distance field, so the far shape's texels are
+/// lit by the same per-pass `uGlow` uniform centred over the near one.
+Future<int> _neighbourGreen(GlassGlow glow) async {
+  final producer = RuntimeGeometryProducer();
+  final composition = GlassComposition();
+  try {
+    final scene = GlassScene();
+    for (final entry in <String, double>{'near': 40, 'far': 200}.entries) {
+      scene.register(
+        entry.key,
+        ShapeGeometry.resolve(
+          shape: const GlassRoundedRectangle(
+            radius: BorderRadius.all(Radius.circular(24)),
+          ),
+          size: const Size(120, 120),
+          toLayer: Matrix4.translationValues(entry.value, 100, 0),
+          devicePixelRatio: 1,
+        ),
+      );
+    }
+    final matte = producer.produce(
+      scene,
+      MatteRequest(
+        devicePixelRatio: 1,
+        maxDisplacement: _material.maxDisplacement,
+        edgeRefraction: _material.edgeRefraction,
+        refractionSpread: _material.refractionSpread,
+        antialiasWidth: 0.5,
+        profile: _material.profile,
+      ),
+    )!;
+    final filter = composition.build(
+      matte: matte,
+      material: _material,
+      snapshot: FilterSnapshot.of(
+        matte: matte,
+        devicePixelRatio: 1,
+        materialRevision: _material.revision,
+        coordinateMapping: Float32List.fromList(<double>[1, 0, 0, 1, 0, 0]),
+        presence: 1,
+        glow: glow,
+      ),
+      devicePixelRatio: 1,
+      presence: 1,
+      glow: glow,
+    )!;
+    final recorder = ui.PictureRecorder();
+    const bounds = Rect.fromLTWH(0, 0, _pairCanvas, _pairCanvas);
+    Canvas(recorder)
+      ..saveLayer(bounds, Paint()..imageFilter = filter)
+      ..drawRect(bounds, Paint()..color = _grey)
+      ..restore();
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(
+      _pairCanvas.toInt(),
+      _pairCanvas.toInt(),
+    );
+    picture.dispose();
+    final bytes = (await image.toByteData())!;
+    image.dispose();
+    producer.release(matte);
+    // Centre of the far shape: placed at x 200, 120 wide.
+    return bytes.getUint8((160 * _pairCanvas.toInt() + 260) * 4 + 1);
+  } finally {
+    composition.dispose();
+    producer.dispose();
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(ShaderLibrary.instance.warmUp);
@@ -141,4 +217,36 @@ void main() {
       );
     },
   );
+
+  test('the glow reaches a neighbouring shape in the same pass', () async {
+    // The reason uGlow is a per-pass uniform rather than a gradient painted
+    // inside each shape: Apple's glow "spreads throughout the element and
+    // onto any Liquid Glass elements nearby", and a painted one is clipped
+    // to the shape that drew it. This is that claim, measured.
+    //
+    // The two shapes' centres are 160 logical pixels apart. At the radius
+    // InteractiveGlass ships, light crosses that gap; at the 140 it
+    // originally shipped, `smoothstep` saturates before it arrives and the
+    // neighbour gets nothing — which is exactly what a simulator
+    // measurement of the example app showed before the radius was retuned.
+    final unlit = await _neighbourGreen(const GlassGlow.none());
+    final reached = await _neighbourGreen(
+      const GlassGlow(centre: Offset(100, 160), radius: 320, strength: 0.55),
+    );
+    final tooShort = await _neighbourGreen(
+      const GlassGlow(centre: Offset(100, 160), radius: 140, strength: 0.55),
+    );
+
+    expect(
+      reached,
+      greaterThan(unlit + 8),
+      reason: 'a 320 radius must visibly light a neighbour 160 away',
+    );
+    expect(
+      tooShort,
+      unlit,
+      reason: 'a 140 radius cannot reach it at all — the regression this '
+          'test exists to catch',
+    );
+  });
 }

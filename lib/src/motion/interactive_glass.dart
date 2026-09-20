@@ -194,7 +194,20 @@ class _InteractiveGlassState extends State<InteractiveGlass>
   /// [_publishGlow]: see that method's own doc comment for why a radius
   /// that ramps from zero is unsafe given how the shader floors its
   /// falloff distance.
-  static const double _glowRadius = 140;
+  ///
+  /// Measured, not guessed. Apple describes the glow as spreading "onto any
+  /// Liquid Glass elements nearby", and the point of putting it in the
+  /// shader rather than painting it per shape was to reach a neighbour at
+  /// all. At the 140 this started as, it did not: measured against two
+  /// adjacent controls in the example, a neighbour 96 logical pixels away
+  /// gained about 7/255 at its near edge and nothing at all across the rest
+  /// of it — at or under the noise floor. The falloff is
+  /// `(1 - smoothstep(0, radius, distance))^2`, so at 320 that same
+  /// neighbour gains roughly 86/255 at its near edge, 23/255 through its
+  /// middle, and is dark again by its far edge. That reads as light
+  /// arriving from somewhere and falling off, which is the effect; much
+  /// beyond 320 and the whole row lifts evenly, which is not.
+  static const double _glowRadius = 320;
 
   /// How strongly the glow brightens at its centre at full press, 0 to 1.
   static const double _glowMaxStrength = 0.55;
