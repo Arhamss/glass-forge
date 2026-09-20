@@ -20,6 +20,10 @@ import 'package:glass_forge_example/src/theme.dart';
 /// drives the morph, so the tabs are gone before the sheet's own glass ever
 /// reaches them. Two backdrop passes over one region is flutter#187820, and
 /// a handoff rather than a cross-fade is how this package avoids it.
+///
+/// Which takes two numbers agreeing, not one: the sheet's floating gap has to
+/// clear the row in the first place, or the two are already stacked at Peek
+/// and no ramp can help. See [_SheetSceneState._gap].
 class SheetScene extends StatefulWidget {
   const SheetScene({required this.info, super.key});
 
@@ -41,6 +45,35 @@ class _SheetSceneState extends State<SheetScene>
 
   static const _detentNames = ['Peek', 'Half', 'Full'];
   static const _tabNames = ['Explore', 'Saved', 'Me'];
+
+  /// How tall the tab row is.
+  static const _barHeight = 52.0;
+
+  /// How far the floating sheet is inset from the frame's edges.
+  ///
+  /// Larger than [_barHeight], and that is the whole design: the sheet's
+  /// bottom edge floats `gap * (1 - progress)` above the frame's bottom while
+  /// the tab row owns the bottom [_barHeight] of it, so a gap no bigger than
+  /// the row puts the two on top of each other at Peek — before any drag has
+  /// started, with no presence ramp able to rescue it. The spec's "floating
+  /// with a visible gap at the low detent" presumes the gap clears whatever
+  /// it is floating over, and this is that number said out loud.
+  static const _gap = 64.0;
+
+  /// The sheet's `progress` at which the shrinking gap sets its bottom edge
+  /// down exactly on the tab row's top edge: `gap * (1 - progress)` reaching
+  /// [_barHeight]. The tabs must be gone by here.
+  static const double _contact = 1 - _barHeight / _gap;
+
+  /// Where the ramp starts: eight points of gap earlier, so the tabs reach
+  /// presence 0 with daylight still between the two surfaces rather than on
+  /// the same frame they meet.
+  static const double _clearance = 1 - (_barHeight + 8) / _gap;
+
+  /// [_detents]' lowest fraction, and the span the sheet's `progress` is
+  /// measured across — the two numbers the ramp above is stated in.
+  static const double _lowestFraction = 0.1;
+  static const double _spanFraction = 1.0 - _lowestFraction;
 
   int _detent = 0;
   int _tab = 0;
@@ -71,20 +104,25 @@ class _SheetSceneState extends State<SheetScene>
   /// every frame would rebuild the tab row's backdrop pass every frame
   /// instead of moving a value through the one pass already warm.
   ///
-  /// The ramp ends exactly at the top detent's own height, so presence
-  /// reaches zero the frame the sheet goes flush — provided [available] is
-  /// the sheet's real available height, which is the precondition this
-  /// method leans on rather than re-derives. It starts a quarter of the way
-  /// below that, so nothing happens to the tabs while the sheet is only at
-  /// Peek or Half.
+  /// The ramp is stated in the heights at which the *gap* closes onto the tab
+  /// row — [_clearance] to [_contact] — not in some fraction of the way to
+  /// the top detent. It has to be: the sheet's glass arrives at the row long
+  /// before the sheet is anywhere near full, because the gap that was holding
+  /// it clear shrinks with `progress`. A ramp that waited for the sheet to be
+  /// three-quarters of the frame tall would leave both surfaces rendering
+  /// over the same pixels from Peek onward, which is the flutter#187820
+  /// artifact this scene exists to disprove. The package pins the same
+  /// derivation in `test/src/chrome/sheet_presence_handoff_test.dart`.
   void _syncPresenceRamp(double available) {
     if (_rampFor == available) {
       return;
     }
     _rampFor = available;
+    final lowest = available * _lowestFraction;
+    final span = available * _spanFraction;
     _tabsPresence = _controller.presenceUnder(
-      start: available * 0.75,
-      end: available,
+      start: lowest + _clearance * span,
+      end: lowest + _contact * span,
     );
   }
 
@@ -112,7 +150,7 @@ class _SheetSceneState extends State<SheetScene>
                   child: GlassPresence(
                     presence: _tabsPresence,
                     child: SizedBox(
-                      height: 52,
+                      height: _barHeight,
                       child: GlassSurface.navigationBar(
                         backdrop: widget.info.barBackdrop,
                         child: Padding(
@@ -131,6 +169,7 @@ class _SheetSceneState extends State<SheetScene>
                 GlassDetentSheet(
                   detents: _detents,
                   controller: _controller,
+                  gap: _gap,
                   backdrop: widget.info.panelBackdrop,
                   semanticLabel: 'Nearby places',
                   onDetentChanged: (index) => setState(() => _detent = index),

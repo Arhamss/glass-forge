@@ -107,7 +107,12 @@ sheet being useful:
    `presenceUnder` exists and is tested; `GlassScaffold` (C4) is what will
    call it automatically once it exists. Until then the example does it by
    hand, and that hand-wiring is also the honest documentation of what C4
-   will be doing.
+   will be doing. The *arrangement* is no longer untested, though: the
+   sheet's gap clearing the bar and the ramp reaching zero before their
+   glass meets is pinned by
+   `test/src/chrome/sheet_presence_handoff_test.dart`, built against the
+   package alone, because the first hand-wiring of it in the example was
+   wrong at every detent and nothing caught it.
 3. There is no overdrag past the top detent. `dragBy` clamps.
    `GlassOverdrag` is the right tool the day a rubber band past the top, or
    a drag-to-dismiss below the bottom, becomes a wanted gesture.
