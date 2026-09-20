@@ -107,9 +107,20 @@ class GlassDetentSheet extends StatefulWidget {
   State<GlassDetentSheet> createState() => _GlassDetentSheetState();
 }
 
+// `TickerProviderStateMixin`, not `SingleTickerProviderStateMixin`, even
+// though only one controller is ever live at a time. The single-ticker mixin
+// never clears its `_ticker` field when that ticker is disposed, so it counts
+// tickers ever created rather than tickers currently alive, and the legal
+// sequence controller: null -> caller's -> null again creates a second one.
+// That is two tickers by its reckoning, and it asserts.
 class _GlassDetentSheetState extends State<GlassDetentSheet>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   GlassDetentSheetController? _internal;
+
+  /// An internal controller displaced by a caller's, waiting for the end of
+  /// the frame to be disposed. See [didUpdateWidget].
+  GlassDetentSheetController? _retiring;
+
   GlassDetentSheetController get _controller =>
       widget.controller ?? (_internal ??= _createController());
 
@@ -130,14 +141,28 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
     if (oldWidget.controller == widget.controller) {
       return;
     }
+    // Read before anything is torn down: which detent the sheet is showing
+    // right now, from whichever controller was driving it.
+    final wasAt = (oldWidget.controller ?? _internal)?.detent;
+
     oldWidget.controller?.onDetentChanged = null;
     if (widget.controller != null && _internal != null) {
       // The sheet made one before the caller supplied theirs. Nothing can
-      // reach it now and its ticker would go on being driven, so it is
+      // reach it now, and it holds a listener on the global
+      // `GlassReduceMotion` that only its own dispose removes, so it is
       // retired here rather than at [dispose] — it is still a controller
       // this state created, which is the only test [dispose] applies.
-      _internal!.dispose();
+      //
+      // At the end of the frame, though, not now: the `AnimatedBuilder`
+      // below is still subscribed to it and only detaches when the rebuild
+      // this update schedules reaches it. Disposing a listenable underneath
+      // a live listener happens to be survivable here, because
+      // `AnimationLocalListenersMixin.removeListener` tolerates a list that
+      // has already been cleared, but that is its tolerance and not this
+      // widget's design. One frame is cheap.
+      _retiring = _internal;
       _internal = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _disposeRetiring());
     }
     _controller.onDetentChanged = _onDetentChanged;
     if (_resolved.isNotEmpty) {
@@ -146,16 +171,36 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
       // when the resolved heights change, and swapping the controller does
       // not change them. Without this the sheet would drive a controller
       // that believes it has nowhere to rest.
-      _controller.setDetents(_resolved);
+      //
+      // The index is only forced when the replacement is one this state just
+      // made. A fresh internal controller has no opinion about where the
+      // sheet is, so inheriting the position it is already at is the only
+      // thing it can do that is not a teleport. A controller the caller
+      // handed in does have an opinion — that is the whole point of handing
+      // one in — so it keeps its own.
+      _controller.setDetents(
+        _resolved,
+        initialDetent: widget.controller == null ? wasAt : null,
+      );
     }
+  }
+
+  void _disposeRetiring() {
+    _retiring?.dispose();
+    _retiring = null;
   }
 
   void _onDetentChanged(int index) => widget.onDetentChanged?.call(index);
 
   @override
   void dispose() {
-    // Only the one this state made. A caller's controller outlives the widget
-    // by construction — that is what passing one in is for.
+    // Only the ones this state made. A caller's controller outlives the
+    // widget by construction — that is what passing one in is for.
+    //
+    // The retiring one goes first and synchronously: its post-frame callback
+    // may not have run yet, and `TickerProviderStateMixin.dispose` asserts
+    // that every ticker it handed out is already disposed.
+    _disposeRetiring();
     _internal?.dispose();
     widget.controller?.onDetentChanged = null;
     super.dispose();
@@ -243,11 +288,20 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
                 padding: EdgeInsets.only(
                   left: metrics.gap,
                   right: metrics.gap,
-                  bottom: metrics.gap,
+                  // The gap, plus as much of the bottom safe-area inset as
+                  // the sheet is not yet carrying itself. A floating sheet
+                  // sits clear of the home indicator entirely; a flush one
+                  // runs to the screen's edge and pads its content instead
+                  // (see [_buildSheet]). Splitting the inset by [progress]
+                  // rather than switching at the top detent is what keeps
+                  // the content's bottom edge continuous: the two halves
+                  // always sum to the whole inset, so nothing jumps on the
+                  // frame the sheet arrives.
+                  bottom: metrics.gap + padding.bottom * (1 - metrics.progress),
                 ),
                 child: SizedBox(
                   height: metrics.height,
-                  child: _buildSheet(context, metrics, padding),
+                  child: _buildSheet(context, constraints, metrics, padding),
                 ),
               ),
             );
@@ -259,19 +313,23 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
 
   Widget _buildSheet(
     BuildContext context,
+    BoxConstraints constraints,
     GlassDetentSheetMetrics metrics,
     EdgeInsets padding,
   ) {
     // The role's style, but not the role's shape: the radius morphs
     // continuously, and the ladder has steps. Everything else — material,
     // shadows, the vibrant label colour — comes from the role as it should.
+    //
+    // Measured from the incoming constraints rather than from the window:
+    // the two agree for a sheet in a `Stack` that fills the screen, which is
+    // the usual arrangement, and only the constraints are right for one in a
+    // narrower host. The resolved style depends on the size it is asked
+    // about, so guessing wide there is a real difference, not a rounding.
     final style = GlassTheme.surfaceOf(
       context,
       GlassSurfaceRole.sheet,
-      size: Size(
-        MediaQuery.sizeOf(context).width - metrics.gap * 2,
-        metrics.height,
-      ),
+      size: Size(constraints.maxWidth - metrics.gap * 2, metrics.height),
       backdrop: widget.backdrop,
     );
 
@@ -288,12 +346,17 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
           radius: BorderRadius.circular(metrics.radius),
         ),
         material: style.material,
-        // The drag detector sits *inside* the glass, not around it. Both
-        // cover the same box, so the gesture behaves identically either
-        // way, but only this order puts the surface itself on the hit-test
-        // path: a `Glass` whose children all decline a hit adds nothing of
-        // its own, and a sheet no hit test ever names is one no test — and
-        // no future gesture that wants to ask what it landed on — can find.
+        // The drag detector sits *inside* the glass, not around it. Only
+        // this order puts the surface itself on the hit-test path: a `Glass`
+        // whose children all decline a hit adds nothing of its own, and a
+        // sheet no hit test ever names is one no test — and no future
+        // gesture that wants to ask what it landed on — can find.
+        //
+        // It is not quite the same target, and the difference is the
+        // rounded corners: inside, the detector is clipped to the shape, so
+        // the four corner offcuts outside the radius no longer start a drag.
+        // They are a few square points of a surface whose whole face is
+        // draggable, and losing them is the price of being findable.
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onVerticalDragStart: _onDragStart,
@@ -312,11 +375,13 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
                       context: context,
                       removeTop: true,
                       child: Padding(
-                        // The gap already clears the home indicator while the
-                        // sheet floats. Once it is flush the inset is the
-                        // sheet's own to carry.
+                        // The other half of the bottom safe-area inset. The
+                        // sheet's own offset carries `1 - progress` of it
+                        // while it floats clear of the home indicator; this
+                        // takes over the rest as it settles flush and the
+                        // sheet's box reaches the screen's edge.
                         padding: EdgeInsets.only(
-                          bottom: metrics.gap > 0 ? 0 : padding.bottom,
+                          bottom: padding.bottom * metrics.progress,
                         ),
                         child: widget.child,
                       ),

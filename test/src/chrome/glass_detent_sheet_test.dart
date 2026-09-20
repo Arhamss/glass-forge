@@ -28,34 +28,60 @@ Widget _host({
   ValueChanged<int>? onDetentChanged,
   int initialDetent = 0,
   Widget? child,
+  EdgeInsets viewPadding = EdgeInsets.zero,
 }) {
   return MaterialApp(
-    home: GlassLayer(
-      // `GeometryTier.none` swaps the matte producer for the one that bakes
-      // nothing. Every claim in this file survives that: the shape still
-      // registers its geometry, the scene still bumps its revision, the
-      // cross-pass overlap check still runs, and `matteProduceCount` still
-      // counts — `RenderGlassLayer._refreshMatte` records a bake around the
-      // producer call whatever the producer returns, so "a settled sheet
-      // bakes nothing" still pins the revision guard that is the actual
-      // claim. What it drops is the software rasterisation of the texture,
-      // which off Impeller runs a full SDF fragment shader over the sheet's
-      // bounds on the CPU: measured at 2s for a 60-high sheet and rising
-      // with its height, once per frame for every frame it moves. At the
-      // default tier this file takes tens of minutes and reads as a hang.
-      tier: GeometryTier.none,
-      child: Stack(
-        children: <Widget>[
-          const SizedBox.expand(child: ColoredBox(color: Color(0xFF203040))),
-          GlassDetentSheet(
-            detents: detents,
-            controller: controller,
-            initialDetent: initialDetent,
-            onDetentChanged: onDetentChanged,
-            child: child ?? const SizedBox.expand(),
-          ),
-        ],
+    home: Builder(
+      builder: (context) => MediaQuery(
+        // The test window has no insets of its own, so a sheet's safe-area
+        // behaviour is invisible unless one is put here.
+        data: MediaQuery.of(
+          context,
+        ).copyWith(padding: viewPadding, viewPadding: viewPadding),
+        child: _layer(
+          detents: detents,
+          controller: controller,
+          onDetentChanged: onDetentChanged,
+          initialDetent: initialDetent,
+          child: child,
+        ),
       ),
+    ),
+  );
+}
+
+Widget _layer({
+  required List<GlassDetent> detents,
+  required GlassDetentSheetController? controller,
+  required ValueChanged<int>? onDetentChanged,
+  required int initialDetent,
+  required Widget? child,
+}) {
+  return GlassLayer(
+    // `GeometryTier.none` swaps the matte producer for the one that bakes
+    // nothing. Every claim in this file survives that: the shape still
+    // registers its geometry, the scene still bumps its revision, the
+    // cross-pass overlap check still runs, and `matteProduceCount` still
+    // counts — `RenderGlassLayer._refreshMatte` records a bake around the
+    // producer call whatever the producer returns, so "a settled sheet
+    // bakes nothing" still pins the revision guard that is the actual
+    // claim. What it drops is the software rasterisation of the texture,
+    // which off Impeller runs a full SDF fragment shader over the sheet's
+    // bounds on the CPU: measured at 2s for a 60-high sheet and rising
+    // with its height, once per frame for every frame it moves. At the
+    // default tier this file takes tens of minutes and reads as a hang.
+    tier: GeometryTier.none,
+    child: Stack(
+      children: <Widget>[
+        const SizedBox.expand(child: ColoredBox(color: Color(0xFF203040))),
+        GlassDetentSheet(
+          detents: detents,
+          controller: controller,
+          initialDetent: initialDetent,
+          onDetentChanged: onDetentChanged,
+          child: child ?? const SizedBox.expand(),
+        ),
+      ],
     ),
   );
 }
@@ -249,5 +275,119 @@ void main() {
 
     // Still usable: disposing it here would throw.
     expect(controller.value, isNotNull);
+  });
+
+  // The bottom safe-area inset is carried in two halves — the sheet's own
+  // offset while it floats, the child's padding once it is flush — that
+  // always sum to the whole inset. Invisible in every other test in this
+  // file, because the test window has no insets of its own.
+  testWidgets(
+    'the bottom safe area is cleared while floating and never jumps flush',
+    (tester) async {
+      // An iPhone home indicator, against the default 12 gap.
+      const inset = EdgeInsets.only(bottom: 34);
+      const content = ValueKey<String>('content');
+      final controller = GlassDetentSheetController(vsync: const TestVSync());
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        _host(
+          controller: controller,
+          viewPadding: inset,
+          child: const SizedBox.expand(key: content),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Measured up from the bottom of the 600-high test window.
+      double above(Finder target) => 600 - tester.getBottomLeft(target).dy;
+      final child = find.byKey(content);
+
+      // Floating, the sheet's own box clears the indicator and the gap is
+      // on top of it — not 12 from the screen's edge with 22 of that inside
+      // the indicator, which is where a gap that ignored the inset put it.
+      expect(above(_sheet), closeTo(12 + 34, 0.5));
+      expect(above(child), closeTo(12 + 34, 0.5));
+
+      final trail = <double>[above(child)];
+      controller.animateToDetent(2);
+      for (var i = 0; controller.isAnimating && i < 600; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        trail.add(above(child));
+      }
+      await tester.pumpAndSettle();
+
+      // Flush, the box runs to the screen's edge and the content carries the
+      // whole inset itself.
+      expect(above(_sheet), closeTo(0, 0.5));
+      expect(above(child), closeTo(34, 0.5));
+
+      // And it got there continuously. With the inset switched on at the top
+      // detent instead of split, the last frame alone moved it by all 34.
+      var worst = 0.0;
+      for (var i = 1; i < trail.length; i++) {
+        final step = (trail[i] - trail[i - 1]).abs();
+        if (step > worst) {
+          worst = step;
+        }
+      }
+      expect(worst, lessThan(6), reason: trail.join(', '));
+    },
+  );
+
+  testWidgets('a controller handed to a live sheet inherits its detents', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host());
+    await tester.pumpAndSettle();
+
+    final controller = GlassDetentSheetController(vsync: const TestVSync());
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(_host(controller: controller));
+    await tester.pumpAndSettle();
+
+    // Throws 'no detent at index 1; there are 0' if the hand-over left the
+    // new controller with nothing: `_syncDetents` only speaks up when the
+    // resolved heights change, and a controller swap does not change them.
+    controller.animateToDetent(1);
+    await tester.pumpAndSettle();
+
+    expect(tester.getSize(_sheet).height, closeTo(300, 0.5));
+
+    // Unmounting asserts if the displaced internal controller's ticker was
+    // never disposed.
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('taking the controller away leaves the sheet where it was', (
+    tester,
+  ) async {
+    // The full round trip, and it has to start here: a sheet that was given
+    // a controller at mount never made one of its own, so swapping away from
+    // it only ever creates a first ticker. It is the sheet that had one,
+    // gave it up and needs another that creates a second.
+    await tester.pumpWidget(_host());
+    await tester.pumpAndSettle();
+
+    final controller = GlassDetentSheetController(vsync: const TestVSync());
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(_host(controller: controller));
+    await tester.pumpAndSettle();
+
+    controller.animateToDetent(1);
+    await tester.pumpAndSettle();
+
+    // Back to an internal controller — the second one this state has made.
+    // `SingleTickerProviderStateMixin` counts tickers ever created, not
+    // tickers alive, so it asserts here however carefully the first was
+    // disposed.
+    await tester.pumpWidget(_host());
+    await tester.pumpAndSettle();
+
+    // A fresh controller has no opinion about where the sheet is, so it
+    // takes the position the sheet already had rather than snapping to
+    // `initialDetent`.
+    expect(tester.getSize(_sheet).height, closeTo(300, 0.5));
+
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 }
