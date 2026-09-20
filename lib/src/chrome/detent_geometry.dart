@@ -1,0 +1,79 @@
+import 'dart:ui' show clampDouble, lerpDouble;
+
+import 'package:flutter/foundation.dart';
+
+/// The sheet's shape at one height: how far it is inset, and how round it is.
+///
+/// Both are functions of [height] and nothing else — not of which detent is
+/// current, and not of which detent is being travelled to. That is the
+/// difference between a morph that tracks a finger and one that plays an
+/// animation when a detent is reached: only the *snap* is discrete.
+@immutable
+class GlassDetentSheetMetrics {
+  /// Creates metrics directly. [GlassDetentSheetMetrics.at] is the usual way.
+  const GlassDetentSheetMetrics({
+    required this.height,
+    required this.gap,
+    required this.radius,
+    required this.progress,
+  });
+
+  /// The metrics for a sheet [height] logical pixels tall.
+  ///
+  /// [lowest] and [top] are the resolved first and last detents, which is
+  /// what the morph is measured between: a sheet whose detents are 0.1 and
+  /// 1.0 floats fully at a tenth of the screen, not at zero.
+  factory GlassDetentSheetMetrics.at({
+    required double height,
+    required double lowest,
+    required double top,
+    double gap = 12,
+    double floatingRadius = 44,
+    double flushRadius = 55,
+  }) {
+    final span = top - lowest;
+    // A degenerate span means one detent. Flush is the right answer for it:
+    // a sheet that cannot be dragged anywhere is not floating between
+    // anything, and the alternative is NaN in a shader uniform.
+    final progress = span > 0
+        ? clampDouble((height - lowest) / span, 0, 1)
+        : 1.0;
+    return GlassDetentSheetMetrics(
+      height: height,
+      gap: lerpDouble(gap, 0, progress)!,
+      radius: lerpDouble(floatingRadius, flushRadius, progress)!,
+      progress: progress,
+    );
+  }
+
+  /// How tall the sheet is, in logical pixels.
+  final double height;
+
+  /// How far the sheet is inset from the screen's side and bottom edges.
+  final double gap;
+
+  /// The corner radius, on all four corners.
+  final double radius;
+
+  /// How far between the lowest detent (0) and the top one (1) this is.
+  final double progress;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is GlassDetentSheetMetrics &&
+        other.height == height &&
+        other.gap == gap &&
+        other.radius == radius &&
+        other.progress == progress;
+  }
+
+  @override
+  int get hashCode => Object.hash(height, gap, radius, progress);
+
+  @override
+  String toString() =>
+      'GlassDetentSheetMetrics(height: $height, gap: $gap, radius: $radius)';
+}
