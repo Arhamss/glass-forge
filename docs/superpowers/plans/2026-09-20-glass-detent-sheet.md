@@ -1389,6 +1389,19 @@ import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge/src/diagnostics/render_counters.dart';
 import 'package:glass_forge/src/rendering/render_glass_shape.dart';
 
+/// The sheet's visible box.
+///
+/// Not `find.byType(GlassDetentSheet)`: the widget returns an `Align` under
+/// the `Stack`'s loose constraints, so its element fills the whole window
+/// whatever the detent is. Its `getSize` is the window's height at every
+/// detent, and its centre is empty space well above the sheet — a `drag` there
+/// misses the gesture detector entirely. The `Glass` inside it is the thing
+/// that is actually the size of the sheet.
+Finder get _sheet => find.descendant(
+  of: find.byType(GlassDetentSheet),
+  matching: find.byType(Glass),
+);
+
 Widget _host({
   List<GlassDetent> detents = const <GlassDetent>[
     GlassDetent.fraction(0.1),
@@ -1397,6 +1410,7 @@ Widget _host({
   ],
   GlassDetentSheetController? controller,
   ValueChanged<int>? onDetentChanged,
+  int initialDetent = 0,
   Widget? child,
 }) {
   return MaterialApp(
@@ -1407,6 +1421,7 @@ Widget _host({
           GlassDetentSheet(
             detents: detents,
             controller: controller,
+            initialDetent: initialDetent,
             onDetentChanged: onDetentChanged,
             child: child ?? const SizedBox.expand(),
           ),
@@ -1421,10 +1436,16 @@ void main() {
     await tester.pumpWidget(_host());
     await tester.pumpAndSettle();
 
-    final size = tester.getSize(find.byType(GlassDetentSheet));
     // A tenth of the 600-high test window, less nothing: the test window has
     // no safe-area inset.
-    expect(size.height, closeTo(60, 0.5));
+    expect(tester.getSize(_sheet).height, closeTo(60, 0.5));
+  });
+
+  testWidgets('opens at a non-zero initial detent', (tester) async {
+    await tester.pumpWidget(_host(initialDetent: 1));
+    await tester.pumpAndSettle();
+
+    expect(tester.getSize(_sheet).height, closeTo(300, 0.5));
   });
 
   testWidgets('a drag up moves the sheet and it snaps to the next detent', (
@@ -1434,12 +1455,11 @@ void main() {
     await tester.pumpWidget(_host(onDetentChanged: changed.add));
     await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(GlassDetentSheet), const Offset(0, -220));
+    await tester.drag(_sheet, const Offset(0, -220));
     await tester.pumpAndSettle();
 
     expect(changed, <int>[1]);
-    expect(tester.getSize(find.byType(GlassDetentSheet)).height,
-        closeTo(300, 0.5));
+    expect(tester.getSize(_sheet).height, closeTo(300, 0.5));
   });
 
   testWidgets('the gap closes and the radius grows as it rises', (
@@ -1451,16 +1471,11 @@ void main() {
     await tester.pumpAndSettle();
 
     double radius() {
-      final shape = tester.renderObject<RenderGlassShape>(
-        find.descendant(
-          of: find.byType(GlassDetentSheet),
-          matching: find.byType(Glass),
-        ),
-      );
+      final shape = tester.renderObject<RenderGlassShape>(_sheet);
       return shape.shape.resolveRadius(shape.size);
     }
 
-    double left() => tester.getTopLeft(find.byType(Glass).first).dx;
+    double left() => tester.getTopLeft(_sheet).dx;
 
     final lowRadius = radius();
     final lowLeft = left();
@@ -1508,9 +1523,7 @@ void main() {
     await tester.pumpWidget(_host());
     await tester.pumpAndSettle();
 
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.byType(GlassDetentSheet)),
-    );
+    final gesture = await tester.startGesture(tester.getCenter(_sheet));
     for (var i = 0; i < 20; i++) {
       await gesture.moveBy(const Offset(0, -20));
       await tester.pump(const Duration(milliseconds: 8));
@@ -1538,10 +1551,7 @@ void main() {
     controller.animateToDetent(2);
     await tester.pump();
 
-    expect(
-      tester.getSize(find.byType(GlassDetentSheet)).height,
-      closeTo(600, 0.5),
-    );
+    expect(tester.getSize(_sheet).height, closeTo(600, 0.5));
   });
 
   testWidgets('semantics expose a draggable with increase and decrease', (
@@ -1553,7 +1563,10 @@ void main() {
 
     expect(
       tester.getSemantics(find.byType(GlassDetentSheet)),
-      matchesSemantics(
+      // `containsSemantics`, not `matchesSemantics`: the latter is exhaustive
+      // and this node also carries a label and a value, which this test has no
+      // opinion about.
+      containsSemantics(
         hasIncreaseAction: true,
         hasDecreaseAction: true,
       ),
@@ -1745,6 +1758,9 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
   }
 
   void _syncDetents(double available) {
+    // Captured before `_resolved` is reassigned below. Reading it after would
+    // always be false, and `initialDetent` would never reach the controller.
+    final isFirst = _resolved.isEmpty;
     final resolved = resolveGlassDetents(
       widget.detents,
       available: available,
@@ -1769,7 +1785,7 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
     _resolved = resolved;
     _controller.setDetents(
       resolved,
-      initialDetent: _resolved.isEmpty ? widget.initialDetent : null,
+      initialDetent: isFirst ? widget.initialDetent : null,
     );
   }
 
@@ -2216,19 +2232,21 @@ sheet install the physics on descendant scrollables by wrapping the child in a
 `ScrollConfiguration` whose `ScrollBehavior.getScrollPhysics` returns
 `GlassSheetScrollPhysics(controller: _controller, parent: super.getScrollPhysics(context))`.
 
-Also: the sheet's own `GestureDetector` must **not** compete with the inner
-scrollable for the same gesture. With the physics in place the scrollable is the
-only vertical consumer inside the sheet, so restrict the `GestureDetector` to
-the handle and the sheet's non-scrolling chrome, and let the physics carry every
-drag that starts on scrollable content. Keeping both would produce a gesture
-arena the scrollable wins, and rule 1 would silently stop working.
+**Leave Task 6's body-wide `GestureDetector` exactly as it is.** It does not
+compete with the inner scrollable: Flutter's gesture arena gives a pointer on
+the list to the inner `Scrollable`, which is the descendant, and the physics
+above route those deltas to the controller; a pointer on the handle, on padding,
+or on any non-scrolling chrome falls through to the ancestor detector. Both
+paths end at the same `dragBy`. Restricting the detector to the handle would
+leave a sheet whose child is not scrollable undraggable — which is exactly what
+Task 6's own tests exercise.
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `flutter test test/src/chrome/glass_sheet_scroll_physics_test.dart`
 Expected: PASS.
-Run: `flutter test` — Expected: the whole suite green, including Task 6's
-drag tests, which now go through the handle rather than the body.
+Run: `flutter test` — Expected: the whole suite green, Task 6's drag tests
+included and unchanged.
 Run: `flutter analyze` — Expected: no issues.
 
 - [ ] **Step 5: Commit**
@@ -2276,7 +2294,22 @@ rather than stepping at each detent; the corners grow into the display's; the
 bottom bar is gone before the sheet's glass reaches it, with no moment where
 both are rendering; a flick carries past the nearest detent.
 
-- [ ] **Step 4: Write the docs**
+- [ ] **Step 4: Mirror the doc example into the guard**
+
+`test/readme_examples_test.dart` is the hand-maintained guard for every `dart`
+code block in a `lib/` doc comment: the block is copied there so the analyzer
+and the test run actually compile it, with real widgets substituted wherever the
+original names a hypothetical one (`NavBarContents`, and here `Map()` and
+`results`). Add a `testWidgets('the GlassDetentSheet example builds', ...)` in
+the same shape as the file's existing cases, ending in
+`expect(tester.takeException(), isNull);`.
+
+Without this the class doc rots silently, which is the exact failure that file
+exists to prevent.
+
+Run: `flutter test test/readme_examples_test.dart` — Expected: PASS.
+
+- [ ] **Step 5: Write the docs**
 
 `CHANGELOG.md`, under Unreleased: one entry naming `GlassDetentSheet`,
 `GlassDetent`, `GlassDetentSheetController` and `GlassSheetScrollPhysics`.
@@ -2285,10 +2318,10 @@ both are rendering; a flick carries past the nearest detent.
 that C4/C1/C2/C3 are still unwritten and that C5 landed ahead of them, and
 record the spec correction about matte produces from the top of this plan.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add example CHANGELOG.md docs/TODO.md docs/superpowers/plans/2026-09-20-glass-detent-sheet.md
+git add example test/readme_examples_test.dart CHANGELOG.md docs/TODO.md
 git commit -m "docs(chrome): the detent sheet scene, changelog and resume notes"
 ```
 
