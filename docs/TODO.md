@@ -56,18 +56,67 @@ Arham signed off the widget spec. Recorded in full in
 4. **Plain names** — `GlassButton` and the rest, colliding with
    `liquid_glass_widgets`.
 
-## Added after sign-off
+## C5 landed — `GlassDetentSheet`, out of order
 
 **C5, `GlassDetentSheet`** — the Apple Maps sheet, requested the same day
-from an Expo write-up of the behaviour. Persistent rather than presented,
-dragged between detents, morphing from floating (inset, big radius) to flush
-(no gap, screen corners) as it rises, with a scroll handoff at the top detent
-and a presence handoff with the bottom bar it covers. Specced as C5; it is
-the hardest widget in the document.
+from an Expo write-up of the behaviour and specced as the hardest widget in
+the document. It has landed: `lib/src/chrome/` (`GlassDetent`,
+`detent_geometry.dart`, `GlassDetentSheetController`,
+`GlassSheetScrollPhysics`, `GlassDetentSheet` itself), a scene in the
+example (`example/lib/src/scenes/sheet_scene.dart`), a
+`test/readme_examples_test.dart` guard on its class-doc example, and a
+`CHANGELOG.md` entry. Plan:
+`docs/superpowers/plans/2026-09-20-glass-detent-sheet.md`.
+
+**It landed ahead of C4, C1, C2 and C3, deliberately.** The documented order
+below is A → B → C4 → C1 → C2 → C3 → C5 → D; C5 jumped the queue to land
+first among the chrome sub-project's five widgets. `GlassScaffold` (C4),
+the tab bar (C1), the app bar (C2) and the sheet-presentation controller
+(C3) are all still unwritten — nothing in this section describes work done
+on them. One consequence: the presence handoff C5 needs a bottom bar for is
+wired by the example app itself, not by any scaffold, because there is no
+scaffold yet. See "Known gaps" below.
+
+**A correction to the spec, worth knowing before trusting
+`GlassRenderCounters` here.** C5's test list asks for "one matte produce for
+the whole drag, not one per frame" — that is not achievable.
+`RenderGlassLayer._refreshMatte` rebakes whenever a registered shape's
+geometry changes, and this sheet resizes and morphs its radius every frame
+of a drag by design, so a per-frame rebake while a finger is down is the
+honest cost. What is tested instead: one backdrop pass for the sheet across
+the whole drag, never two; and a settled sheet — resting at a detent,
+registering unchanged geometry — bakes nothing per frame.
+
+**Off Impeller, this geometry producer is slow enough to stall a session.**
+Outside Impeller, the runtime geometry producer runs the SDF over a shape's
+bounds on the CPU, measured at 2–6 seconds per bake and rising with the
+shape's size, once per frame for every frame it moves. A widget test that
+animates a large glass surface — this sheet included — must build its
+`GlassLayer` with `tier: GeometryTier.none`, or the file takes tens of
+minutes and reads as a hang. This stalled one implementer during this plan;
+see `test/src/chrome/glass_detent_sheet_test.dart`'s `_layer` helper for the
+pattern that avoids it.
+
+**Known gaps, left deliberately.** Each is its own task and none blocks the
+sheet being useful:
+
+1. `GlassDetent.content()` is not measured — nothing measures the child yet,
+   so a content detent resolves to the available height (the documented
+   fallback in `GlassDetentContent.resolve`).
+2. The bottom-bar presence handoff is wired by the app, not by the sheet.
+   `presenceUnder` exists and is tested; `GlassScaffold` (C4) is what will
+   call it automatically once it exists. Until then the example does it by
+   hand, and that hand-wiring is also the honest documentation of what C4
+   will be doing.
+3. There is no overdrag past the top detent. `dragBy` clamps.
+   `GlassOverdrag` is the right tool the day a rubber band past the top, or
+   a drag-to-dismiss below the bottom, becomes a wanted gesture.
 
 ## Order, and where the plans are
 
-A1 → A4 → A2 → A3 → B1 → B2 → B3 → B4 → B5 → C4 → C1 → C2 → C3 → C5 → D.
+A1 → A4 → A2 → A3 → B1 → B2 → B3 → B4 → B5 → C4 → C1 → C2 → C3 → C5 → D —
+the documented order. **Not the order taken**: C5 landed before C4, C1, C2
+and C3, see above.
 
 - **Sub-project A** — plan written:
   `docs/superpowers/plans/2026-09-18-glass-widgets-a-foundations.md`.

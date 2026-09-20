@@ -10,6 +10,7 @@ import 'package:glass_forge_example/src/scene.dart';
 import 'package:glass_forge_example/src/scenes/blend_scene.dart';
 import 'package:glass_forge_example/src/scenes/edge_scene.dart';
 import 'package:glass_forge_example/src/scenes/motion_scene.dart';
+import 'package:glass_forge_example/src/scenes/sheet_scene.dart';
 import 'package:glass_forge_example/src/scenes/system_scene.dart';
 import 'package:glass_forge_example/src/theme.dart';
 
@@ -24,7 +25,8 @@ void main() {
   runApp(const GlassForgeExample());
 }
 
-/// Five scenes over five photographs.
+/// Six scenes over five photographs — Sheet reuses Edge's, since its panel
+/// and tab row sit over the same crop of it.
 ///
 /// Everything on screen is this package's own API. There is no wrapper layer
 /// between the reader and `GlassLayer`, `Glass`, `GlassMaterial`,
@@ -136,6 +138,7 @@ class _StageState extends State<Stage> {
       requested: widget.requested,
       onDim: () => setState(() => _dimmed = true),
     ),
+    5 => SheetScene(info: info),
     _ => LensScene(info: info),
   };
 
