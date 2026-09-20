@@ -1,0 +1,9 @@
+# Revisions that changed formatting only, and should be skipped by blame.
+#
+# Configure git to use this file once, per clone:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# GitHub reads it automatically.
+
+# style: format the whole package
+8ff3e016822132fcbea73db94734353bb37b6a4b
