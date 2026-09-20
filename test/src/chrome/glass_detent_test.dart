@@ -13,8 +13,7 @@ void main() {
 
     test('a height is itself, clamped to what there is', () {
       expect(
-        const GlassDetent.height(200)
-            .resolve(available: 800, contentHeight: 0),
+        const GlassDetent.height(200).resolve(available: 800, contentHeight: 0),
         200,
       );
       expect(
@@ -42,8 +41,10 @@ void main() {
     // `content()` around a scrollable actually wanted.
     test('an unmeasurable child falls back to the available height', () {
       expect(
-        const GlassDetent.content()
-            .resolve(available: 800, contentHeight: double.infinity),
+        const GlassDetent.content().resolve(
+          available: 800,
+          contentHeight: double.infinity,
+        ),
         800,
       );
     });

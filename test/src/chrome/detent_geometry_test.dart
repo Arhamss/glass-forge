@@ -3,20 +3,22 @@ import 'package:glass_forge/src/chrome/detent_geometry.dart';
 
 void main() {
   group('the morph is continuous in height, not stepped by detent', () {
-    test('at the lowest detent the sheet floats: full gap, floating radius',
-        () {
-      final metrics = GlassDetentSheetMetrics.at(
-        height: 80,
-        lowest: 80,
-        top: 800,
-        gap: 20,
-        floatingRadius: 50,
-        flushRadius: 60,
-      );
-      expect(metrics.progress, 0);
-      expect(metrics.gap, 20);
-      expect(metrics.radius, 50);
-    });
+    test(
+      'at the lowest detent the sheet floats: full gap, floating radius',
+      () {
+        final metrics = GlassDetentSheetMetrics.at(
+          height: 80,
+          lowest: 80,
+          top: 800,
+          gap: 20,
+          floatingRadius: 50,
+          flushRadius: 60,
+        );
+        expect(metrics.progress, 0);
+        expect(metrics.gap, 20);
+        expect(metrics.radius, 50);
+      },
+    );
 
     test('at the top detent it is flush: no gap, the display radius', () {
       final metrics = GlassDetentSheetMetrics.at(
