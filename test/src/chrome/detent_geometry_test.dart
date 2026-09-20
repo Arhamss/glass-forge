@@ -9,10 +9,13 @@ void main() {
         height: 80,
         lowest: 80,
         top: 800,
+        gap: 20,
+        floatingRadius: 50,
+        flushRadius: 60,
       );
       expect(metrics.progress, 0);
-      expect(metrics.gap, 12);
-      expect(metrics.radius, 44);
+      expect(metrics.gap, 20);
+      expect(metrics.radius, 50);
     });
 
     test('at the top detent it is flush: no gap, the display radius', () {
@@ -20,10 +23,13 @@ void main() {
         height: 800,
         lowest: 80,
         top: 800,
+        gap: 20,
+        floatingRadius: 50,
+        flushRadius: 60,
       );
       expect(metrics.progress, 1);
       expect(metrics.gap, 0);
-      expect(metrics.radius, 55);
+      expect(metrics.radius, 60);
     });
 
     // The point of the whole class. Half way up is half the morph, whether or
@@ -34,10 +40,13 @@ void main() {
         height: 440,
         lowest: 80,
         top: 800,
+        gap: 20,
+        floatingRadius: 50,
+        flushRadius: 60,
       );
       expect(metrics.progress, closeTo(0.5, 1e-9));
-      expect(metrics.gap, closeTo(6, 1e-9));
-      expect(metrics.radius, closeTo(49.5, 1e-9));
+      expect(metrics.gap, closeTo(10, 1e-9));
+      expect(metrics.radius, closeTo(55, 1e-9));
     });
 
     test('dragged below the lowest detent it stays fully floating', () {
