@@ -1,6 +1,7 @@
 import 'dart:ui' show clampDouble, lerpDouble;
 
 import 'package:flutter/foundation.dart';
+import 'package:glass_forge/src/motion/glass_decay.dart';
 
 /// The sheet's shape at one height: how far it is inset, and how round it is.
 ///
@@ -76,4 +77,38 @@ class GlassDetentSheetMetrics {
   @override
   String toString() =>
       'GlassDetentSheetMetrics(height: $height, gap: $gap, radius: $radius)';
+}
+
+/// Which of [heights] a sheet released at [height] with [velocity] belongs at.
+///
+/// The velocity is projected forward through [decay] first, so a flick lands
+/// where the fling would have come to rest and then snaps from *there*. That
+/// is why a hard flick carries past the nearest detent without any threshold
+/// to tune: friction already encodes how far a given speed travels, and iOS
+/// uses the same 0.135 retention factor for exactly this judgement.
+///
+/// [heights] must be ascending and non-empty — `resolveGlassDetents` returns
+/// it that way. [height] is in logical pixels, increasing upward — a drag
+/// upward raises it, a fling upward is positive velocity in pixels per
+/// second.
+int nearestDetentIndex(
+  List<double> heights,
+  double height, {
+  double velocity = 0,
+  GlassDecay decay = const GlassDecay(),
+}) {
+  assert(heights.isNotEmpty, 'a sheet with no detents has nowhere to go');
+  final projected = velocity == 0
+      ? height
+      : decay.restingPoint(start: height, velocity: velocity);
+  var best = 0;
+  var bestDistance = (heights[0] - projected).abs();
+  for (var i = 1; i < heights.length; i++) {
+    final distance = (heights[i] - projected).abs();
+    if (distance < bestDistance) {
+      best = i;
+      bestDistance = distance;
+    }
+  }
+  return best;
 }

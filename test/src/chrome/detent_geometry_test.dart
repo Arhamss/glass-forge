@@ -80,4 +80,43 @@ void main() {
       expect(metrics.gap, 0);
     });
   });
+
+  group('snapping on release', () {
+    const detents = <double>[80, 400, 800];
+
+    test('a slow release goes to the nearest detent', () {
+      expect(nearestDetentIndex(detents, 150), 0);
+      expect(nearestDetentIndex(detents, 300), 1);
+      expect(nearestDetentIndex(detents, 700), 2);
+    });
+
+    test('exactly on a detent stays there', () {
+      expect(nearestDetentIndex(detents, 400), 1);
+    });
+
+    // The reason velocity is projected through friction rather than compared
+    // against a threshold: a flick is a statement about where the sheet was
+    // going, and the decay already knows where that is. A threshold would
+    // need a second constant nobody can tune from first principles.
+    test('a flick up carries past the nearest detent to the next', () {
+      // From just above the lowest detent, nearest is 0. A hard flick up
+      // coasts most of the way to the middle detent, so it should land there.
+      expect(nearestDetentIndex(detents, 120), 0);
+      expect(nearestDetentIndex(detents, 120, velocity: 900), 1);
+    });
+
+    test('a flick down carries past the nearest detent to the one below', () {
+      expect(nearestDetentIndex(detents, 760), 2);
+      expect(nearestDetentIndex(detents, 760, velocity: -900), 1);
+    });
+
+    test('a fling never leaves the detent list', () {
+      expect(nearestDetentIndex(detents, 700, velocity: 100000), 2);
+      expect(nearestDetentIndex(detents, 200, velocity: -100000), 0);
+    });
+
+    test('a single detent is always the answer', () {
+      expect(nearestDetentIndex(const <double>[400], 90, velocity: 4000), 0);
+    });
+  });
 }
