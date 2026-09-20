@@ -150,8 +150,21 @@ Motion. System becomes the Adaptation group. The five photographs and the
 Geist type stay — that aesthetic is already right and matches the direction
 below.
 
-Deleted: `chrome.dart`'s bespoke tab bar and the per-scene slider panel,
-replaced by the index/detail model and per-entry knobs.
+Deleted: the `_SceneTabs` bottom tab bar in `main.dart`, and the per-scene
+control panel, replaced by the index/detail model and per-entry knobs.
+
+`chrome.dart` mostly **survives**. Its `SegmentedControl`, `ValueSlider` and
+`GlassCaption` are painted controls — not package widgets — and they are
+already the knob toolkit an entry page needs. Rebuilding them would be
+inventing a second set of the same thing.
+
+`SceneInfo` survives too, renamed to carry a backdrop rather than a scene:
+its `panelBackdrop` and `barBackdrop` are colours *measured off the
+photograph*, and they exist because nothing in the package samples the
+backdrop for you — `GlassSurface` can only keep labels readable if it is
+told what is behind them. Any entry placed over imagery inherits that
+obligation, so the catalogue reuses the five measured backdrops rather than
+introducing unmeasured ones.
 
 ## Visual direction
 
