@@ -5,7 +5,11 @@ import 'package:glass_forge/glass_forge.dart';
 void main() {
   late GlassDetentSheetController controller;
 
-  Widget host() {
+  Widget host({
+    Axis scrollDirection = Axis.vertical,
+    bool reverse = false,
+    int itemCount = 60,
+  }) {
     return MaterialApp(
       home: GlassLayer(
         // `GeometryTier.none` swaps the matte producer for the one that bakes
@@ -29,9 +33,14 @@ void main() {
                 GlassDetent.fraction(1),
               ],
               child: ListView.builder(
-                itemCount: 60,
-                itemBuilder: (context, i) =>
-                    SizedBox(height: 40, child: Text('row $i')),
+                scrollDirection: scrollDirection,
+                reverse: reverse,
+                itemCount: itemCount,
+                itemBuilder: (context, i) => SizedBox(
+                  height: 40,
+                  width: 40,
+                  child: Text('row $i'),
+                ),
               ),
             ),
           ],
@@ -49,9 +58,13 @@ void main() {
   /// recogniser and moves nothing, and every move after it is reported in
   /// full. Without it a single large [TestGesture.moveBy] is swallowed
   /// entirely and the test measures nothing.
-  Future<TestGesture> armedGestureOn(WidgetTester tester, Finder target) async {
+  Future<TestGesture> armedGestureOn(
+    WidgetTester tester,
+    Finder target, {
+    Offset arm = const Offset(0, -kDragSlopDefault),
+  }) async {
     final gesture = await tester.startGesture(tester.getCenter(target));
-    await gesture.moveBy(const Offset(0, -kDragSlopDefault));
+    await gesture.moveBy(arm);
     await tester.pump();
     return gesture;
   }
@@ -174,6 +187,154 @@ void main() {
     // rather than wherever the finger left it.
     expect(controller.value, controller.top);
     expect(controller.detent, 1);
+  });
+
+  testWidgets('a drag on the handle stays the sheet own drag', (tester) async {
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+
+    final sheet = find.descendant(
+      of: find.byType(GlassDetentSheet),
+      matching: find.byType(Glass),
+    );
+    // Ten points below the sheet's own top edge is the grab handle, and the
+    // point of this test is that it is *not* the list: a gesture there is the
+    // sheet's `GestureDetector`'s, start to finish, and the physics has no
+    // claim on it.
+    final grab = Offset(
+      tester.getCenter(sheet).dx,
+      tester.getTopLeft(sheet).dy + 10,
+    );
+    expect(
+      grab.dy,
+      lessThan(tester.getRect(find.byType(Scrollable)).top),
+      reason: 'the grab point must be above the list for this to mean anything',
+    );
+
+    final gesture = await tester.startGesture(grab);
+    await gesture.moveBy(const Offset(0, -kDragSlopDefault));
+    await tester.pump();
+    expect(controller.isDragging, isTrue);
+
+    // Each of these resizes the sheet, which resizes the list's viewport.
+    // That is a dimension change, and an idle `ScrollPosition` answers one
+    // with `goBallistic(0)` — which is how a drag nobody handed to the
+    // physics used to get ended underneath a finger that was still down.
+    for (var i = 0; i < 3; i++) {
+      await gesture.moveBy(const Offset(0, -40));
+      await tester.pump();
+      expect(
+        controller.isDragging,
+        isTrue,
+        reason: 'the finger is still down after move ${i + 1}',
+      );
+    }
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(controller.isDragging, isFalse);
+    expect(controller.detents, contains(controller.value));
+  });
+
+  testWidgets('a horizontal scrollable inside the sheet scrolls itself', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(scrollDirection: Axis.horizontal));
+    await tester.pumpAndSettle();
+
+    final position = positionOf(tester);
+    final gesture = await armedGestureOn(
+      tester,
+      find.text('row 0'),
+      arm: const Offset(-kDragSlopDefault, 0),
+    );
+    await gesture.moveBy(const Offset(-120, 0));
+    await tester.pump();
+
+    expect(position.pixels, closeTo(120, 0.5));
+    expect(
+      controller.value,
+      controller.lowest,
+      reason: 'a sideways swipe is not a gesture the sheet has a claim on',
+    );
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a reversed list is read by the finger, not the scroll offset', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(reverse: true));
+    controller.animateToDetent(1);
+    await tester.pumpAndSettle();
+
+    final position = positionOf(tester);
+    final list = find.byType(Scrollable);
+
+    // A reversed viewport negates the delta a second time, so a finger going
+    // *up* arrives here as a positive offset — which the naive reading takes
+    // for a downward finger and hands to the sheet.
+    var gesture = await armedGestureOn(tester, list);
+    await gesture.moveBy(const Offset(0, -80));
+    await tester.pump();
+    expect(
+      controller.value,
+      controller.top,
+      reason: 'a finger going up never lowers the sheet',
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    // Downward is the direction that scrolls a reversed list back through its
+    // content, and at its near end that is the list's business, not the
+    // sheet's.
+    gesture = await armedGestureOn(tester, list);
+    await gesture.moveBy(const Offset(0, 80));
+    await tester.pump();
+    expect(position.pixels, closeTo(80, 0.5));
+    expect(controller.value, controller.top);
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    // The far end of a reversed list is the top of its content, so that —
+    // not pixel zero — is where rule 3 hands the gesture back.
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pump();
+    gesture = await armedGestureOn(tester, list);
+    await gesture.moveBy(const Offset(0, 120));
+    await tester.pump();
+    expect(
+      controller.value,
+      closeTo(controller.top - 120, 0.5),
+      reason: 'the sheet should have taken the gesture back',
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('at the top detent a downward drag off zero still scrolls', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host());
+    controller.animateToDetent(1);
+    await tester.pumpAndSettle();
+
+    final position = positionOf(tester)..jumpTo(200);
+    await tester.pump();
+
+    final gesture = await armedGestureOn(tester, find.byType(Scrollable));
+    await gesture.moveBy(const Offset(0, 80));
+    await tester.pump();
+
+    // The half that is load-bearing: the finger is going the direction that
+    // lowers the sheet, and the sheet stays put because the list still has
+    // somewhere to go.
+    expect(position.pixels, closeTo(120, 0.5));
+    expect(controller.value, controller.top);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
   });
 
   testWidgets('a widget in the content can reach the sheet controller', (
