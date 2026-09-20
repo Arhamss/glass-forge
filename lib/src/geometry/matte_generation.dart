@@ -57,10 +57,10 @@ class MatteGeneration {
   /// texture — see [isOwner] — because the original generation is still the
   /// one responsible for disposing it.
   MatteGeneration translated(Offset delta) => MatteGeneration(
-        texture: texture,
-        bounds: bounds.shift(delta),
-        sceneRevision: sceneRevision,
-        codec: codec,
-        isOwner: false,
-      );
+    texture: texture,
+    bounds: bounds.shift(delta),
+    sceneRevision: sceneRevision,
+    codec: codec,
+    isOwner: false,
+  );
 }

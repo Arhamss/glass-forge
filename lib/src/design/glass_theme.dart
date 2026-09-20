@@ -85,13 +85,15 @@ class GlassThemeData {
     required Brightness platformBrightness,
     Color? backdrop,
   }) {
-    return surfaces.of(role).resolve(
-      size: size,
-      platformBrightness: brightness ?? platformBrightness,
-      tokens: tokens,
-      motionDefaults: motion,
-      backdrop: backdrop,
-    );
+    return surfaces
+        .of(role)
+        .resolve(
+          size: size,
+          platformBrightness: brightness ?? platformBrightness,
+          tokens: tokens,
+          motionDefaults: motion,
+          backdrop: backdrop,
+        );
   }
 
   /// Returns a copy with the given fields replaced.

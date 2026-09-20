@@ -43,18 +43,17 @@ class _UnavailableProducer implements GeometryProducer {
 }
 
 GlassScene _sceneWithOneShape() {
-  return GlassScene()
-    ..register(
-      'a',
-      ShapeGeometry.resolve(
-        shape: const GlassRoundedRectangle(
-          radius: BorderRadius.all(Radius.circular(8)),
-        ),
-        size: const Size(100, 40),
-        toLayer: Matrix4.identity(),
-        devicePixelRatio: 1,
+  return GlassScene()..register(
+    'a',
+    ShapeGeometry.resolve(
+      shape: const GlassRoundedRectangle(
+        radius: BorderRadius.all(Radius.circular(8)),
       ),
-    );
+      size: const Size(100, 40),
+      toLayer: Matrix4.identity(),
+      devicePixelRatio: 1,
+    ),
+  );
 }
 
 Future<Uint8List> _rgbaBytes(ui.Image image) async {
@@ -274,7 +273,8 @@ void main() {
         expect(
           fromEdgeBand,
           greaterThan(0),
-          reason: 'the portable dome came out as the edge band, so the '
+          reason:
+              'the portable dome came out as the edge band, so the '
               'parity above compared two edge bands',
         );
       },

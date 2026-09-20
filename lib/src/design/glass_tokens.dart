@@ -189,8 +189,14 @@ class GlassRadiusScale {
   final double extraLarge;
 
   /// The steps in ladder order, with the capsule's unbounded radius last.
-  List<double> get steps =>
-      <double>[none, small, medium, large, extraLarge, double.infinity];
+  List<double> get steps => <double>[
+    none,
+    small,
+    medium,
+    large,
+    extraLarge,
+    double.infinity,
+  ];
 
   /// The radius [step] resolves to, before any size clamp.
   double radiusOf(GlassRadiusStep step) => switch (step) {
@@ -323,8 +329,7 @@ class GlassDepthScale {
   final double referenceLift;
 
   /// The steps in ladder order. Monotonicity is tested on this.
-  List<double> get steps =>
-      <double>[flush, raised, floating, presented];
+  List<double> get steps => <double>[flush, raised, floating, presented];
 
   /// The lift [step] resolves to, in logical pixels.
   double liftOf(GlassDepthStep step) => switch (step) {
@@ -344,8 +349,7 @@ class GlassDepthScale {
     if (lift <= 0) {
       return const <BoxShadow>[];
     }
-    final opacity =
-        referenceOpacity * referenceLift / (referenceLift + lift);
+    final opacity = referenceOpacity * referenceLift / (referenceLift + lift);
     return <BoxShadow>[
       BoxShadow(
         color: shadowColor.withValues(alpha: opacity.clamp(0.0, 1.0)),
@@ -483,6 +487,5 @@ class GlassTokens {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(blur, radius, depth, tint, flipMaxShortSide);
+  int get hashCode => Object.hash(blur, radius, depth, tint, flipMaxShortSide);
 }

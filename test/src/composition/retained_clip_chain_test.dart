@@ -69,8 +69,9 @@ void main() {
   setUpAll(ShaderLibrary.instance.warmUp);
   tearDownAll(ShaderLibrary.instance.disposeAll);
 
-  testWidgets('glass survives being scrolled to the viewport edge',
-      (tester) async {
+  testWidgets('glass survives being scrolled to the viewport edge', (
+    tester,
+  ) async {
     // Upstream #124: glass and its contents disappear at the scroll bounds.
     final controller = ScrollController();
     await tester.pumpWidget(
@@ -108,8 +109,7 @@ void main() {
     controller.dispose();
   }, tags: <String>['impeller']);
 
-  testWidgets('glass inside a clipped container stays clipped',
-      (tester) async {
+  testWidgets('glass inside a clipped container stays clipped', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Center(

@@ -121,8 +121,10 @@ void main() {
     );
 
     expect(after.material.frost, isNot(before.material.frost));
-    expect(after.material.copyWith(frost: before.material.frost),
-        before.material);
+    expect(
+      after.material.copyWith(frost: before.material.frost),
+      before.material,
+    );
     expect(after.shape, before.shape);
     expect(after.motion, before.motion);
     expect(after.shadows, before.shadows);
@@ -191,8 +193,10 @@ void main() {
       tokens: GlassTokens(blur: GlassBlurScale(thick: 21)),
     );
     expect(
-      const GlassTheme(data: changed, child: SizedBox.shrink())
-          .updateShouldNotify(first),
+      const GlassTheme(
+        data: changed,
+        child: SizedBox.shrink(),
+      ).updateShouldNotify(first),
       isTrue,
     );
   });

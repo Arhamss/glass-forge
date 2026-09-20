@@ -50,7 +50,9 @@ void main() {
     // implicit layer instead and warn.
     await tester.pumpWidget(
       const MaterialApp(
-        home: Center(child: Glass(shape: GlassOval(), child: Text('orphan'))),
+        home: Center(
+          child: Glass(shape: GlassOval(), child: Text('orphan')),
+        ),
       ),
     );
     expect(find.text('orphan'), findsOneWidget);
@@ -256,7 +258,8 @@ void main() {
       expect(
         initialOrigin,
         offsetMoreOrLessEquals(const Offset(30, 40) * dpr, epsilon: 0.5),
-        reason: 'the geometry registered on the very first paint does not '
+        reason:
+            'the geometry registered on the very first paint does not '
             "match this Positioned's own offset -- performLayout's stale "
             'transform is what stuck',
       );
@@ -277,7 +280,8 @@ void main() {
       expect(
         layer.scene.shapes.single.origin,
         isNot(equals(initialOrigin)),
-        reason: "the registered geometry did not follow the shape's new "
+        reason:
+            "the registered geometry did not follow the shape's new "
             'Positioned offset',
       );
     },

@@ -88,9 +88,9 @@ class GpuGeometryProducer implements GeometryProducer {
 
   @override
   GeometryCapabilities get capabilities => GeometryCapabilities(
-        available: _available ??= _probe(),
-        name: 'flutter-gpu',
-      );
+    available: _available ??= _probe(),
+    name: 'flutter-gpu',
+  );
 
   bool _probe() {
     final cached = _contextProbe;
@@ -399,10 +399,16 @@ class GpuGeometryProducer implements GeometryProducer {
 /// interpolated varying (see geometry_fragment.glsl), so this attribute
 /// carries nothing but coverage.
 final Float32List _fullScreenQuadVertices = Float32List.fromList(<double>[
-  -1, -1,
-  1, -1,
-  -1, 1,
-  1, -1,
-  1, 1,
-  -1, 1,
+  -1,
+  -1,
+  1,
+  -1,
+  -1,
+  1,
+  1,
+  -1,
+  1,
+  1,
+  -1,
+  1,
 ]);

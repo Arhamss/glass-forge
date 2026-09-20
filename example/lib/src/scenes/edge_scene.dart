@@ -74,7 +74,8 @@ class _EdgeSceneState extends State<EdgeScene> {
         onChanged: (value) => setState(() => _brightness = value),
         labelOf: (value) => value == Brightness.dark ? 'Dark' : 'Light',
       ),
-      code: 'GlassMaterial.regular(brightness: Brightness.'
+      code:
+          'GlassMaterial.regular(brightness: Brightness.'
           '${_brightness.name})',
     );
   }

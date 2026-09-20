@@ -150,7 +150,9 @@ class AccessibilitySignalSource extends ChangeNotifier
   }) : _platform = platform ?? GlassForgePlatform.instance,
        _features =
            features ??
-           (() => WidgetsBinding.instance.platformDispatcher
+           (() => WidgetsBinding
+               .instance
+               .platformDispatcher
                .accessibilityFeatures);
 
   final GlassForgePlatform _platform;

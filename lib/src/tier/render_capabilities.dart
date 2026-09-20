@@ -194,7 +194,8 @@ abstract final class RenderCapabilityProbe {
     // exact here anyway — iOS and macOS have had no backend other than
     // Metal since 3.29 removed Skia from iOS and the FLTEnableImpeller
     // opt-out stopped working.
-    final apple = defaultTargetPlatform == TargetPlatform.iOS ||
+    final apple =
+        defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
     return apple ? GraphicsBackend.metal : GraphicsBackend.vulkan;
   }

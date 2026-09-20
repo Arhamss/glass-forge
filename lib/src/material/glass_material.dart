@@ -41,8 +41,9 @@ class GlassMaterial {
       thickness: _appleThickness,
       edgeRefraction: _appleEdgeRefraction,
       frost: dark ? _appleRegularFrostDark : _appleRegularFrostLight,
-      saturation:
-          dark ? _appleRegularSaturationDark : _appleRegularSaturationLight,
+      saturation: dark
+          ? _appleRegularSaturationDark
+          : _appleRegularSaturationLight,
       tint: dark ? _appleRegularTintDark : _appleRegularTintLight,
       tintOpacity: dark
           ? _appleRegularTintOpacityDark
@@ -161,8 +162,7 @@ class GlassMaterial {
       saturation != 1.0;
 
   /// The displacement range the matte codec should cover, in logical pixels.
-  double get maxDisplacement =>
-      MatteCodec.displacementRangeFor(edgeRefraction);
+  double get maxDisplacement => MatteCodec.displacementRangeFor(edgeRefraction);
 
   /// The derived refractive index.
   double get refractiveIndex {
@@ -236,18 +236,18 @@ class GlassMaterial {
 
   @override
   int get hashCode => Object.hash(
-        variant,
-        profile,
-        thickness,
-        edgeRefraction,
-        refractionSpread,
-        frost,
-        chromaticAberration,
-        tint,
-        tintOpacity,
-        saturation,
-        highlight,
-        lightDirection,
-        contour,
-      );
+    variant,
+    profile,
+    thickness,
+    edgeRefraction,
+    refractionSpread,
+    frost,
+    chromaticAberration,
+    tint,
+    tintOpacity,
+    saturation,
+    highlight,
+    lightDirection,
+    contour,
+  );
 }

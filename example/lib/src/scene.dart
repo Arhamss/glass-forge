@@ -61,7 +61,8 @@ class SceneInfo {
 final scenes = <SceneInfo>[
   SceneInfo(
     name: 'Lens',
-    blurb: 'Refraction across the whole surface. Drag it, and the ridge '
+    blurb:
+        'Refraction across the whole surface. Drag it, and the ridge '
         'behind bends with it.',
     photo: 'assets/images/desert_dunes.jpg',
     panelBackdrop: const Color(0xFF674339),
@@ -70,7 +71,8 @@ final scenes = <SceneInfo>[
   ),
   SceneInfo(
     name: 'Edge',
-    blurb: "Apple's material bends only at the rim. Regular and clear, "
+    blurb:
+        "Apple's material bends only at the rim. Regular and clear, "
         'fitted to iOS 27 captures.',
     photo: 'assets/images/coastal_town.jpg',
     panelBackdrop: const Color(0xFF3F4A4A),
@@ -79,7 +81,8 @@ final scenes = <SceneInfo>[
   ),
   SceneInfo(
     name: 'Blend',
-    blurb: 'Two shapes, one distance field. Slide them together and they '
+    blurb:
+        'Two shapes, one distance field. Slide them together and they '
         'join through a neck.',
     photo: 'assets/images/northern_lights.jpg',
     panelBackdrop: const Color(0xFF29364C),
@@ -88,7 +91,8 @@ final scenes = <SceneInfo>[
   ),
   SceneInfo(
     name: 'Motion',
-    blurb: "Squash is read off the spring's own velocity, so it peaks when "
+    blurb:
+        "Squash is read off the spring's own velocity, so it peaks when "
         'the surface is fastest.',
     photo: 'assets/images/tokyo_rain.jpg',
     panelBackdrop: const Color(0xFF482427),
@@ -97,7 +101,8 @@ final scenes = <SceneInfo>[
   ),
   SceneInfo(
     name: 'System',
-    blurb: 'Named surfaces, each resolving its own material — and the tier '
+    blurb:
+        'Named surfaces, each resolving its own material — and the tier '
         'that decided what they render.',
     photo: 'assets/images/alpine_lake.jpg',
     panelBackdrop: const Color(0xFF676664),

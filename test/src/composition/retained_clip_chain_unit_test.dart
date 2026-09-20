@@ -243,8 +243,7 @@ void main() {
       ),
     );
     _attachAndLayout(twoClipsLayer, const Size(60, 60));
-    final twoClips = RetainedClipChain()
-      ..collect(twoClipsShape, twoClipsLayer);
+    final twoClips = RetainedClipChain()..collect(twoClipsShape, twoClipsLayer);
 
     expect(oneClip.matches(twoClips), isFalse);
     expect(twoClips.matches(oneClip), isFalse);
@@ -286,8 +285,7 @@ void main() {
       child: RenderClipRect(clipBehavior: Clip.hardEdge, child: hardEdgeShape),
     );
     _attachAndLayout(hardEdgeLayer, const Size(60, 60));
-    final hardEdge = RetainedClipChain()
-      ..collect(hardEdgeShape, hardEdgeLayer);
+    final hardEdge = RetainedClipChain()..collect(hardEdgeShape, hardEdgeLayer);
 
     final antiAliasShape = _leaf();
     final antiAliasLayer = RenderConstrainedBox(

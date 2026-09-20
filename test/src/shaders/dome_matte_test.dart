@@ -252,7 +252,8 @@ void main() {
       expect(
         dome.at(halfway.dx, halfway.dy).displacement.dx,
         lessThan(0),
-        reason: 'right of centre, a lens samples from further left -- '
+        reason:
+            'right of centre, a lens samples from further left -- '
             'toward the middle, which is what magnifies it',
       );
     },
@@ -271,8 +272,10 @@ void main() {
       );
       final rim = dome.at(_at.dx + 599.5, centre.dy).displacement.distance;
       expect(rim, closeTo(84, 84 * 0.06));
-      expect(dome.at(centre.dx, centre.dy).displacement.distance,
-          lessThan(1.5));
+      expect(
+        dome.at(centre.dx, centre.dy).displacement.distance,
+        lessThan(1.5),
+      );
     },
   );
 
@@ -320,8 +323,11 @@ void main() {
     // rounded to 3x a small displacement here, so its own seams start well
     // before the radial term has taken over. This is the case the widening
     // stencil is for.
-    ('a large rounded square with a small edge refraction',
-        const Size(1200, 1200), 60),
+    (
+      'a large rounded square with a small edge refraction',
+      const Size(1200, 1200),
+      60,
+    ),
   ]) {
     test('$label has no seam down its diagonals', () async {
       // Inside a rounded box the SDF gradient is piecewise constant, and
@@ -391,7 +397,8 @@ void main() {
         expect(
           (after - before).abs(),
           lessThan(0.05),
-          reason: 'the row ${above.round()} above centre turns by '
+          reason:
+              'the row ${above.round()} above centre turns by '
               '${(after - before).toStringAsFixed(3)} px/px at the diagonal',
         );
       }

@@ -97,8 +97,7 @@ class _SystemSceneState extends State<SystemScene> {
   }
 }
 
-String _capitalise(String value) =>
-    value[0].toUpperCase() + value.substring(1);
+String _capitalise(String value) => value[0].toUpperCase() + value.substring(1);
 
 /// What the engine decided, and what it decided it from.
 ///

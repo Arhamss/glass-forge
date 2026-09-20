@@ -129,7 +129,8 @@ void main() {
       expect(
         worstCrossing,
         lessThan(1.5),
-        reason: 'a texel sampled ${worstCrossing.toStringAsFixed(1)} px '
+        reason:
+            'a texel sampled ${worstCrossing.toStringAsFixed(1)} px '
             'across the medial axis',
       );
 
@@ -140,14 +141,14 @@ void main() {
       expect(
         (below - above).abs(),
         lessThan(4),
-        reason: 'across the axis the image jumped '
+        reason:
+            'across the axis the image jumped '
             '${(below - above).toStringAsFixed(1)} px',
       );
     });
   }
 
-  test('a shape deep enough for its band keeps the fitted profile',
-      () async {
+  test('a shape deep enough for its band keeps the fitted profile', () async {
     // 600 px deep against a band of 82: nothing is fitted here, so the
     // magnitude must be exactly the convex squircle the presets were fitted
     // with. Half-way through the band that is (1 - 0.5^4)^(1/4) of the

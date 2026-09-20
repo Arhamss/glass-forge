@@ -89,12 +89,12 @@ void main() {
       );
       final layer =
           RenderGlassLayer(
-            material: const GlassMaterial(),
-            tier: GeometryTier.none,
-            devicePixelRatio: 1,
-          )
-          ..child = child
-          ..layout(const BoxConstraints.tightFor(width: 40, height: 40));
+              material: const GlassMaterial(),
+              tier: GeometryTier.none,
+              devicePixelRatio: 1,
+            )
+            ..child = child
+            ..layout(const BoxConstraints.tightFor(width: 40, height: 40));
       expect(ShaderLibrary.instance.isReady, isFalse);
 
       final rootLayer = ContainerLayer();
@@ -149,8 +149,10 @@ void main() {
       owner.flushCompositingBits();
       layer.layout(const BoxConstraints.tightFor(width: 40, height: 40));
       expect(
-        layer.scene.shapes, hasLength(1),
-        reason: 'without a registered shape there is no backdrop pass, and '
+        layer.scene.shapes,
+        hasLength(1),
+        reason:
+            'without a registered shape there is no backdrop pass, and '
             'the offset below would be checked on the wrong code path',
       );
 

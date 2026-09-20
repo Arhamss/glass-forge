@@ -268,7 +268,8 @@ void main() {
       expect(
         producer.shapeCounts,
         <int>[3, 3],
-        reason: 'a matte holding a shape from another pass would smooth-min '
+        reason:
+            'a matte holding a shape from another pass would smooth-min '
             'that shape into this one and then fill it with the wrong '
             'material',
       );
@@ -344,13 +345,15 @@ void main() {
       expect(
         captured.colorAt(const Offset(5, 30)),
         _red,
-        reason: 'the first pass drew nothing, so an empty backdrop pass '
+        reason:
+            'the first pass drew nothing, so an empty backdrop pass '
             'never reached the compositor',
       );
       expect(
         captured.colorAt(const Offset(55, 30)),
         _blue,
-        reason: 'where the two overlap the later pass wins, because it is '
+        reason:
+            'where the two overlap the later pass wins, because it is '
             'composited over the earlier one',
       );
     },
@@ -437,7 +440,8 @@ void main() {
       expect(
         captured.colorAt(const Offset(80, 30)),
         _red,
-        reason: 'the second member declared blue, but a shape that merges '
+        reason:
+            'the second member declared blue, but a shape that merges '
             'into another is part of one surface and takes one material',
       );
     },
@@ -509,7 +513,8 @@ void main() {
         expect(
           renders[roles[a]],
           isNot(renders[roles[b]]),
-          reason: '${roles[a].name} and ${roles[b].name} rendered the same '
+          reason:
+              '${roles[a].name} and ${roles[b].name} rendered the same '
               'glass, so their materials never reached the renderer',
         );
       }

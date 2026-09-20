@@ -340,7 +340,8 @@ class _LensSceneState extends State<LensScene> {
         format: (v) => '${v.round()} px',
         onChanged: (v) => setState(() => _refraction = v),
       ),
-      code: 'GlassMaterial.dome()'
+      code:
+          'GlassMaterial.dome()'
           '.copyWith(edgeRefraction: ${_refraction.round()})',
     );
   }

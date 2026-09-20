@@ -502,6 +502,5 @@ class GlassSurfaces {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(navigationBar, sheet, card, control, scrim);
+  int get hashCode => Object.hash(navigationBar, sheet, card, control, scrim);
 }

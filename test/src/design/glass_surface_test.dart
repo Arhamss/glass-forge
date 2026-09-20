@@ -50,8 +50,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a small control flips its labels where a large sheet does not',
-      (tester) async {
+  testWidgets('a small control flips its labels where a large sheet does not', (
+    tester,
+  ) async {
     // The same rule as `glass_surfaces_test.dart`, one layer up: what the
     // size gate decides has to survive being wired through a widget's
     // constraints and come out as the colour text is actually drawn in.

@@ -125,8 +125,7 @@ class SpringAxis {
       final oscillation = a * cos + b * sin;
       position = target + decay * oscillation;
       velocity =
-          decay *
-          (damped * (b * cos - a * sin) - zeta * omega * oscillation);
+          decay * (damped * (b * cos - a * sin) - zeta * omega * oscillation);
     } else if (zeta > 1 + _criticalBand) {
       final rate = omega * math.sqrt(zeta * zeta - 1);
       final fast = -zeta * omega - rate;

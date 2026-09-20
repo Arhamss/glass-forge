@@ -70,7 +70,8 @@ void main() {
     expect(
       distances.every((d) => d < -4),
       isTrue,
-      reason: 'a texel on the horizontal axis read as the boundary: '
+      reason:
+          'a texel on the horizontal axis read as the boundary: '
           '$distances',
     );
   });

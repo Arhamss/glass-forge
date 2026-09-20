@@ -71,7 +71,11 @@ void main() {
     // `vec4[]`, so a parameter typed `vec4 shapeData[24]` is exactly the
     // defect this test exists to catch, and a float-only pattern would miss it.
     expect(
-      RegExp(r'\(\s*[^)]*' '$_glslTypePattern' r'\s+\w+\s*\[').hasMatch(code),
+      RegExp(
+        r'\(\s*[^)]*'
+        '$_glslTypePattern'
+        r'\s+\w+\s*\[',
+      ).hasMatch(code),
       isFalse,
       reason: 'an array parameter would break SkSL compilation',
     );

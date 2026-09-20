@@ -129,7 +129,8 @@ void main() {
       expect(
         matte.codec.decodeSignedDistance(blue / 255),
         lessThan(0),
-        reason: 'the middle of a 24-pixel gap under a 40-pixel blend is '
+        reason:
+            'the middle of a 24-pixel gap under a 40-pixel blend is '
             'outside the glass: the shapes did not merge',
       );
     },

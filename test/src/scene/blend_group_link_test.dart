@@ -30,7 +30,9 @@ void main() {
   });
 
   test('tracks membership and reports the first member', () {
-    final link = BlendGroupLink(blend: 12)..add('a')..add('b');
+    final link = BlendGroupLink(blend: 12)
+      ..add('a')
+      ..add('b');
     expect(link.isFirst('a'), isTrue);
     expect(link.isFirst('b'), isFalse);
 

@@ -131,8 +131,10 @@ class GlassTintRamp {
     Color backdrop, {
     GlassTintStep step = GlassTintStep.regular,
   }) {
-    return GlassLegibility.contrastRatio(surfaceOver(backdrop, step: step),
-        label);
+    return GlassLegibility.contrastRatio(
+      surfaceOver(backdrop, step: step),
+      label,
+    );
   }
 
   /// Returns a copy with the given fields replaced.

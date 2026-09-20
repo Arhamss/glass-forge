@@ -7,10 +7,9 @@ void main() {
   final geometry = File('shaders/geometry.frag').readAsStringSync();
   final profile = File('shaders/common/profile.glsl').readAsStringSync();
   final codec = File('shaders/common/codec.glsl').readAsStringSync();
-  final gpuGeometry =
-      File('shaders/gpu/geometry_fragment.glsl').readAsStringSync();
-  final mattePass =
-      File('shaders/common/matte_pass.glsl').readAsStringSync();
+  final gpuGeometry = File('shaders/gpu/geometry_fragment.glsl')
+      .readAsStringSync();
+  final mattePass = File('shaders/common/matte_pass.glsl').readAsStringSync();
 
   test('MAX_SHAPES matches the Dart constant', () {
     // Drift here silently truncates the shape list, and the missing shapes
@@ -19,8 +18,8 @@ void main() {
   });
 
   test('the first uniform is the engine-written vec2', () {
-    final firstUniform =
-        RegExp(r'uniform\s+(\w+)\s+(\w+)').firstMatch(geometry);
+    final firstUniform = RegExp(r'uniform\s+(\w+)\s+(\w+)')
+        .firstMatch(geometry);
     expect(firstUniform?.group(1), 'vec2');
     expect(firstUniform?.group(2), 'uSize');
   });

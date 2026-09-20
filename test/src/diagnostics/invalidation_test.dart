@@ -132,13 +132,11 @@ void main() {
       GlassRenderCounters.instance.reset();
 
       final owner = PipelineOwner();
-      final layer =
-          RenderGlassLayer(
-            material: const GlassMaterial(),
-            tier: GeometryTier.portable,
-            devicePixelRatio: 1,
-          )
-          ..attach(owner);
+      final layer = RenderGlassLayer(
+        material: const GlassMaterial(),
+        tier: GeometryTier.portable,
+        devicePixelRatio: 1,
+      )..attach(owner);
       final shape = RenderGlassShape(shape: const GlassOval(), group: null)
         ..child = RenderConstrainedBox(
           additionalConstraints: BoxConstraints.tight(const Size(80, 80)),

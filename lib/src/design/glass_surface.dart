@@ -216,6 +216,5 @@ class _GlassShadowPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_GlassShadowPainter oldDelegate) =>
-      oldDelegate.shape != shape ||
-      !listEquals(oldDelegate.shadows, shadows);
+      oldDelegate.shape != shape || !listEquals(oldDelegate.shadows, shadows);
 }

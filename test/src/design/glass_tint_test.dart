@@ -44,9 +44,7 @@ void main() {
             readable: entry.key == GlassTintStep.readable
                 ? opacity - 0.001
                 : null,
-            opaque: entry.key == GlassTintStep.opaque
-                ? opacity - 0.001
-                : null,
+            opaque: entry.key == GlassTintStep.opaque ? opacity - 0.001 : null,
           );
           expect(
             shaved.labelContrastOver(backdrop, step: entry.key),
@@ -156,7 +154,9 @@ void main() {
     expect(overridden.regular, GlassTintRamp.appleDark.regular);
     expect(overridden.opaque, GlassTintRamp.appleDark.opaque);
     expect(overridden.color, GlassTintRamp.appleDark.color);
-    expect(const GlassTints(light: GlassTintRamp.appleDark).dark,
-        GlassTintRamp.appleDark);
+    expect(
+      const GlassTints(light: GlassTintRamp.appleDark).dark,
+      GlassTintRamp.appleDark,
+    );
   });
 }

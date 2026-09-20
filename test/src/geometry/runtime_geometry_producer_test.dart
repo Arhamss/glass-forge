@@ -11,18 +11,17 @@ import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/shapes/shape_geometry.dart';
 
 GlassScene _sceneWithOneShape() {
-  return GlassScene()
-    ..register(
-      'a',
-      ShapeGeometry.resolve(
-        shape: const GlassRoundedRectangle(
-          radius: BorderRadius.all(Radius.circular(8)),
-        ),
-        size: const Size(100, 40),
-        toLayer: Matrix4.identity(),
-        devicePixelRatio: 1,
+  return GlassScene()..register(
+    'a',
+    ShapeGeometry.resolve(
+      shape: const GlassRoundedRectangle(
+        radius: BorderRadius.all(Radius.circular(8)),
       ),
-    );
+      size: const Size(100, 40),
+      toLayer: Matrix4.identity(),
+      devicePixelRatio: 1,
+    ),
+  );
 }
 
 const _request = MatteRequest(
@@ -280,7 +279,8 @@ void _offOriginTests() {
       expect(
         generation.bounds.left,
         greaterThan(200),
-        reason: 'the test only means something if the allocation is well '
+        reason:
+            'the test only means something if the allocation is well '
             'away from the layer origin',
       );
       expect(generation.codec.decode(centre).signedDistance, lessThan(0));
@@ -351,7 +351,8 @@ void _flatShapeTests() {
     expect(
       pastCorner,
       greaterThan(1),
-      reason: 'the bounding box corner decoded at $pastCorner, inside a '
+      reason:
+          'the bounding box corner decoded at $pastCorner, inside a '
           '${radius}px round: the shape draws as a rectangle',
     );
   });

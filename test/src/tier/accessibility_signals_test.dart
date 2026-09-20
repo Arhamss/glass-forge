@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/platform/glass_forge_platform_interface.dart';
 import 'package:glass_forge/src/tier/accessibility_signals.dart';
@@ -152,8 +153,7 @@ void main() {
         addTearDown(platform.controller.close);
         final source = AccessibilitySignalSource(
           platform: platform,
-          features: () =>
-              const FakeAccessibilityFeatures(highContrast: true),
+          features: () => const FakeAccessibilityFeatures(highContrast: true),
         );
         addTearDown(source.dispose);
 

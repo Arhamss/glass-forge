@@ -40,8 +40,8 @@ void main() {
       // shader keeps dispatching on only the old number of indices and every
       // shape past that index silently stops rendering, with no test
       // failing. This test is that tie.
-      final maxShapesMatch =
-          RegExp(r'#define\s+MAX_SHAPES\s+(\d+)').firstMatch(geometry);
+      final maxShapesMatch = RegExp(r'#define\s+MAX_SHAPES\s+(\d+)')
+          .firstMatch(geometry);
       expect(
         maxShapesMatch,
         isNotNull,

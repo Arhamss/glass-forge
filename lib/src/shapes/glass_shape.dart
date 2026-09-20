@@ -50,8 +50,8 @@ class GlassRoundedRectangle extends GlassShape {
 
   @override
   ShapeBorder toBorder(Size size) => RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(resolveRadius(size)),
-      );
+    borderRadius: BorderRadius.circular(resolveRadius(size)),
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -99,8 +99,8 @@ class GlassSuperellipse extends GlassShape {
 
   @override
   ShapeBorder toBorder(Size size) => RoundedSuperellipseBorder(
-        borderRadius: BorderRadius.circular(resolveRadius(size)),
-      );
+    borderRadius: BorderRadius.circular(resolveRadius(size)),
+  );
 
   @override
   bool operator ==(Object other) =>

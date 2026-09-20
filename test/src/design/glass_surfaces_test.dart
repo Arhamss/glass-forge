@@ -134,7 +134,8 @@ void main() {
           expect(
             contrast,
             greaterThanOrEqualTo(spec.minimumContrast),
-            reason: '${role.name} promises ${spec.minimumContrast}:1 and '
+            reason:
+                '${role.name} promises ${spec.minimumContrast}:1 and '
                 'delivers ${contrast.toStringAsFixed(2)}:1',
           );
         });
@@ -242,8 +243,10 @@ void main() {
 
     expect(
       frostFor(Brightness.light, GlassBlurStep.thick) / lightRegular,
-      closeTo(frostFor(Brightness.dark, GlassBlurStep.thick) / darkRegular,
-          1e-9),
+      closeTo(
+        frostFor(Brightness.dark, GlassBlurStep.thick) / darkRegular,
+        1e-9,
+      ),
     );
   });
 

@@ -175,14 +175,16 @@ void main() {
       expect(
         probe.paints,
         greaterThan(paintsBefore),
-        reason: 'the layer did not repaint on an animating frame at all, '
+        reason:
+            'the layer did not repaint on an animating frame at all, '
             'which would mean the matte never updates rather than updating '
             'late',
       );
       expect(
         producer.bakedOrigins,
         isNotEmpty,
-        reason: 'the layer repainted without baking anything, so this frame '
+        reason:
+            'the layer repainted without baking anything, so this frame '
             'says nothing about when the bake happens',
       );
 
@@ -196,7 +198,8 @@ void main() {
       expect(
         producer.bakedOrigins.last,
         origin,
-        reason: 'the matte was baked from the scene as the previous frame '
+        reason:
+            'the matte was baked from the scene as the previous frame '
             'left it',
       );
 
@@ -207,7 +210,8 @@ void main() {
       expect(
         probe.revisionSeenByLayer,
         lessThan(layer.scene.revision),
-        reason: 'the shape registered nothing while this frame painted, so '
+        reason:
+            'the shape registered nothing while this frame painted, so '
             'baking before or after it would look identical',
       );
       expect(probe.originSeenByLayer, isNot(origin));
@@ -287,7 +291,8 @@ void main() {
       expect(
         producer.bakedOrigins,
         isNotEmpty,
-        reason: 'the layer was never asked to repaint, so the matte still '
+        reason:
+            'the layer was never asked to repaint, so the matte still '
             'describes where the shape used to be',
       );
       expect(producer.bakedOrigins.last, after);
