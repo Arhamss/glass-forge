@@ -670,6 +670,29 @@ why these cannot be `const`). Task 8b adds
 shape, so the steps below apply to each; what differs is the inventory, given
 per task.
 
+
+**Where the specimens now live.** Task 3 deleted `example/lib/src/scenes/`
+and `LensScene` from `main.dart`. It had to: Task 3's own Step 5 removes
+`SceneShell`, `BackdropInfo.name` and `.blurb`, and all five scenes depend on
+them, so leaving the scene files in place made `flutter analyze` clean —
+Task 3's hard gate — unreachable. This plan's pre-flight scan asserted the
+scene widgets would survive until Task 12 and was wrong.
+
+So read specimens out of **git history**, not the working tree:
+
+```bash
+git show acd6ee2:example/lib/src/scenes/edge_scene.dart
+git show acd6ee2:example/lib/src/scenes/blend_scene.dart
+git show acd6ee2:example/lib/src/scenes/motion_scene.dart
+git show acd6ee2:example/lib/src/scenes/system_scene.dart
+git show acd6ee2:example/lib/src/scenes/sheet_scene.dart
+git show acd6ee2:example/lib/main.dart      # LensScene lives here
+```
+
+Nothing is lost; it is one command away. Port the specimen's glass
+construction into the entry's `build`, and do not port `SceneShell` — the
+entry page replaces it.
+
 **Per-task steps, every one of Tasks 5-10:**
 
 - [ ] **Step 1:** Write a test in `example/test/catalogue_test.dart` asserting
@@ -813,15 +836,18 @@ git commit -m "test(example): compile every catalogue snippet"
 - Modify: `example/lib/main.dart`, `example/README.md`
 - Modify: `README.md` at the repository root, if it describes the scenes
 
-- [ ] **Step 1: Delete the scene files and any now-unused imports**
+- [ ] **Step 1: Confirm the scene files are already gone**
 
-Note the fifth scene is **not** a file: `LensScene` is declared inline in
-`example/lib/main.dart` (around line 278) and must be deleted from there.
-Deleting only `lib/src/scenes/` leaves it behind, still compiling, unused.
+**Task 3 did this deletion**, including `LensScene`, which was inline in
+`main.dart` rather than in `lib/src/scenes/`. It was forced: Task 3 removes
+`SceneShell`, `BackdropInfo.name` and `.blurb`, which every scene depended
+on, so they could not survive its `flutter analyze` gate.
 
-Confirm nothing references any of them: grep each deleted type's name across
-`example/lib`, `example/test` and the root `README.md`. Remember a barrel
-export or an import is not a use.
+So this step is now a verification, not a deletion. Confirm
+`example/lib/src/scenes/` does not exist and that no `SceneShell`,
+`LensScene`, `EdgeScene`, `BlendScene`, `MotionScene`, `SystemScene` or
+`SheetScene` reference survives in `example/lib`, `example/test`, the example
+README or the root README. A barrel export or an import is not a use.
 
 - [ ] **Step 2: Update the example README and the root README**
 
