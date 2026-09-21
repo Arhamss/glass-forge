@@ -8,13 +8,17 @@ import 'package:flutter/widgets.dart';
 @immutable
 class Knob<T> {
   /// Creates a knob.
-  const Knob({
+  ///
+  /// [options] is copied into an unmodifiable list, so holding a knob's
+  /// [options] never grants a way to change it in place — the only way to
+  /// change a knob is [withValue], which produces a new one.
+  Knob({
     required this.name,
     required this.value,
-    this.options = const <Never>[],
+    List<T> options = const <Never>[],
     this.min,
     this.max,
-  });
+  }) : options = List.unmodifiable(options);
 
   /// The parameter's name, as it appears in the API.
   final String name;
@@ -50,15 +54,19 @@ class Knob<T> {
 @immutable
 class CatalogueEntry {
   /// Creates an entry.
-  const CatalogueEntry({
+  ///
+  /// [knobs] is copied into an unmodifiable list, so holding an entry's
+  /// [knobs] never grants a way to change it in place — the only way to
+  /// change a knob is [withKnob], which produces a new entry.
+  CatalogueEntry({
     required this.api,
     required this.purpose,
     required this.group,
-    required this.knobs,
+    required List<Knob<Object?>> knobs,
     required this.build,
     required this.code,
     this.seeAlso = const <String>[],
-  });
+  }) : knobs = List.unmodifiable(knobs);
 
   /// The API name. This is the string a reader would search for.
   final String api;

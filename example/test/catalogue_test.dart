@@ -46,4 +46,19 @@ void main() {
     final original = entryWithFrost(8)..withKnob(0, 20.0);
     expect(original.knobs.first.value, 8.0);
   });
+
+  test('entry.knobs cannot be mutated through a held reference', () {
+    final entry = entryWithFrost(8);
+
+    expect(
+      () => entry.knobs[0] = Knob<double>(name: 'frost', value: 99),
+      throwsUnsupportedError,
+      reason: 'the list is unmodifiable, not just the field',
+    );
+    expect(
+      entry.knobs.first.value,
+      8.0,
+      reason: 'the failed write left the entry as it was',
+    );
+  });
 }
