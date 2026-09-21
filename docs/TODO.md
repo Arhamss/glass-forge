@@ -162,8 +162,8 @@ and C3, see above.
 
 ## Known problems, none of them fixed
 
-- **A `Glass` inside a `CustomScrollView` throws on first layout under a
-  plain `MaterialApp`.** Found while building the catalogue example. It is a
+- **A `Glass` under a transform-bearing ancestor that has not been laid out
+  yet throws on first layout.** Two symptoms found so far, one cause.** Found while building the catalogue example. It is a
   package bug, not an example one, and it hits the headline use case — glass
   chrome over scrolling content.
 
@@ -206,6 +206,21 @@ and C3, see above.
   the error. The real fix belongs in `RenderGlassShape` — either tolerate an
   unlaid-out ancestor during the walk, or defer registration until layout has
   settled. `_scheduleLayerRepaint` in that same file is the nearest prior art.
+
+  **Second symptom, same cause, found later.** `_EntryRow` in the catalogue
+  example puts each row's thumbnail in a `FittedBox`, which is also
+  transform-bearing. Pumping a populated `CatalogueIndexPage` throws on the
+  first frame when a fresh `Glass` specimen beneath it registers geometry
+  before the `FittedBox` has laid out — and it is unstable run to run,
+  sometimes one self-correcting exception, sometimes several across many
+  frames. That instability is why a widget test covering the real index had
+  to stand in a simpler widget instead.
+
+  So this is not "handle Material's overscroll indicator". It is: **the
+  `getTransformTo` walk in `RenderGlassShape._syncGeometry` must tolerate an
+  ancestor that has not been laid out**, whatever put it there — a stretch
+  overscroll `Transform`, a `FittedBox`, or a plain `Transform` a consumer
+  wrote. Fixing only the overscroll case would leave the other two.
 
 - **Not publish-clean.** On a fresh checkout `flutter pub publish --dry-run`
   reports one warning: `pubspec.yaml` declares
