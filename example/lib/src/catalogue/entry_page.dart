@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart' show Icons, Scaffold;
+import 'package:flutter/material.dart'
+    show Icons, MaterialRouteTransitionMixin, Scaffold;
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_example/src/backdrop.dart';
@@ -21,23 +22,58 @@ import 'package:glass_forge_example/src/theme.dart';
 /// [outgoingCataloguePresence], which this and `CatalogueIndexPage` (via
 /// its own `ModalRoute`) build from the same shared [Interval] split.
 ///
-/// A plain [PageRouteBuilder] rather than `MaterialPageRoute`, because its
-/// `transitionsBuilder` replaces the platform's own page transition
-/// outright — nothing else gets to slide or fade this page's glass in
-/// alongside the ramp above.
+/// [_CatalogueEntryRoute], not a plain `PageRouteBuilder`: the index's own
+/// route is a `MaterialPageRoute`, and `MaterialRouteTransitionMixin
+/// .canTransitionTo` — the check that decides whether a covered route's
+/// `secondaryAnimation` gets proxied to the route being pushed at all —
+/// only says yes to a `nextRoute` that is itself a
+/// `MaterialRouteTransitionMixin` (or carries a matching
+/// `delegatedTransition`). A bare `PageRouteBuilder` is neither, so
+/// pushing one leaves the covered route's `secondaryAnimation` pinned at
+/// `kAlwaysDismissedAnimation` forever — `outgoingCataloguePresence` would
+/// then read a `covered` that never leaves 0, and the index's chrome
+/// would never fade at all while the entry page rose over it, exactly the
+/// two-passes-at-once failure this whole design exists to prevent. Mixing
+/// in `MaterialRouteTransitionMixin` here is what makes the index's
+/// `canTransitionTo` check pass.
 Route<void> catalogueEntryRoute(CatalogueEntry entry) {
-  return PageRouteBuilder<void>(
-    transitionDuration: const Duration(milliseconds: 420),
-    reverseTransitionDuration: const Duration(milliseconds: 420),
-    pageBuilder: (context, animation, secondaryAnimation) =>
-        CatalogueEntryPage(entry: entry),
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      return GlassPresence(
-        presence: incomingCataloguePresence(animation),
-        child: child,
-      );
-    },
-  );
+  return _CatalogueEntryRoute(entry: entry);
+}
+
+/// A `MaterialPageRoute`-compatible route whose transition is entirely
+/// the handoff — see [catalogueEntryRoute] for why it has to be one of
+/// these rather than a `PageRouteBuilder`.
+class _CatalogueEntryRoute extends PageRoute<void>
+    with MaterialRouteTransitionMixin<void> {
+  _CatalogueEntryRoute({required this.entry});
+
+  /// What the pushed page shows.
+  final CatalogueEntry entry;
+
+  @override
+  Widget buildContent(BuildContext context) => CatalogueEntryPage(entry: entry);
+
+  @override
+  bool get maintainState => true;
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 420);
+
+  @override
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 420);
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return GlassPresence(
+      presence: incomingCataloguePresence(animation),
+      child: child,
+    );
+  }
 }
 
 /// The midpoint every handoff in the catalogue splits at.

@@ -43,13 +43,6 @@ class BackdropInfo {
   final GlassMaterial material;
 }
 
-/// The five measured backdrops, one per photograph shipped with the example.
-///
-/// Photographs were generated for this project, so they ship with the
-/// example rather than being fetched at run time. Each one was picked for
-/// coarse structure — a ridge line, a painted terrace, a curtain of light. A
-/// backdrop finer than the displacement is pushed through whole periods and
-/// lands looking identical, and the glass then appears to do nothing.
 /// [backdrops], looked up by [BackdropInfo.photo] rather than a position in
 /// the list.
 ///
@@ -66,6 +59,13 @@ BackdropInfo backdropFor(String photo) =>
 /// drawn over it changes, which is the whole point of the handoff.
 const String catalogueBackdropPhoto = 'assets/images/northern_lights.jpg';
 
+/// The five measured backdrops, one per photograph shipped with the example.
+///
+/// Photographs were generated for this project, so they ship with the
+/// example rather than being fetched at run time. Each one was picked for
+/// coarse structure — a ridge line, a painted terrace, a curtain of light. A
+/// backdrop finer than the displacement is pushed through whole periods and
+/// lands looking identical, and the glass then appears to do nothing.
 final backdrops = <BackdropInfo>[
   BackdropInfo(
     photo: 'assets/images/desert_dunes.jpg',
