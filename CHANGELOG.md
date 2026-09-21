@@ -1,5 +1,11 @@
 ## Unreleased
 
+- `GlassDetentSheet.bottomGap` separates the floating sheet's bottom inset
+  from its side ones. A sheet that floats over other glass has to clear
+  that chrome's full height before their backdrop passes would overlap, and
+  driving every edge from one number charged twice that clearance in width.
+  Defaults to `gap`, so a sheet floating over nothing is unchanged.
+
 ### Chrome
 
 - `GlassDetentSheet` — a persistent bottom sheet dragged between fixed

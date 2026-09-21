@@ -15,6 +15,7 @@ class GlassDetentSheetMetrics {
   const GlassDetentSheetMetrics({
     required this.height,
     required this.gap,
+    required this.bottomGap,
     required this.radius,
     required this.progress,
   });
@@ -29,6 +30,7 @@ class GlassDetentSheetMetrics {
     required double lowest,
     required double top,
     double gap = 12,
+    double? bottomGap,
     double floatingRadius = 44,
     double flushRadius = 55,
   }) {
@@ -42,6 +44,7 @@ class GlassDetentSheetMetrics {
     return GlassDetentSheetMetrics(
       height: height,
       gap: lerpDouble(gap, 0, progress)!,
+      bottomGap: lerpDouble(bottomGap ?? gap, 0, progress)!,
       radius: lerpDouble(floatingRadius, flushRadius, progress)!,
       progress: progress,
     );
@@ -50,8 +53,20 @@ class GlassDetentSheetMetrics {
   /// How tall the sheet is, in logical pixels.
   final double height;
 
-  /// How far the sheet is inset from the screen's side and bottom edges.
+  /// How far the sheet is inset from the screen's **side** edges.
   final double gap;
+
+  /// How far the sheet is inset from the screen's **bottom** edge.
+  ///
+  /// Separate from [gap] because the two are asked for by different things.
+  /// The side inset is taste — how much of the backdrop shows past the
+  /// sheet. The bottom one is a clearance: where the sheet floats over other
+  /// glass chrome, it has to clear that chrome's whole height before their
+  /// two backdrop passes would overlap, and a bar is usually taller than any
+  /// side inset anyone wants. Driving both from one number means paying for
+  /// that clearance twice in width — a 52pt bar needs 64pt of bottom gap and
+  /// takes 128pt off the sheet's width to get it.
+  final double bottomGap;
 
   /// The corner radius, on all four corners.
   final double radius;
@@ -67,16 +82,18 @@ class GlassDetentSheetMetrics {
     return other is GlassDetentSheetMetrics &&
         other.height == height &&
         other.gap == gap &&
+        other.bottomGap == bottomGap &&
         other.radius == radius &&
         other.progress == progress;
   }
 
   @override
-  int get hashCode => Object.hash(height, gap, radius, progress);
+  int get hashCode => Object.hash(height, gap, bottomGap, radius, progress);
 
   @override
   String toString() =>
-      'GlassDetentSheetMetrics(height: $height, gap: $gap, radius: $radius)';
+      'GlassDetentSheetMetrics(height: $height, gap: $gap, '
+      'bottomGap: $bottomGap, radius: $radius)';
 }
 
 /// Which of [heights] a sheet released at [height] with [velocity] belongs at.

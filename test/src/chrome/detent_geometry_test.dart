@@ -83,6 +83,61 @@ void main() {
     });
   });
 
+  group('the side and bottom insets are separate', () {
+    // They were one number until a sheet had to float clear of a 52pt tab
+    // bar: buying that clearance through the shared gap also inset both
+    // sides by the same amount and took 128pt off the sheet's width.
+    test('bottomGap defaults to gap', () {
+      final metrics = GlassDetentSheetMetrics.at(
+        height: 80,
+        lowest: 80,
+        top: 800,
+        gap: 20,
+      );
+      expect(metrics.gap, 20);
+      expect(metrics.bottomGap, 20);
+    });
+
+    test('a bottom inset can exceed the side inset', () {
+      final metrics = GlassDetentSheetMetrics.at(
+        height: 80,
+        lowest: 80,
+        top: 800,
+        gap: 16,
+        bottomGap: 64,
+      );
+      expect(metrics.gap, 16);
+      expect(metrics.bottomGap, 64);
+    });
+
+    // Both close to nothing together, so a flush sheet is flush on every
+    // edge however far apart the two started.
+    test('both reach zero at the top detent', () {
+      final metrics = GlassDetentSheetMetrics.at(
+        height: 800,
+        lowest: 80,
+        top: 800,
+        gap: 16,
+        bottomGap: 64,
+      );
+      expect(metrics.gap, 0);
+      expect(metrics.bottomGap, 0);
+    });
+
+    test('each ramps on its own scale, not a shared one', () {
+      final metrics = GlassDetentSheetMetrics.at(
+        height: 440,
+        lowest: 80,
+        top: 800,
+        gap: 16,
+        bottomGap: 64,
+      );
+      expect(metrics.progress, closeTo(0.5, 1e-9));
+      expect(metrics.gap, closeTo(8, 1e-9));
+      expect(metrics.bottomGap, closeTo(32, 1e-9));
+    });
+  });
+
   group('snapping on release', () {
     const detents = <double>[80, 400, 800];
 

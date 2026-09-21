@@ -59,6 +59,7 @@ class GlassDetentSheet extends StatefulWidget {
     this.controller,
     this.backdrop,
     this.gap = 12,
+    this.bottomGap,
     this.floatingRadius,
     this.flushRadius = 55,
     this.showHandle = true,
@@ -92,8 +93,22 @@ class GlassDetentSheet extends StatefulWidget {
   /// What is behind the sheet, where the app knows — see `GlassSurface`.
   final Color? backdrop;
 
-  /// How far the floating sheet is inset from the screen's edges.
+  /// How far the floating sheet is inset from the screen's **side** edges.
   final double gap;
+
+  /// How far the floating sheet is inset from the screen's **bottom** edge.
+  ///
+  /// Null takes [gap], which is the right default for a sheet floating over
+  /// nothing. Raise it above [gap] when the sheet floats over other glass —
+  /// a tab bar, a toolbar — because the two must never both render over the
+  /// same pixels, and the sheet clears that chrome only once this inset
+  /// exceeds its height. Raising [gap] instead would buy the same clearance
+  /// and charge twice its width for it: 64 pt of clearance for a 52 pt bar
+  /// costs 128 pt of a phone-width sheet.
+  ///
+  /// Both insets close to 0 together as the sheet rises, so a flush sheet is
+  /// flush on every edge however far apart they started.
+  final double? bottomGap;
 
   /// The corner radius while floating. Null takes the theme's
   /// [GlassRadiusStep.extraLarge], which is the sheet role's own step.
@@ -359,6 +374,7 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
               lowest: _controller.lowest,
               top: _controller.top,
               gap: widget.gap,
+              bottomGap: widget.bottomGap,
               floatingRadius: floatingRadius,
               flushRadius: widget.flushRadius,
             );
@@ -377,7 +393,9 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
                   // the content's bottom edge continuous: the two halves
                   // always sum to the whole inset, so nothing jumps on the
                   // frame the sheet arrives.
-                  bottom: metrics.gap + padding.bottom * (1 - metrics.progress),
+                  bottom:
+                      metrics.bottomGap +
+                      padding.bottom * (1 - metrics.progress),
                 ),
                 child: SizedBox(
                   height: metrics.height,

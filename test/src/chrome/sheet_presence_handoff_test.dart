@@ -29,19 +29,27 @@ const _barHeight = 52.0;
 /// two are on top of each other at the lowest detent — before the drag has
 /// even started, with no ramp able to rescue it. Twelve points of daylight
 /// at rest is what 64 against 52 buys.
-const _gap = 64.0;
+const _bottomGap = 64.0;
+
+/// The sheet's side inset, which has nothing to do with the bar.
+///
+/// Deliberately much smaller than [_bottomGap], and the reason the two are
+/// separate parameters: the clearance the bar dictates is a property of the
+/// bottom edge alone, and charging the sides for it would take
+/// `2 * (64 - 16)` points off the sheet's width to buy nothing.
+const _sideGap = 16.0;
 
 /// The sheet's morph progress at which the shrinking gap sets the
 /// sheet's bottom edge down exactly on the bar's top edge.
 ///
 /// `metrics.gap` is `lerp(gap, 0, progress)`, so contact is where
 /// `gap * (1 - progress) == barHeight`.
-const double _contact = 1 - _barHeight / _gap;
+const double _contact = 1 - _barHeight / _bottomGap;
 
 /// Where the bar's presence ramp starts: eight points of gap earlier, so the
 /// bar is already at presence 0 by the time the two shapes meet rather than
 /// arriving at 0 on the same frame.
-const double _clearance = 1 - (_barHeight + 8) / _gap;
+const double _clearance = 1 - (_barHeight + 8) / _bottomGap;
 
 const _detents = <GlassDetent>[
   GlassDetent.fraction(0.1),
@@ -114,7 +122,8 @@ Widget _host(
           GlassDetentSheet(
             controller: controller,
             detents: _detents,
-            gap: _gap,
+            gap: _sideGap,
+            bottomGap: _bottomGap,
             backdrop: const Color(0xFF101820),
             child: const SizedBox.expand(),
           ),

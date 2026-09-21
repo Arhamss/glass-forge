@@ -23,7 +23,7 @@ import 'package:glass_forge_example/src/theme.dart';
 ///
 /// Which takes two numbers agreeing, not one: the sheet's floating gap has to
 /// clear the row in the first place, or the two are already stacked at Peek
-/// and no ramp can help. See [_SheetSceneState._gap].
+/// and no ramp can help. See [_SheetSceneState._bottomGap].
 class SheetScene extends StatefulWidget {
   const SheetScene({required this.info, super.key});
 
@@ -58,17 +58,17 @@ class _SheetSceneState extends State<SheetScene>
   /// started, with no presence ramp able to rescue it. The spec's "floating
   /// with a visible gap at the low detent" presumes the gap clears whatever
   /// it is floating over, and this is that number said out loud.
-  static const _gap = 64.0;
+  static const _bottomGap = 64.0;
 
   /// The sheet's `progress` at which the shrinking gap sets its bottom edge
   /// down exactly on the tab row's top edge: `gap * (1 - progress)` reaching
   /// [_barHeight]. The tabs must be gone by here.
-  static const double _contact = 1 - _barHeight / _gap;
+  static const double _contact = 1 - _barHeight / _bottomGap;
 
   /// Where the ramp starts: eight points of gap earlier, so the tabs reach
   /// presence 0 with daylight still between the two surfaces rather than on
   /// the same frame they meet.
-  static const double _clearance = 1 - (_barHeight + 8) / _gap;
+  static const double _clearance = 1 - (_barHeight + 8) / _bottomGap;
 
   /// [_detents]' lowest fraction, and the span the sheet's `progress` is
   /// measured across — the two numbers the ramp above is stated in.
@@ -169,7 +169,12 @@ class _SheetSceneState extends State<SheetScene>
                 GlassDetentSheet(
                   detents: _detents,
                   controller: _controller,
-                  gap: _gap,
+                  // Sides stay at the widget's own default. Only the
+                  // bottom inset has a job here — clearing the tab row —
+                  // and until `bottomGap` existed, buying that clearance
+                  // through the shared `gap` cost this sheet 104 points of
+                  // width to solve a problem the sides never had.
+                  bottomGap: _bottomGap,
                   backdrop: widget.info.panelBackdrop,
                   semanticLabel: 'Nearby places',
                   onDetentChanged: (index) => setState(() => _detent = index),

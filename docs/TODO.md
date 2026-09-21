@@ -116,14 +116,17 @@ sheet being useful:
 3. There is no overdrag past the top detent. `dragBy` clamps.
    `GlassOverdrag` is the right tool the day a rubber band past the top, or
    a drag-to-dismiss below the bottom, becomes a wanted gesture.
-4. `GlassDetentSheet.gap` is **one number for the left, right and bottom
-   edges**, and that turns out to cost width. Clearing a 52 pt bottom bar
-   needs a 64 pt gap, which also insets both sides by 64 and leaves the
-   sheet 128 pt narrower than the frame — fine on a desktop, narrow on a
-   phone. The example's sheet scene pays exactly that today. Splitting it
-   into a side inset and a bottom inset is a public-API change, which is why
-   it was not done inside a fix; it is the right shape for whoever touches
-   this next. Found while fixing the scene, not designed in.
+4. ~~`GlassDetentSheet.gap` is one number for all three edges.~~
+   **Fixed 2026-09-21.** `gap` now means the side edges and a new
+   `bottomGap` means the bottom, defaulting to `gap` so a sheet floating
+   over nothing is unaffected. Both still close to 0 together, so a flush
+   sheet is flush on every edge however far apart they started. The sheet
+   scene now leaves the sides at the widget's default and raises only the
+   bottom to clear its 52 pt tab row, recovering the 104 pt of width the
+   shared number was costing it. Pinned by
+   `test/src/chrome/detent_geometry_test.dart` (the two insets ramp on
+   their own scales) and `sheet_presence_handoff_test.dart` (the clearance
+   still comes from the bottom edge alone, with a 16 pt side inset).
 5. `GlassDetentSheetController.settleMotion` carries the **`present`** role's
    spring, not `GlassMotionRole.settle`'s. That is deliberate and correct —
    `GlassSurfaces.sheet` names `present`, and `settle` defaults to
