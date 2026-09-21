@@ -147,14 +147,34 @@ class _SheetSceneState extends State<SheetScene>
                 // handoff is needed at all.
                 Align(
                   alignment: Alignment.bottomCenter,
-                  child: GlassPresence(
-                    presence: _tabsPresence,
-                    child: SizedBox(
-                      height: _barHeight,
-                      child: GlassSurface.navigationBar(
-                        backdrop: widget.info.barBackdrop,
-                        child: Padding(
-                          padding: const EdgeInsets.all(6),
+                  child: AnimatedBuilder(
+                    animation: _tabsPresence,
+                    builder: (context, child) {
+                      // `GlassPresence` ramps the *glass* — refraction,
+                      // frost, tint — and says so: it is explicitly not an
+                      // `Opacity`, because a half-faded refraction is still
+                      // a full backdrop read. What it does not touch is the
+                      // bar's own content, and a row of labels left at full
+                      // strength over a sheet that has covered them reads as
+                      // a rendering failure even though the handoff beneath
+                      // it worked perfectly. So the labels fade on the same
+                      // animation, and at zero the bar leaves the tree
+                      // entirely rather than lingering as a shadow with
+                      // nothing inside it.
+                      if (_tabsPresence.value <= 0) {
+                        return const SizedBox.shrink();
+                      }
+                      return GlassPresence(
+                        presence: _tabsPresence,
+                        child: SizedBox(height: _barHeight, child: child),
+                      );
+                    },
+                    child: GlassSurface.navigationBar(
+                      backdrop: widget.info.barBackdrop,
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: FadeTransition(
+                          opacity: _tabsPresence,
                           child: SegmentedControl<int>(
                             options: const [0, 1, 2],
                             selected: _tab,
