@@ -1,5 +1,21 @@
 ## Unreleased
 
+### Chrome
+
+- `GlassDetentSheet` — a persistent bottom sheet dragged between fixed
+  heights, à la Apple Maps: floating with an inset, large-radius corner
+  below its top detent, flush with the display's own corners at it, with a
+  scroll handoff to the content it carries and no gap between detents to
+  step across. Detents are `GlassDetent.fraction`, `.height` or `.content`.
+  `GlassDetentSheetController` drives it from outside — including
+  `presenceUnder`, which hands a covered surface's `GlassPresence` off
+  before the sheet's own glass reaches it, over a ramp the caller states in
+  their own geometry: the sheet's floating `gap` has to clear the covered
+  bar in the first place, or the two are stacked before any drag begins —
+  and `GlassSheetScrollPhysics`
+  is what lets one drag cross from the sheet to its list and back without a
+  lifted finger.
+
 ### Presence
 
 - `GlassPresence` and `GlassPresenceScope` fade a `Glass` in and out —

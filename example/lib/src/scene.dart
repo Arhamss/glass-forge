@@ -109,6 +109,19 @@ final scenes = <SceneInfo>[
     barBackdrop: const Color(0xFF494A4D),
     material: GlassMaterial.regular(brightness: Brightness.dark),
   ),
+  SceneInfo(
+    name: 'Sheet',
+    blurb:
+        "Apple Maps' sheet. Drag it — the tab row beneath gives way "
+        'before the glass ever reaches it.',
+    // Reused from Edge, not measured again: the panel and the tab row sit
+    // over the same crop of the same photograph in every scene, so a second
+    // measurement of a photo already measured would just repeat the first.
+    photo: 'assets/images/coastal_town.jpg',
+    panelBackdrop: const Color(0xFF3F4A4A),
+    barBackdrop: const Color(0xFF424237),
+    material: GlassMaterial.regular(brightness: Brightness.dark),
+  ),
 ];
 
 /// The layout every scene shares: the specimen owns the frame, the controls

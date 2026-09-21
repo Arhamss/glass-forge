@@ -220,4 +220,30 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('the GlassDetentSheet example builds', (tester) async {
+    // `Map()` and `results` in the class doc are hypothetical — a caller's
+    // own map widget and their own list of rows. Substituted here with a
+    // real backdrop and a real list, same shape as the doc's `Stack`.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          child: Stack(
+            children: [
+              const SizedBox.expand(),
+              GlassDetentSheet(
+                detents: const [
+                  GlassDetent.fraction(0.1),
+                  GlassDetent.fraction(0.5),
+                  GlassDetent.fraction(1),
+                ],
+                child: ListView(children: const [SizedBox(height: 40)]),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
