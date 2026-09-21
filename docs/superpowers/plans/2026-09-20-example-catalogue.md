@@ -491,8 +491,15 @@ List<CatalogueEntry> entriesIn(String group) => switch (group) {
 };
 ```
 
-Create the six entry files each exporting an empty
-`const List<CatalogueEntry> xEntries = <CatalogueEntry>[];` for now. **The
+Create the seven entry files each exporting an empty
+`final List<CatalogueEntry> xEntries = <CatalogueEntry>[];` for now.
+
+**`final`, not `const`, and this is not a style choice.** Every entry carries
+`build` and `code` as closure literals, and a closure literal is not a
+constant expression in Dart — `const CatalogueEntry(build: (knobs) => ...)`
+does not compile. An earlier draft of this plan said `const` throughout; it
+was wrong from the start, independently of `CatalogueEntry`'s constructor
+also being non-const since its lists became unmodifiable. **The
 count test will fail until Tasks 5–10 land** — that is expected and correct;
 it is the contract holding the later tasks to the inventory. Mark it
 `skip: 'populated by Tasks 5-10'` with exactly that reason, and remove the
@@ -657,7 +664,8 @@ git commit -m "feat(example): the entry page, with GlassPresence driving the tra
 
 ## Tasks 5-10: the six entry groups
 
-Each task populates one file's `const List<CatalogueEntry>`. Task 8b adds
+Each task populates one file's `final List<CatalogueEntry>` (see Task 3 for
+why these cannot be `const`). Task 8b adds
 `example/lib/src/catalogue/entries/chrome.dart` exporting `chromeEntries`. They share a
 shape, so the steps below apply to each; what differs is the inventory, given
 per task.
