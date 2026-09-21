@@ -636,8 +636,23 @@ draw, and `theme.dart` already says so.
 
 - [ ] **Step 5: Wire navigation through `GlassPresence`**
 
-In `main.dart`, replace `_Stage`/`_SceneTabs` with the index as home and a
-route to the entry page. The entry page's glass materialises by driving
+**`_Stage` and `_SceneTabs` are already gone** — Task 3 deleted them and
+repointed `main.dart`'s `home:` at `CatalogueIndexPage`, because its own
+Step 5 removed the symbols every scene depended on. So there is nothing left
+to replace: what remains is adding the **route to the entry page** and the
+presence handoff.
+
+Two smaller things to fold in while you are in these files, both raised by
+Task 3's review:
+
+- `index_page.dart` selects its backdrop as `backdrops[2]`, a bare positional
+  index into the list in `backdrop_info.dart`. `BackdropInfo` no longer
+  carries a `name`, so there is nothing to match on. You are about to add a
+  second consumer, and positional fragility compounds with consumers — add a
+  named accessor (keyed off the photo asset path, which is already a unique
+  string on each instance) and repoint both call sites at it.
+- `catalogue_entry.dart`'s doc comment on `CatalogueEntry.group` still says
+  "one of the six groups". There are seven. The entry page's glass materialises by driving
 `GlassPresence` from the route animation, and the index chrome's presence
 runs to 0 as the entry's rises.
 
