@@ -1,6 +1,9 @@
+import 'package:flutter/material.dart' show MaterialApp;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_example/src/catalogue/catalogue_entry.dart';
+import 'package:glass_forge_example/src/catalogue/entries/surfaces.dart';
 import 'package:glass_forge_example/src/catalogue/snippet.dart';
 
 void main() {
@@ -60,5 +63,82 @@ void main() {
       8.0,
       reason: 'the failed write left the entry as it was',
     );
+  });
+
+  group('surfacesEntries', () {
+    test('the group has its promised six entries', () {
+      expect(surfacesEntries, hasLength(6));
+    });
+
+    test('every entry names its api, its purpose and at least one knob', () {
+      for (final entry in surfacesEntries) {
+        expect(entry.api, isNotEmpty, reason: 'a nameless entry');
+        expect(
+          entry.purpose,
+          isNotEmpty,
+          reason: '${entry.api} has no purpose',
+        );
+        expect(
+          entry.knobs,
+          isNotEmpty,
+          reason: '${entry.api} has nothing to move',
+        );
+      }
+    });
+
+    test('every entry names the Surfaces group', () {
+      for (final entry in surfacesEntries) {
+        expect(entry.group, 'Surfaces');
+      }
+    });
+
+    test('every entry api is unique', () {
+      final names = surfacesEntries.map((entry) => entry.api).toList();
+      expect(names.toSet(), hasLength(names.length));
+    });
+
+    test(
+      'entry.build(entry.knobs) constructs without throwing, for every '
+      "entry's default knobs",
+      () {
+        for (final entry in surfacesEntries) {
+          expect(
+            () => entry.build(entry.knobs),
+            returnsNormally,
+            reason: '${entry.api} threw building its default widget',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'every entry mounts and paints under a real GlassLayer, at default '
+      'knobs',
+      (tester) async {
+        for (final entry in surfacesEntries) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: GlassLayer(child: Center(child: entry.build(entry.knobs))),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: '${entry.api} threw once mounted',
+          );
+        }
+      },
+    );
+
+    test("every entry's code compiles from its default knobs", () {
+      for (final entry in surfacesEntries) {
+        expect(
+          renderSnippet(entry),
+          isNotEmpty,
+          reason: '${entry.api} rendered no snippet',
+        );
+      }
+    });
   });
 }
