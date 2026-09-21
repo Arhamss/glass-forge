@@ -2,8 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the example app's five-scene lab bench with a 29-entry named
-catalogue — index to detail, each entry showing one capability live with the
+**Goal:** Replace the example app's scene-based lab bench with a 33-entry
+named catalogue — index to detail, each entry showing one capability live with the
 exact Dart that builds it.
 
 **Architecture:** One `CatalogueEntry` value type is the single source for
@@ -42,8 +42,8 @@ this package's own API.
   introduce an unmeasured one.
 - **Snippets are derived, never hand-written.** See Task 2. A hand-written
   snippet string in any entry is a plan violation.
-- **29 entries, per the spec's inventory.** Surfaces 6, Shapes 4, Motion 7,
-  Composition 4, Design system 5, Adaptation 3.
+- **33 entries, per the spec's inventory.** Surfaces 6, Shapes 4, Motion 7,
+  Composition 4, Chrome 4, Design system 5, Adaptation 3.
 - Verification commands, used throughout:
   - `cd example && flutter analyze` then `cd .. && flutter analyze`
   - `cd example && flutter test` (example-local widget tests)
@@ -80,6 +80,7 @@ declarations first.
 | `lib/src/catalogue/entries/shapes.dart` | Create: the 4 Shapes entries. |
 | `lib/src/catalogue/entries/motion.dart` | Create: the 7 Motion entries. |
 | `lib/src/catalogue/entries/composition.dart` | Create: the 4 Composition entries. |
+| `lib/src/catalogue/entries/chrome.dart` | Create: the 4 Chrome entries. |
 | `lib/src/catalogue/entries/design_system.dart` | Create: the 5 Design system entries. |
 | `lib/src/catalogue/entries/adaptation.dart` | Create: the 3 Adaptation entries. |
 | `lib/src/catalogue/index_page.dart` | Create: the grouped index, with live thumbnails and the glow on press. |
@@ -403,6 +404,7 @@ void main() {
       'Shapes',
       'Motion',
       'Composition',
+      'Chrome',
       'Design system',
       'Adaptation',
     ]);
@@ -416,11 +418,12 @@ void main() {
     expect(entriesIn('Shapes'), hasLength(4));
     expect(entriesIn('Motion'), hasLength(7));
     expect(entriesIn('Composition'), hasLength(4));
+    expect(entriesIn('Chrome'), hasLength(4));
     expect(entriesIn('Design system'), hasLength(5));
     expect(entriesIn('Adaptation'), hasLength(3));
     expect(
       catalogueGroups.fold<int>(0, (n, g) => n + entriesIn(g).length),
-      29,
+      33,
     );
   });
 
@@ -452,6 +455,7 @@ const List<String> catalogueGroups = <String>[
   'Shapes',
   'Motion',
   'Composition',
+  'Chrome',
   'Design system',
   'Adaptation',
 ];
@@ -461,6 +465,7 @@ List<CatalogueEntry> entriesIn(String group) => switch (group) {
   'Shapes' => shapesEntries,
   'Motion' => motionEntries,
   'Composition' => compositionEntries,
+  'Chrome' => chromeEntries,
   'Design system' => designSystemEntries,
   'Adaptation' => adaptationEntries,
   _ => const <CatalogueEntry>[],
@@ -633,7 +638,8 @@ git commit -m "feat(example): the entry page, with GlassPresence driving the tra
 
 ## Tasks 5-10: the six entry groups
 
-Each task populates one file's `const List<CatalogueEntry>`. They share a
+Each task populates one file's `const List<CatalogueEntry>`. Task 8b adds
+`example/lib/src/catalogue/entries/chrome.dart` exporting `chromeEntries`. They share a
 shape, so the steps below apply to each; what differs is the inventory, given
 per task.
 
@@ -694,6 +700,21 @@ For the overlap entry, capture the warning by assigning `debugPrint` in
 `initState` and restoring it in `dispose`. A diagnostic the reader can watch
 fire is worth more than one they read about.
 
+### Task 8b — Chrome (4)
+
+`GlassDetentSheet` (a detent knob — the sheet's three rest heights) ·
+`GlassDetent` (fraction, height and content resolution) ·
+`GlassDetentSheetController` · `GlassSheetScrollPhysics`.
+
+Starting point: `example/lib/src/scenes/sheet_scene.dart`, added when the
+detent sheet landed. Its own doc comment is the entry copy's source — it
+explains that the tab row behind the sheet is the actual demonstration,
+because nothing wires a covered surface's presence for a caller yet, so the
+scene does by hand what `GlassScaffold` will automate.
+
+The `GlassDetentSheet` entry must state that the presence handoff is what
+keeps the tab row and the sheet from both being glass over the same pixels.
+
 ### Task 9 — Design system (5)
 
 `GlassTheme` · `GlassSurface` with `GlassSurfaces` · `GlassTokens` ·
@@ -735,7 +756,7 @@ technique rather than inventing one. Its header explains the rot it prevents.
 
 - [ ] **Step 2: Write the test**
 
-For each of the 29 entries, a compiled expression equivalent to that entry's
+For each of the 33 entries, a compiled expression equivalent to that entry's
 `code` output. Follow the existing file's approach: the snippets are
 hand-mirrored into real Dart in the test, so the compiler checks them.
 
@@ -760,7 +781,8 @@ git commit -m "test(example): compile every catalogue snippet"
 
 **Files:**
 - Delete: `example/lib/src/scenes/edge_scene.dart`,
-  `blend_scene.dart`, `motion_scene.dart`, `system_scene.dart`
+  `blend_scene.dart`, `motion_scene.dart`, `system_scene.dart`,
+  `sheet_scene.dart`
 - Modify: `example/lib/main.dart`, `example/README.md`
 - Modify: `README.md` at the repository root, if it describes the scenes
 
@@ -824,7 +846,7 @@ git commit -m "refactor(example): retire the five-scene stage"
 
 Checked against the spec:
 
-- **Inventory (29 entries, six groups)** — Tasks 5-10, with the count test in
+- **Inventory (33 entries, seven groups)** — Tasks 5-10 including 8b, with the count test in
   Task 3 as the contract and Task 10 making it live.
 - **Index → detail** — Tasks 3 and 4.
 - **Entry anatomy** — Task 4 Step 3, against the Task 1 comp.

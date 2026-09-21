@@ -34,7 +34,7 @@ this" — the running widget, its knobs, and the exact Dart.
 
 ## Inventory
 
-Twenty-nine entries in six groups. This is the contract for "all the
+Thirty-three entries in seven groups. This is the contract for "all the
 functionality": if a capability is not here, the catalogue does not claim to
 cover it. Per-group counts are given so the total is checkable rather than
 asserted.
@@ -57,6 +57,15 @@ the cross-pass overlap warning.
 
 **Design system (5)** — `GlassTheme`, `GlassSurface` with `GlassSurfaces`
 as one entry, `GlassTokens`, `GlassTint`, `GlassLegibility`.
+
+**Chrome (4)** — `GlassDetentSheet`, `GlassDetent`,
+`GlassDetentSheetController`, `GlassSheetScrollPhysics`. Added after the
+detent-sheet work landed on `main`; the example already carries a sixth
+scene for it (`example/lib/src/scenes/sheet_scene.dart`), which is this
+group's starting point. The sheet is also the clearest demonstration the
+package has of `GlassPresence`: its own doc comment calls it "the reason
+`GlassPresence` exists", because the tab row behind it must reach presence
+zero before the sheet's glass arrives, or the two stack.
 
 **Adaptation (3)** — `GlassTierScope` with tier degradation as one entry,
 the thermal / frame-rate / accessibility signals as one, and
