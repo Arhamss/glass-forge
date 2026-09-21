@@ -44,6 +44,25 @@ this package's own API.
   snippet string in any entry is a plan violation.
 - **33 entries, per the spec's inventory.** Surfaces 6, Shapes 4, Motion 7,
   Composition 4, Chrome 4, Design system 5, Adaptation 3.
+- **The comps are directional, not literal. Three details in them are wrong
+  and must NOT be copied** (recorded when Task 1 was approved):
+  - **No bottom tab bar.** Both comps show one, and they do not even agree
+    with each other on its labels. This design is a flat index→detail with no
+    tabbed navigation, and retiring the old app's tab bar is one of the
+    reasons the catalogue exists. Reinstating it would be rebuilding the
+    thing being deleted.
+  - **Use real symbol names.** The index comp shows `GlassGroup`, which does
+    not exist; the real name is `GlassBlendGroup`. Every API name rendered in
+    the app must be a symbol that actually exists — this is the same failure
+    as the `GlassShape.capsule()` that sat in shipped doc comments long
+    enough to be copied into a plan.
+  - **Seven groups, not four.** The index comp shows Surfaces, Shapes, Motion
+    and Composition only. Chrome, Design system and Adaptation exist too, and
+    the index must be designed against the real density of 33 entries.
+  - Type in the comps is a stand-in: image models cannot render Geist or
+    Geist Mono. Carry the pairing intent and use the example's real text
+    styles.
+
 - Verification commands, used throughout:
   - `cd example && flutter analyze` then `cd .. && flutter analyze`
   - `cd example && flutter test` (example-local widget tests)
