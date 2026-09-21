@@ -162,6 +162,51 @@ and C3, see above.
 
 ## Known problems, none of them fixed
 
+- **A `Glass` inside a `CustomScrollView` throws on first layout under a
+  plain `MaterialApp`.** Found while building the catalogue example. It is a
+  package bug, not an example one, and it hits the headline use case — glass
+  chrome over scrolling content.
+
+  ```
+  RenderBox was not laid out: RenderTransform NEEDS-LAYOUT NEEDS-PAINT
+    RenderTransform._effectiveTransform  (proxy_box.dart:2700)
+    RenderTransform.applyPaintTransform   (proxy_box.dart:2783)
+  ```
+
+  **Cause.** Material's default scroll behaviour wraps scrollable content in
+  a stretch overscroll indicator, which is a `Transform`.
+  `RenderGlassShape._syncGeometry` calls `getTransformTo(layer)`, and that
+  walk reaches the `RenderTransform` before it has been laid out;
+  `applyPaintTransform` then asserts on its own unlaid-out box.
+
+  **Reproduction** — a bare widget test, no example code involved:
+
+  ```dart
+  await tester.pumpWidget(
+    MaterialApp(
+      home: GlassLayer(
+        child: CustomScrollView(
+          slivers: <Widget>[
+            SliverList.list(children: <Widget>[
+              Glass(shape: const GlassOval(),
+                    child: const SizedBox(width: 200, height: 80)),
+            ]),
+          ],
+        ),
+      ),
+    ),
+  );
+  ```
+
+  **Not fixed.** The catalogue example works around it with
+  `ScrollConfiguration(...copyWith(overscroll: false))` around its scroll
+  views, and the same default app-wide in `main.dart`. That is the right move
+  for the example and the wrong thing to ask of a consumer: anyone putting
+  glass in a scroll view hits this, and the workaround is undiscoverable from
+  the error. The real fix belongs in `RenderGlassShape` — either tolerate an
+  unlaid-out ancestor during the walk, or defer registration until layout has
+  settled. `_scheduleLayerRepaint` in that same file is the nearest prior art.
+
 - **Not publish-clean.** On a fresh checkout `flutter pub publish --dry-run`
   reports one warning: `pubspec.yaml` declares
   `build/shaderbundles/geometry.shaderbundle` as an asset, but `build/` is
