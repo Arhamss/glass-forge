@@ -5,6 +5,7 @@ import 'package:glass_forge_example/src/backdrop.dart';
 import 'package:glass_forge_example/src/backdrop_info.dart';
 import 'package:glass_forge_example/src/catalogue/catalogue.dart';
 import 'package:glass_forge_example/src/catalogue/catalogue_entry.dart';
+import 'package:glass_forge_example/src/catalogue/entry_page.dart';
 import 'package:glass_forge_example/src/theme.dart';
 
 /// The catalogue's home: every entry, grouped, before any one of them is
@@ -30,12 +31,13 @@ class CatalogueIndexPage extends StatelessWidget {
 
   /// The photograph and measured colours behind the index.
   ///
-  /// Reused, not measured again: this is `backdrops[2]`, the same aurora
-  /// crop the Blend group's specimen sits over. `GlassSurface` cannot
-  /// sample its own backdrop, so a page with a bar to keep readable needs a
-  /// colour that was actually measured off what is behind it, and this is
-  /// one of the five the example already has numbers for.
-  static final BackdropInfo _backdrop = backdrops[2];
+  /// Looked up by [catalogueBackdropPhoto] rather than a position in
+  /// [backdrops] — the entry page is a second caller wanting the same
+  /// crop, and a bare index invites the two to drift apart. `GlassSurface`
+  /// cannot sample its own backdrop, so a page with a bar to keep readable
+  /// needs a colour that was actually measured off what is behind it, and
+  /// this is one of the five the example already has numbers for.
+  static final BackdropInfo _backdrop = backdropFor(catalogueBackdropPhoto);
 
   /// The bar's own height, independent of the safe-area inset added to it
   /// at build time — see `_TopBar`.
@@ -45,6 +47,14 @@ class CatalogueIndexPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final topInset = MediaQuery.paddingOf(context).top;
     final barHeight = topInset + _barContentHeight;
+
+    // Driven by the covering route's own progress rather than any local
+    // state: this page never has to know an entry was pushed, only that
+    // `ModalRoute` says something now sits on top of it. See
+    // `outgoingCataloguePresence` for why this ramp and the entry page's
+    // incoming one never overlap.
+    final covered =
+        ModalRoute.of(context)?.secondaryAnimation ?? kAlwaysDismissedAnimation;
 
     // A Scaffold, for one reason: `MaterialApp` marks any text that is not
     // inside a `Material` with a debug underline, and every label on this
@@ -57,39 +67,53 @@ class CatalogueIndexPage extends StatelessWidget {
           Backdrop(photo: _backdrop.photo),
           GlassLayer(
             material: _backdrop.material,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverPadding(
-                        padding: EdgeInsets.only(top: barHeight),
-                      ),
-                      for (final group in catalogueGroups) ...[
-                        SliverToBoxAdapter(child: _GroupHeader(group)),
-                        SliverList(
-                          delegate: SliverChildListDelegate(
-                            _rowsFor(entriesIn(group)),
+            child: GlassPresence(
+              presence: outgoingCataloguePresence(covered),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    // A local override, not a reliance on `main.dart`'s
+                    // app-wide one — see `CatalogueEntryPage`'s own doc
+                    // comment for why a `CustomScrollView` with glass
+                    // inside it (every row's `InteractiveGlass` thumbnail,
+                    // once Tasks 5-10 populate the groups) needs this
+                    // regardless of what any ancestor `MaterialApp` set.
+                    child: ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(
+                        context,
+                      ).copyWith(overscroll: false),
+                      child: CustomScrollView(
+                        slivers: [
+                          SliverPadding(
+                            padding: EdgeInsets.only(top: barHeight),
                           ),
-                        ),
-                      ],
-                      const SliverPadding(
-                        padding: EdgeInsets.only(bottom: 24),
+                          for (final group in catalogueGroups) ...[
+                            SliverToBoxAdapter(child: _GroupHeader(group)),
+                            SliverList(
+                              delegate: SliverChildListDelegate(
+                                _rowsFor(entriesIn(group)),
+                              ),
+                            ),
+                          ],
+                          const SliverPadding(
+                            padding: EdgeInsets.only(bottom: 24),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: barHeight,
-                  child: _TopBar(
-                    backdrop: _backdrop.barBackdrop,
-                    topInset: topInset,
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: barHeight,
+                    child: _TopBar(
+                      backdrop: _backdrop.barBackdrop,
+                      topInset: topInset,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -183,6 +207,7 @@ class _EntryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InteractiveGlass(
+      onTap: () => Navigator.of(context).push(catalogueEntryRoute(entry)),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Row(

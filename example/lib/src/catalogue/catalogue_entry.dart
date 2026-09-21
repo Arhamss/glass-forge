@@ -74,7 +74,7 @@ class CatalogueEntry {
   /// One line on what it is for.
   final String purpose;
 
-  /// Which of the six groups this belongs to.
+  /// Which of the seven groups this belongs to.
   final String group;
 
   /// The parameters this entry lets the reader move.

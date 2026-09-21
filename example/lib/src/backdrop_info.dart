@@ -50,6 +50,22 @@ class BackdropInfo {
 /// coarse structure — a ridge line, a painted terrace, a curtain of light. A
 /// backdrop finer than the displacement is pushed through whole periods and
 /// lands looking identical, and the glass then appears to do nothing.
+/// [backdrops], looked up by [BackdropInfo.photo] rather than a position in
+/// the list.
+///
+/// A bare index drifts the moment a second caller wants the same backdrop:
+/// nothing ties `backdrops[2]` to what the picture actually shows, where a
+/// path is a name every caller can read and agree on.
+BackdropInfo backdropFor(String photo) =>
+    backdrops.firstWhere((backdrop) => backdrop.photo == photo);
+
+/// The aurora crop behind the catalogue's own chrome.
+///
+/// The index and every entry page share this one photograph, so paging
+/// between them never swaps out the picture underneath — only the glass
+/// drawn over it changes, which is the whole point of the handoff.
+const String catalogueBackdropPhoto = 'assets/images/northern_lights.jpg';
+
 final backdrops = <BackdropInfo>[
   BackdropInfo(
     photo: 'assets/images/desert_dunes.jpg',

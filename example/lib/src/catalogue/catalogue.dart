@@ -34,3 +34,20 @@ List<CatalogueEntry> entriesIn(String group) => switch (group) {
   'Adaptation' => adaptationEntries,
   _ => const <CatalogueEntry>[],
 };
+
+/// The entry named [api], if the catalogue has one — for a see-also chip
+/// deciding whether it has somewhere to send the reader.
+///
+/// A linear scan over 33 entries, on every tap, rather than an index built
+/// once: the catalogue is small enough that building and invalidating a
+/// lookup table would cost more to maintain than it ever saves.
+CatalogueEntry? findEntryByApi(String api) {
+  for (final group in catalogueGroups) {
+    for (final entry in entriesIn(group)) {
+      if (entry.api == api) {
+        return entry;
+      }
+    }
+  }
+  return null;
+}

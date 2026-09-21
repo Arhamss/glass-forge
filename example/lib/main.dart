@@ -52,6 +52,16 @@ class GlassForgeExample extends StatelessWidget {
             fontFamily: 'Geist',
             scaffoldBackgroundColor: Tone.ground,
           ),
+          // The stretch overscroll indicator wraps a `CustomScrollView` in
+          // a `Transform` for its stretch effect, and both catalogue pages
+          // put glass inside one. `CatalogueIndexPage` and
+          // `CatalogueEntryPage` each turn it off locally, for the frame
+          // they registered geometry against — see their own doc comments
+          // for the full mechanism. This app-wide default is the same fix
+          // for any scrollable the example adds later that forgets to.
+          scrollBehavior: const MaterialScrollBehavior().copyWith(
+            overscroll: false,
+          ),
           home: const CatalogueIndexPage(),
         ),
       ),
