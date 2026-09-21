@@ -1,0 +1,252 @@
+import 'package:flutter/material.dart' show Scaffold;
+import 'package:flutter/widgets.dart';
+import 'package:glass_forge/glass_forge.dart';
+import 'package:glass_forge_example/src/backdrop.dart';
+import 'package:glass_forge_example/src/backdrop_info.dart';
+import 'package:glass_forge_example/src/catalogue/catalogue.dart';
+import 'package:glass_forge_example/src/catalogue/catalogue_entry.dart';
+import 'package:glass_forge_example/src/theme.dart';
+
+/// The catalogue's home: every entry, grouped, before any one of them is
+/// opened.
+///
+/// **One `GlassLayer` for the whole page**, wrapping both the top bar and
+/// every row below it. That single layer is also what makes the index
+/// demonstrate `InteractiveGlass`'s touch glow rather than merely use it:
+/// `GlassGlowScope` publishes one shared glow channel per `GlassLayer`
+/// instance, and every `InteractiveGlass` beneath a layer — however many
+/// rows there are — writes into that same instance. Splitting the rows
+/// across two layers, or giving any row its own, would give each its own
+/// channel and the glow would stop reaching a row's neighbours, which is
+/// the one behaviour a bench of separately-pressable rows exists to show.
+/// None of the rows declare a `material` of their own either, for the same
+/// reason one layer per screen already gives for free: a shape with no
+/// declared material inherits the layer's, and shapes sharing a material
+/// share a backdrop pass — the touch glow and the backdrop capture both
+/// stay singular by the same rule.
+class CatalogueIndexPage extends StatelessWidget {
+  /// Creates the index.
+  const CatalogueIndexPage({super.key});
+
+  /// The photograph and measured colours behind the index.
+  ///
+  /// Reused, not measured again: this is `backdrops[2]`, the same aurora
+  /// crop the Blend group's specimen sits over. `GlassSurface` cannot
+  /// sample its own backdrop, so a page with a bar to keep readable needs a
+  /// colour that was actually measured off what is behind it, and this is
+  /// one of the five the example already has numbers for.
+  static final BackdropInfo _backdrop = backdrops[2];
+
+  /// The bar's own height, independent of the safe-area inset added to it
+  /// at build time — see `_TopBar`.
+  static const double _barContentHeight = 56;
+
+  @override
+  Widget build(BuildContext context) {
+    final topInset = MediaQuery.paddingOf(context).top;
+    final barHeight = topInset + _barContentHeight;
+
+    // A Scaffold, for one reason: `MaterialApp` marks any text that is not
+    // inside a `Material` with a debug underline, and every label on this
+    // page is drawn straight onto glass or bare photograph.
+    return Scaffold(
+      backgroundColor: Tone.ground,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Backdrop(photo: _backdrop.photo),
+          GlassLayer(
+            material: _backdrop.material,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: EdgeInsets.only(top: barHeight),
+                      ),
+                      for (final group in catalogueGroups) ...[
+                        SliverToBoxAdapter(child: _GroupHeader(group)),
+                        SliverList(
+                          delegate: SliverChildListDelegate(
+                            _rowsFor(entriesIn(group)),
+                          ),
+                        ),
+                      ],
+                      const SliverPadding(
+                        padding: EdgeInsets.only(bottom: 24),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: barHeight,
+                  child: _TopBar(
+                    backdrop: _backdrop.barBackdrop,
+                    topInset: topInset,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// [entries], each followed by a hairline divider except the last.
+  static List<Widget> _rowsFor(List<CatalogueEntry> entries) {
+    final rows = <Widget>[];
+    for (var i = 0; i < entries.length; i++) {
+      rows.add(_EntryRow(entry: entries[i]));
+      if (i != entries.length - 1) {
+        rows.add(const _RowDivider());
+      }
+    }
+    return rows;
+  }
+}
+
+/// The glass bar pinned to the top of the frame, with content scrolling
+/// behind it.
+///
+/// Edge-to-edge on purpose, covering the safe-area inset rather than
+/// sitting below it: an inset told apart from the bar reads as a status-bar
+/// gap above a floating pill, and the comp this implements draws the glass
+/// running all the way to the top of the frame instead.
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.backdrop, required this.topInset});
+
+  /// The measured colour behind this bar.
+  final Color backdrop;
+
+  /// The safe-area inset the title is padded below.
+  final double topInset;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassSurface.navigationBar(
+      backdrop: backdrop,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, topInset + 12, 20, 12),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Catalogue', style: context.display),
+        ),
+      ),
+    );
+  }
+}
+
+/// A group's name, in the small tracked caps the comp uses for it.
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader(this.group);
+
+  /// One of [catalogueGroups].
+  final String group;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 10),
+      child: Text(
+        group.toUpperCase(),
+        style: context.caption.copyWith(
+          color: context.inkTertiary,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 1,
+        ),
+      ),
+    );
+  }
+}
+
+/// One entry: its thumbnail, its API name and its purpose.
+///
+/// `InteractiveGlass`, not `Glass` — the row itself carries no glass of its
+/// own to press. What it wraps is a painted line of text beside a small
+/// live thumbnail, and pressing anywhere on that line still claims the
+/// enclosing layer's one shared touch-glow channel, which is what lets a
+/// press here light [entry]'s thumbnail *and* every other row's on screen
+/// that is itself glass.
+class _EntryRow extends StatelessWidget {
+  const _EntryRow({required this.entry});
+
+  /// What this row shows.
+  final CatalogueEntry entry;
+
+  static const double _thumbnailSize = 44;
+
+  @override
+  Widget build(BuildContext context) {
+    return InteractiveGlass(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.all(Radius.circular(10)),
+              child: SizedBox(
+                width: _thumbnailSize,
+                height: _thumbnailSize,
+                // `entry.build` sizes itself however its own specimen
+                // does; `FittedBox` is what lets one fixed thumbnail slot
+                // hold any of them without the row needing to know which.
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: entry.build(entry.knobs),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.api,
+                    style: context.mono.copyWith(color: context.ink),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    entry.purpose,
+                    style: context.body.copyWith(
+                      color: context.inkSecondary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A thin separator between two rows in the same group.
+///
+/// Painted, not glass — a hairline this thin has nothing for a backdrop
+/// filter to do, and giving it one would be a second surface for no
+/// reason. Sits outside every `InteractiveGlass` row rather than inside
+/// one, so it never takes part in that row's own press.
+class _RowDivider extends StatelessWidget {
+  const _RowDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: SizedBox(
+        height: 1,
+        child: ColoredBox(color: context.inkHairline),
+      ),
+    );
+  }
+}
