@@ -91,9 +91,9 @@ class _HostAwareChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (GlassHostScope.isOnGlass(context)) {
-      return const SizedBox.square(
+      return SizedBox.square(
         dimension: 96,
-        child: ColoredBox(color: Color(0x33FFFFFF)),
+        child: ColoredBox(color: context.inkFill),
       );
     }
     return SizedBox.square(
@@ -140,13 +140,38 @@ final CatalogueEntry _glassHostScope = CatalogueEntry(
   },
   code: (knobs) {
     final radius = _asDouble(knobs[0]).toStringAsFixed(1);
-    return 'GlassHostScope.isOnGlass(context)\n'
-        '    ? const ColoredBox(color: Color(0x33FFFFFF))\n'
-        '    : Glass(\n'
-        '        shape: GlassRoundedRectangle(\n'
-        '          radius: BorderRadius.all(Radius.circular($radius)),\n'
-        '        ),\n'
-        '      )';
+    // Both placements below run this exact ternary at their own position
+    // — the same control, not two — so the snippet repeats it rather
+    // than hiding the second copy behind a comment.
+    final chip =
+        'GlassHostScope.isOnGlass(context)\n'
+        '        ? SizedBox.square(\n'
+        '            dimension: 96,\n'
+        '            child: ColoredBox(color: context.inkFill),\n'
+        '          )\n'
+        '        : SizedBox.square(\n'
+        '            dimension: 96,\n'
+        '            child: Glass(\n'
+        '              shape: GlassRoundedRectangle(\n'
+        '                radius: BorderRadius.all(\n'
+        '                  Radius.circular($radius),\n'
+        '                ),\n'
+        '              ),\n'
+        '            ),\n'
+        '          )';
+    return 'Row(\n'
+        '  children: [\n'
+        '    // On content: nothing above it is glass yet.\n'
+        '    $chip,\n'
+        '    // Inside a glass toolbar: the same control paints.\n'
+        '    Glass(\n'
+        '      shape: const GlassSuperellipse(\n'
+        '        radius: BorderRadius.all(Radius.circular(32)),\n'
+        '      ),\n'
+        '      child: Center(child: $chip),\n'
+        '    ),\n'
+        '  ],\n'
+        ')';
   },
   seeAlso: const <String>['Glass', 'GlassLayer'],
 );
@@ -268,13 +293,24 @@ class _OverlapWarningDemoState extends State<_OverlapWarningDemo> {
     super.dispose();
   }
 
+  /// How far right the second shape's `Positioned` can ever sit — the
+  /// knob's own `max` — plus a shape's own width. A `Stack` whose only
+  /// children are `Positioned` takes `constraints.biggest` under an
+  /// unbounded-width parent (a `FittedBox`, as every index-page thumbnail
+  /// is one: `_EntryRow` wraps `entry.build` in exactly that) and never
+  /// lays out at all. A fixed width here is what keeps this entry alive
+  /// in that slot, at every knob value, rather than only recovering after
+  /// the first-frame geometry exception the way its siblings do.
+  static const double _stackWidth = 240;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          height: 140,
+          width: _stackWidth,
+          height: 100,
           child: Stack(
             children: [
               const Positioned(
@@ -308,28 +344,26 @@ class _OverlapWarningDemoState extends State<_OverlapWarningDemo> {
           ),
         ),
         const SizedBox(height: 12),
+        // Scrollable, not clipped: the warning is the entry's whole
+        // payload, and `RenderGlassLayer`'s own message runs past 400
+        // characters — far more than any fixed box here could show
+        // without either truncating mid-word or crowding the shapes
+        // above out of the specimen's own budget.
         SizedBox(
-          height: 48,
-          child: Text(
-            _captured ?? 'watching for the paint-time warning…',
-            textAlign: TextAlign.center,
-            style: context.mono.copyWith(color: context.inkSecondary),
+          height: 140,
+          width: _stackWidth,
+          child: SingleChildScrollView(
+            child: Text(
+              _captured ?? 'watching for the paint-time warning…',
+              textAlign: TextAlign.center,
+              style: context.mono.copyWith(color: context.inkSecondary),
+            ),
           ),
         ),
       ],
     );
   }
 }
-
-/// The offset baked into a built `Cross-pass overlap` widget.
-///
-/// `_OverlapWarningDemo` is private, so nothing outside this file can name
-/// its type to cast against it — this is the one typed door left open for
-/// the catalogue's own tests to confirm the `offset` knob actually reached
-/// the widget, without resorting to a dynamic call.
-@visibleForTesting
-double debugCrossPassOverlapOffset(Widget widget) =>
-    (widget as _OverlapWarningDemo).offset;
 
 final CatalogueEntry _crossPassOverlap = CatalogueEntry(
   api: 'Cross-pass overlap',

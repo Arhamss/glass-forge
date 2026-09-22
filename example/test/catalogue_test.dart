@@ -736,6 +736,61 @@ void main() {
       },
     );
 
+    testWidgets(
+      'every entry lays out inside the FittedBox thumbnail slot '
+      '_EntryRow uses, at default knobs',
+      (tester) async {
+        // `_EntryRow` (index_page.dart) puts every entry's specimen in a
+        // fixed 44x44 slot via FittedBox(fit: BoxFit.cover, child: ...),
+        // and FittedBox gives its child unbounded constraints in the
+        // axis it scales. A Stack whose only children are Positioned
+        // then takes constraints.biggest, gets infinite width and never
+        // lays out at all (docs/TODO.md, "the FittedBox also imposes
+        // unbounded width") — found in Cross-pass overlap, which used
+        // to keep throwing every frame there, unlike its three siblings.
+        for (final entry in compositionEntries) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: GlassLayer(
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.all(
+                      Radius.circular(10),
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: KeyedSubtree(
+                        key: ValueKey(entry.api),
+                        child: entry.build(entry.knobs),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          // A not-yet-laid-out transform ancestor (FittedBox included)
+          // makes `getTransformTo` throw on the very first frame — a
+          // known, unfixed package bug (docs/TODO.md) unrelated to this
+          // test, which every entry hits here and recovers from once its
+          // geometry re-syncs on its own next paint. Tolerated, not
+          // asserted away: this test exists to catch the *other*
+          // failure, one that keeps throwing past that first frame.
+          tester.takeException();
+          await tester.pumpAndSettle();
+          expect(
+            tester.takeException(),
+            isNull,
+            reason:
+                '${entry.api} kept throwing under an unbounded-width '
+                'FittedBox past the first, known frame',
+          );
+        }
+      },
+    );
+
     // Not a compile check — see the equivalent comment in surfacesEntries.
     // The knob-move tests below guard the drift-free property.
     test("every entry's code is non-empty at its default knobs", () {
@@ -893,17 +948,27 @@ void main() {
       },
     );
 
-    test(
-      'Cross-pass overlap — moving offset changes the built widget and '
+    testWidgets(
+      'Cross-pass overlap — moving offset changes the built position and '
       'the snippet',
-      () {
+      (tester) async {
         final entry = entryNamed('Cross-pass overlap');
         expect(entry.knobs[0].value, 30.0, reason: 'sanity: default');
 
         final moved = entry.withKnob(0, 100.0);
-        final built = moved.build(moved.knobs);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: GlassLayer(child: Center(child: moved.build(moved.knobs))),
+          ),
+        );
+        await tester.pumpAndSettle();
 
-        expect(debugCrossPassOverlapOffset(built), 100.0);
+        bool isOffsetShape(Widget widget) =>
+            widget is Positioned && widget.left != 0;
+        final positioned = tester.widget<Positioned>(
+          find.byWidgetPredicate(isOffsetShape),
+        );
+        expect(positioned.left, 100.0);
         expect(renderSnippet(moved), contains('left: 100.0'));
       },
     );
