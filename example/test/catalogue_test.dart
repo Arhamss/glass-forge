@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_example/src/backdrop_info.dart';
 import 'package:glass_forge_example/src/catalogue/catalogue_entry.dart';
+import 'package:glass_forge_example/src/catalogue/entries/adaptation.dart';
 import 'package:glass_forge_example/src/catalogue/entries/chrome.dart';
 import 'package:glass_forge_example/src/catalogue/entries/composition.dart';
 import 'package:glass_forge_example/src/catalogue/entries/design_system.dart';
@@ -1938,6 +1939,433 @@ void main() {
               'raises tint, never lowers it',
         );
         expect(renderSnippet(moved), contains('target: 7.0'));
+      },
+    );
+  });
+
+  group('adaptationEntries', () {
+    test('the group has its promised three entries', () {
+      expect(adaptationEntries, hasLength(3));
+    });
+
+    test('every entry names its api, its purpose and at least one knob', () {
+      for (final entry in adaptationEntries) {
+        expect(entry.api, isNotEmpty, reason: 'a nameless entry');
+        expect(
+          entry.purpose,
+          isNotEmpty,
+          reason: '${entry.api} has no purpose',
+        );
+        expect(
+          entry.knobs,
+          isNotEmpty,
+          reason: '${entry.api} has nothing to move',
+        );
+      }
+    });
+
+    test('every entry names the Adaptation group', () {
+      for (final entry in adaptationEntries) {
+        expect(entry.group, 'Adaptation');
+      }
+    });
+
+    test('every entry api is unique', () {
+      final names = adaptationEntries.map((entry) => entry.api).toList();
+      expect(names.toSet(), hasLength(names.length));
+    });
+
+    test(
+      'entry.build(entry.knobs) constructs without throwing, for every '
+      "entry's default knobs",
+      () {
+        for (final entry in adaptationEntries) {
+          expect(
+            () => entry.build(entry.knobs),
+            returnsNormally,
+            reason: '${entry.api} threw building its default widget',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'every entry mounts and paints under a real GlassLayer, at default '
+      'knobs',
+      (tester) async {
+        // Keyed by api, same as the groups above, and with one extra
+        // reason here: two of these three own a `GlassTierEngine`, which
+        // is a `ChangeNotifier` with three live signals behind it. An
+        // updated-in-place subtree would hand the second entry the first
+        // entry's engine state instead of disposing it and starting one.
+        for (final entry in adaptationEntries) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: GlassLayer(
+                child: Center(
+                  child: KeyedSubtree(
+                    key: ValueKey(entry.api),
+                    child: entry.build(entry.knobs),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: '${entry.api} threw once mounted',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'every entry lays out inside the FittedBox thumbnail slot '
+      '_EntryRow uses, at default knobs',
+      (tester) async {
+        // The same unbounded-width slot compositionEntries and
+        // designSystemEntries are checked against, for the same reason:
+        // `FittedBox` hands its child infinite width, so a specimen whose
+        // root takes `constraints.biggest` never lays out. Every root in
+        // this group is a doubly-tight `SizedBox`, and this is what says
+        // so. The `GeometryTier` specimen is the one that would have been
+        // caught here — its `Stack` is exactly the shape of the original
+        // bug, and it lays out only because the `SizedBox` above it is
+        // tight in both axes.
+        //
+        // Every individual `FlutterErrorDetails` is captured and matched
+        // against the known first-frame bug's own signature, rather than
+        // one `tester.takeException()` discarding whichever of them it
+        // returns. That shortcut cannot fail: the binding collapses
+        // several errors from one `pumpWidget` into a synthetic
+        // "Multiple exceptions" string and throws the originals away, and
+        // every entry here has a `Glass`, so the known bug fires at least
+        // once before any regression exists to be seen. Same collector and
+        // same signature as compositionEntries — see the long note there.
+        for (final entry in adaptationEntries) {
+          final caught = <FlutterErrorDetails>[];
+          final originalOnError = FlutterError.onError;
+          FlutterError.onError = caught.add;
+          try {
+            await tester.pumpWidget(
+              MaterialApp(
+                home: GlassLayer(
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.all(
+                        Radius.circular(10),
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        child: KeyedSubtree(
+                          key: ValueKey(entry.api),
+                          child: entry.build(entry.knobs),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          } finally {
+            FlutterError.onError = originalOnError;
+          }
+
+          for (final details in caught) {
+            final isKnownFirstFrameBug =
+                details.exception.toString().contains(
+                  "Failed assertion: line 2251 pos 12: 'hasSize'",
+                ) &&
+                details.stack.toString().contains(
+                  'RenderGlassShape._syncGeometry',
+                );
+            expect(
+              isKnownFirstFrameBug,
+              isTrue,
+              reason:
+                  '${entry.api} threw under an unbounded-width FittedBox '
+                  'with something other than the known, tolerated '
+                  'first-frame geometry exception: ${details.exception}',
+            );
+          }
+
+          await tester.pumpAndSettle();
+          expect(
+            tester.takeException(),
+            isNull,
+            reason:
+                '${entry.api} kept throwing under an unbounded-width '
+                'FittedBox past the first, known frame',
+          );
+        }
+      },
+    );
+
+    // Not a compile check — see the equivalent comment in surfacesEntries.
+    // The knob-move tests below guard the drift-free property.
+    test("every entry's code is non-empty at its default knobs", () {
+      for (final entry in adaptationEntries) {
+        expect(
+          renderSnippet(entry),
+          isNotEmpty,
+          reason: '${entry.api} rendered no snippet',
+        );
+      }
+    });
+
+    // --- moving a knob moves both build and code -------------------------
+
+    CatalogueEntry entryNamed(String api) =>
+        adaptationEntries.firstWhere((entry) => entry.api == api);
+
+    /// Mounts [variant], keyed on its knob values.
+    ///
+    /// Keyed so that mounting a second variant replaces the specimen
+    /// rather than updating the first in place. That matters more here
+    /// than anywhere else in this file: two of these specimens own a
+    /// `GlassTierEngine`, and an engine carried across a variant would
+    /// bring the previous verdict's dome hysteresis with it.
+    ///
+    /// `GeometryTier.none` on the *enclosing* layer for the reason
+    /// chromeEntries gives — off Impeller the field is baked on the CPU,
+    /// and nothing below reads the matte. It does not reach the
+    /// `GeometryTier` specimen's own layer, which pins its own.
+    Future<void> pump(WidgetTester tester, CatalogueEntry variant) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GlassLayer(
+            tier: GeometryTier.none,
+            child: Center(
+              child: KeyedSubtree(
+                key: ValueKey<String>(
+                  variant.knobs.map((knob) => '${knob.value}').join('|'),
+                ),
+                child: variant.build(variant.knobs),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    /// The verdict the scope in the mounted specimen is publishing.
+    ///
+    /// Read off the engine the specimen handed its `GlassTierScope`, so
+    /// this is `resolveTier`'s own output over four real signals — not a
+    /// value the entry stored for the test to find.
+    ResolvedTier resolvedOf(WidgetTester tester) {
+      final engine = tester
+          .widget<GlassTierScope>(find.byType(GlassTierScope))
+          .engine;
+      expect(
+        engine,
+        isNotNull,
+        reason: 'the specimen owns its engine, so the scope is given one',
+      );
+      return engine!.value;
+    }
+
+    testWidgets(
+      'GlassTierScope — moving requested moves the resolved tier, the '
+      'material the glass renders with, and the snippet',
+      (tester) async {
+        final entry = entryNamed('GlassTierScope');
+        expect(entry.knobs[0].value, 'auto', reason: 'sanity: default');
+
+        await pump(tester, entry);
+        final atDefault = resolvedOf(tester);
+        expect(
+          atDefault.tier,
+          GlassTier.full,
+          reason:
+              'nothing pinned, and the pinned capability report plus three '
+              'quiet signals leave the top rung',
+        );
+        expect(atDefault.geometry, GeometryTier.accelerated);
+        expect(atDefault.dome, isTrue);
+
+        final moved = entry.withKnob(0, 'reduced');
+        await pump(tester, moved);
+        final atMoved = resolvedOf(tester);
+
+        expect(atMoved.tier, GlassTier.reduced);
+        expect(
+          atMoved.geometry,
+          GeometryTier.portable,
+          reason: 'the rung moved the geometry axis with it',
+        );
+        expect(
+          atMoved.dome,
+          isFalse,
+          reason: 'reduced is where a dome flattens to an edge band',
+        );
+
+        // And the verdict reached the glass, rather than only the readout:
+        // the material this shape is drawn with is the one the tier left.
+        final glass = tester.widget<Glass>(find.byType(Glass));
+        final asked = glass.material;
+        expect(
+          asked,
+          isNotNull,
+          reason: 'the specimen overrides its layer material by name',
+        );
+        final effective = atMoved.materialFor(
+          asked!,
+          brightness: Brightness.light,
+        );
+        expect(
+          effective.edgeRefraction,
+          lessThan(asked.edgeRefraction),
+          reason: 'reduced halves the lensing it was asked for',
+        );
+        expect(
+          find.text(effective.edgeRefraction.toStringAsFixed(1)),
+          findsOneWidget,
+          reason: 'and the specimen prints the number it is drawn with',
+        );
+        expect(find.text('tier reduced'), findsOneWidget);
+        expect(renderSnippet(moved), contains('GlassTier.reduced'));
+        expect(
+          renderSnippet(entry),
+          contains('the four signals decide'),
+          reason: 'the default position says what null means',
+        );
+      },
+    );
+
+    testWidgets(
+      'GlassTierEngine — the capability report moves the ceiling, a '
+      'request clears it, and one report it cannot clear',
+      (tester) async {
+        final entry = entryNamed('GlassTierEngine');
+        expect(
+          entry.knobs[0].value,
+          GraphicsBackend.metal,
+          reason: 'sanity: default capabilities',
+        );
+        expect(entry.knobs[1].value, 'auto', reason: 'sanity: no pin');
+
+        await pump(tester, entry);
+        expect(resolvedOf(tester).capabilityCeiling, GlassTier.full);
+        expect(resolvedOf(tester).tier, GlassTier.full);
+
+        final gles = entry.withKnob(0, GraphicsBackend.openGLES);
+        await pump(tester, gles);
+        final atGles = resolvedOf(tester);
+        expect(
+          atGles.capabilityCeiling,
+          GlassTier.balanced,
+          reason:
+              'a complete report with no accelerated geometry is exactly '
+              'the balanced ceiling',
+        );
+        expect(atGles.tier, GlassTier.balanced);
+        expect(find.text('tier balanced'), findsOneWidget);
+        expect(
+          find.text('false'),
+          findsOneWidget,
+          reason:
+              'acceleratedGeometry is the one false in this report, and '
+              'the panel prints the booleans the ceiling is read from',
+        );
+
+        final pinned = gles.withKnob(1, 'full');
+        await pump(tester, pinned);
+        final atPinned = resolvedOf(tester);
+        expect(
+          atPinned.tier,
+          GlassTier.full,
+          reason: 'a request beats a capability ceiling',
+        );
+        expect(
+          atPinned.capabilityCeiling,
+          GlassTier.balanced,
+          reason:
+              'the ceiling is still there and still reported — the '
+              'request went over it rather than removing it',
+        );
+
+        final skia = entry
+            .withKnob(0, GraphicsBackend.skia)
+            .withKnob(1, 'full');
+        await pump(tester, skia);
+        final atSkia = resolvedOf(tester);
+        expect(atSkia.capabilityCeiling, GlassTier.off);
+        expect(
+          atSkia.tier,
+          GlassTier.off,
+          reason:
+              'the one ceiling a request cannot lift: without shader '
+              'filters the composite pass throws rather than running slow',
+        );
+        expect(atSkia.requested, GlassTier.full);
+        expect(find.text('tier off'), findsOneWidget);
+
+        expect(renderSnippet(skia), contains('shaderFilters: false'));
+        expect(renderSnippet(pinned), contains('GlassTier.full'));
+        expect(
+          renderSnippet(gles),
+          contains('acceleratedGeometry: false'),
+          reason: 'the snippet quotes the report the specimen was given',
+        );
+      },
+    );
+
+    testWidgets(
+      'GeometryTier — moving the tier moves the pin on the layer the '
+      'entry builds, what it says it baked, and the snippet',
+      (tester) async {
+        final entry = entryNamed('GeometryTier');
+        expect(
+          entry.knobs[0].value,
+          GeometryTier.accelerated,
+          reason: 'sanity: default',
+        );
+
+        GlassLayer pinnedLayer(WidgetTester tester) =>
+            tester.widget<GlassLayer>(
+              find.byKey(const ValueKey<String>('layer')),
+            );
+
+        await pump(tester, entry);
+        expect(pinnedLayer(tester).tier, GeometryTier.accelerated);
+        expect(find.text('accelerated'), findsOneWidget);
+        expect(find.text('baked'), findsOneWidget);
+
+        final moved = entry.withKnob(0, GeometryTier.none);
+        await pump(tester, moved);
+        expect(
+          pinnedLayer(tester).tier,
+          GeometryTier.none,
+          reason:
+              'the knob reached GlassLayer.tier, which is the whole call '
+              'site this enum has',
+        );
+        expect(find.text('none'), findsOneWidget);
+        expect(
+          find.text('not baked'),
+          findsOneWidget,
+          reason: 'and the strip says which of the two cases it is in',
+        );
+        expect(renderSnippet(moved), contains('tier: GeometryTier.none'));
+
+        final portable = entry.withKnob(0, GeometryTier.portable);
+        await pump(tester, portable);
+        expect(pinnedLayer(tester).tier, GeometryTier.portable);
+        expect(
+          find.text('baked'),
+          findsOneWidget,
+          reason: 'portable bakes the same matte by the other route',
+        );
+        expect(
+          renderSnippet(portable),
+          contains('tier: GeometryTier.portable'),
+        );
       },
     );
   });

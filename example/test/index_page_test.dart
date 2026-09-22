@@ -32,7 +32,6 @@ void main() {
         33,
       );
     },
-    skip: 'populated by Tasks 5-10',
   );
 
   test('every entry names a group that exists', () {
