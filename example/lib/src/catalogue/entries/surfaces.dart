@@ -67,7 +67,7 @@ final CatalogueEntry _glass = CatalogueEntry(
         '  child: const ColoredBox(color: Color(0x33FFFFFF)),\n'
         ')';
   },
-  seeAlso: const <String>['GlassLayer', 'GlassMaterial', 'GlassShape'],
+  seeAlso: const <String>['GlassLayer', 'GlassMaterial', 'GlassSuperellipse'],
 );
 
 // ---------------------------------------------------------------------------
@@ -125,42 +125,38 @@ final CatalogueEntry _glassLayer = CatalogueEntry(
 // GlassMaterial — regular / clear / dome
 // ---------------------------------------------------------------------------
 
-/// Which fitted look to build — not a `glass_forge` type, only ever used to
-/// pick between three real factory calls. Never printed: the rendered code
-/// always names the constructor it chose, never this selector.
-enum _MaterialPreset { regular, clear, dome }
+/// A fitted look, its constructor call and the material it builds carried
+/// together — one declaration, read by both `build` and `code`, so there is
+/// nothing left to keep in sync between them.
+typedef _MaterialPreset = ({String constructorCode, GlassMaterial material});
 
-String _presetConstructor(_MaterialPreset preset) => switch (preset) {
-  _MaterialPreset.regular =>
-    'GlassMaterial.regular(brightness: Brightness.dark)',
-  _MaterialPreset.clear => 'GlassMaterial.clear()',
-  _MaterialPreset.dome => 'GlassMaterial.dome()',
-};
-
-GlassMaterial _presetMaterial(_MaterialPreset preset) => switch (preset) {
-  _MaterialPreset.regular => GlassMaterial.regular(
-    brightness: Brightness.dark,
+final List<_MaterialPreset> _materialPresets = <_MaterialPreset>[
+  (
+    constructorCode: 'GlassMaterial.regular(brightness: Brightness.dark)',
+    material: GlassMaterial.regular(brightness: Brightness.dark),
   ),
-  _MaterialPreset.clear => GlassMaterial.clear(),
-  _MaterialPreset.dome => GlassMaterial.dome(),
-};
+  (constructorCode: 'GlassMaterial.clear()', material: GlassMaterial.clear()),
+  (constructorCode: 'GlassMaterial.dome()', material: GlassMaterial.dome()),
+];
 
 final CatalogueEntry _glassMaterial = CatalogueEntry(
   api: 'GlassMaterial',
-  purpose: "How a glass surface looks — Apple's two fitted presets, or a lens.",
+  purpose:
+      "How a glass surface looks — Apple's two fitted presets, or a "
+      'lens.',
   group: 'Surfaces',
   knobs: <Knob<Object?>>[
     Knob<_MaterialPreset>(
       name: 'preset',
-      value: _MaterialPreset.regular,
-      options: _MaterialPreset.values,
+      value: _materialPresets[0],
+      options: _materialPresets,
     ),
   ],
   build: (knobs) {
     final preset = knobs[0].value! as _MaterialPreset;
     return SizedBox.square(
       dimension: 200,
-      child: Glass(shape: _shape, material: _presetMaterial(preset)),
+      child: Glass(shape: _shape, material: preset.material),
     );
   },
   code: (knobs) {
@@ -169,7 +165,7 @@ final CatalogueEntry _glassMaterial = CatalogueEntry(
         '  shape: const GlassSuperellipse(\n'
         '    radius: BorderRadius.all(Radius.circular(40)),\n'
         '  ),\n'
-        '  material: ${_presetConstructor(preset)},\n'
+        '  material: ${preset.constructorCode},\n'
         ')';
   },
   seeAlso: const <String>['GlassVariant', 'GlassProfile', 'Material knobs'],

@@ -166,6 +166,17 @@ class _TopBar extends StatelessWidget {
 }
 
 /// A group's name, in the small tracked caps the comp uses for it.
+///
+/// A bare `Text` here reads fine over the aurora but washes out over
+/// sunlit ice — this header is a sibling `SliverToBoxAdapter`, undecorated
+/// by whatever photograph scrolls beneath it, and its colour resolves
+/// through [SurfaceInk] to [Tone.overPhoto] precisely because nothing set a
+/// surface colour. `Tone.captionScrim` is this codebase's own prior art for
+/// exactly this ("a strip painted inside a bare `Glass` to carry a
+/// caption") — painted here rather than a second `Glass`, which would cost
+/// an extra backdrop pass and could stack. Sized to the label, not the row:
+/// an `Align` under `Padding`'s loose constraints keeps the scrim a tight
+/// pill rather than a bar spanning the width.
 class _GroupHeader extends StatelessWidget {
   const _GroupHeader(this.group);
 
@@ -176,12 +187,21 @@ class _GroupHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 10),
-      child: Text(
-        group.toUpperCase(),
-        style: context.caption.copyWith(
-          color: context.inkTertiary,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 1,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(color: Tone.captionScrim),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: Text(
+              group.toUpperCase(),
+              style: context.caption.copyWith(
+                color: context.inkTertiary,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1,
+              ),
+            ),
+          ),
         ),
       ),
     );

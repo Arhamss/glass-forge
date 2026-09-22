@@ -132,7 +132,13 @@ void main() {
       },
     );
 
-    test("every entry's code compiles from its default knobs", () {
+    // This does not compile the snippets — Task 11 does that, by feeding
+    // them through the analyzer. All this checks is that `code` produced
+    // something for each entry's default knobs, which a fabricated,
+    // unrelated string would also satisfy. The tests below it are what
+    // actually guard the drift-free property this design exists for: that
+    // moving a knob moves both `build` and `code` together.
+    test("every entry's code is non-empty at its default knobs", () {
       for (final entry in surfacesEntries) {
         expect(
           renderSnippet(entry),
@@ -141,6 +147,133 @@ void main() {
         );
       }
     });
+
+    // --- moving a knob moves both build and code -------------------------
+
+    CatalogueEntry entryNamed(String api) =>
+        surfacesEntries.firstWhere((entry) => entry.api == api);
+
+    test(
+      'Glass — moving clipBehavior changes the built widget and the '
+      'snippet',
+      () {
+        final entry = entryNamed('Glass');
+        expect(
+          entry.knobs[0].value,
+          Clip.antiAlias,
+          reason: 'sanity: default',
+        );
+
+        final moved = entry.withKnob(0, Clip.hardEdge);
+        final glass = (moved.build(moved.knobs) as SizedBox).child! as Glass;
+
+        expect(glass.clipBehavior, Clip.hardEdge);
+        expect(renderSnippet(moved), contains('clipBehavior: Clip.hardEdge'));
+      },
+    );
+
+    test(
+      'GlassLayer — moving variant changes the built material and the '
+      'snippet',
+      () {
+        final entry = entryNamed('GlassLayer');
+        expect(
+          entry.knobs[0].value,
+          GlassVariant.regular,
+          reason: 'sanity: default',
+        );
+
+        final moved = entry.withKnob(0, GlassVariant.clear);
+        final layer =
+            (moved.build(moved.knobs) as SizedBox).child! as GlassLayer;
+
+        expect(layer.material.variant, GlassVariant.clear);
+        expect(
+          renderSnippet(moved),
+          contains('variant: GlassVariant.clear'),
+        );
+      },
+    );
+
+    test(
+      'GlassMaterial — moving the preset changes the built material and '
+      'the printed constructor',
+      () {
+        final entry = entryNamed('GlassMaterial');
+        final defaultPreset = entry.knobs[0].value;
+        final otherPreset = entry.knobs[0].options.firstWhere(
+          (option) => option != defaultPreset,
+        );
+        final preset =
+            otherPreset! as ({String constructorCode, GlassMaterial material});
+
+        final moved = entry.withKnob(0, otherPreset);
+        final glass = (moved.build(moved.knobs) as SizedBox).child! as Glass;
+
+        expect(glass.material, preset.material);
+        expect(renderSnippet(moved), contains(preset.constructorCode));
+      },
+    );
+
+    test(
+      'GlassVariant — moving variant changes the built material and the '
+      'snippet',
+      () {
+        final entry = entryNamed('GlassVariant');
+        expect(
+          entry.knobs[0].value,
+          GlassVariant.regular,
+          reason: 'sanity: default',
+        );
+
+        final moved = entry.withKnob(0, GlassVariant.clear);
+        final glass = (moved.build(moved.knobs) as SizedBox).child! as Glass;
+
+        expect(glass.material!.variant, GlassVariant.clear);
+        expect(
+          renderSnippet(moved),
+          contains('variant: GlassVariant.clear'),
+        );
+      },
+    );
+
+    test(
+      'GlassProfile — moving profile changes the built material and the '
+      'snippet',
+      () {
+        final entry = entryNamed('GlassProfile');
+        expect(
+          entry.knobs[0].value,
+          GlassProfile.edgeBand,
+          reason: 'sanity: default',
+        );
+
+        final moved = entry.withKnob(0, GlassProfile.dome);
+        final glass = (moved.build(moved.knobs) as SizedBox).child! as Glass;
+
+        expect(glass.material!.profile, GlassProfile.dome);
+        expect(renderSnippet(moved), contains('profile: GlassProfile.dome'));
+      },
+    );
+
+    test(
+      'Material knobs — moving frost changes the built material and the '
+      'snippet',
+      () {
+        final entry = entryNamed('Material knobs');
+        final frostIndex = entry.knobs.indexWhere(
+          (knob) => knob.name == 'frost',
+        );
+        expect(frostIndex, isNonNegative, reason: 'sanity: knob exists');
+        expect(entry.knobs[frostIndex].value, 5.0, reason: 'sanity: default');
+
+        final moved = entry.withKnob(frostIndex, 18.0);
+        final glass = (moved.build(moved.knobs) as SizedBox).child! as Glass;
+
+        expect(glass.material!.frost, 18.0);
+        expect(renderSnippet(moved), contains('frost: 18.00'));
+      },
+    );
   });
 
   group('shapesEntries', () {
@@ -209,7 +342,10 @@ void main() {
       },
     );
 
-    test("every entry's code compiles from its default knobs", () {
+    // See the equivalent comment in the surfacesEntries group above: this
+    // is not a compile check, only an emptiness check. The knob-move tests
+    // below are what guard the drift-free property.
+    test("every entry's code is non-empty at its default knobs", () {
       for (final entry in shapesEntries) {
         expect(
           renderSnippet(entry),
@@ -218,5 +354,74 @@ void main() {
         );
       }
     });
+
+    // --- moving a knob moves both build and code -------------------------
+
+    CatalogueEntry entryNamed(String api) =>
+        shapesEntries.firstWhere((entry) => entry.api == api);
+
+    test(
+      'GlassRoundedRectangle — moving radius changes the built shape and '
+      'the snippet',
+      () {
+        final entry = entryNamed('GlassRoundedRectangle');
+        expect(entry.knobs[0].value, 32.0, reason: 'sanity: default');
+
+        final moved = entry.withKnob(0, 60.0);
+        final glass = (moved.build(moved.knobs) as SizedBox).child! as Glass;
+        final shape = glass.shape as GlassRoundedRectangle;
+
+        expect(shape.radius, const BorderRadius.all(Radius.circular(60)));
+        expect(renderSnippet(moved), contains('Radius.circular(60.0)'));
+      },
+    );
+
+    test(
+      'GlassOval — moving width changes the built size and the snippet',
+      () {
+        final entry = entryNamed('GlassOval');
+        expect(entry.knobs[0].value, 200.0, reason: 'sanity: default');
+
+        final moved = entry.withKnob(0, 150.0);
+        final box = moved.build(moved.knobs) as SizedBox;
+
+        expect(box.width, 150.0);
+        expect(renderSnippet(moved), contains('width: 150.0'));
+      },
+    );
+
+    test(
+      'GlassSuperellipse — moving radius changes the built shape and the '
+      'snippet',
+      () {
+        final entry = entryNamed('GlassSuperellipse');
+        expect(entry.knobs[0].value, 40.0, reason: 'sanity: default');
+
+        final moved = entry.withKnob(0, 70.0);
+        final glass = (moved.build(moved.knobs) as SizedBox).child! as Glass;
+        final shape = glass.shape as GlassSuperellipse;
+
+        expect(shape.radius, const BorderRadius.all(Radius.circular(70)));
+        expect(renderSnippet(moved), contains('Radius.circular(70.0)'));
+      },
+    );
+
+    test(
+      'GlassBlendGroup — moving separation changes the built layout and '
+      'the snippet',
+      () {
+        final entry = entryNamed('GlassBlendGroup');
+        expect(entry.knobs[0].value, 40.0, reason: 'sanity: default');
+
+        final moved = entry.withKnob(0, 65.0);
+        final group =
+            (moved.build(moved.knobs) as SizedBox).child! as GlassBlendGroup;
+        final row = group.child as Row;
+        final gap = row.children[1] as SizedBox;
+
+        expect(gap.width, 65.0);
+        expect(renderSnippet(moved), contains('SizedBox(width: 65.0)'));
+      },
+    );
   });
 }
