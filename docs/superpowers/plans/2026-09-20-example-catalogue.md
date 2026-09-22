@@ -710,10 +710,26 @@ entry page replaces it.
 
 **Per-task steps, every one of Tasks 5-10:**
 
-- [ ] **Step 1:** Write a test in `example/test/catalogue_test.dart` asserting
-  this group's entry count and that every entry's `api`, `purpose` and at
-  least one knob are populated, and that `entry.build(entry.knobs)` returns a
-  widget without throwing for each entry's default knobs.
+- [ ] **Step 1:** Write a test group in `example/test/catalogue_test.dart`
+  mirroring the existing ones. It must assert this group's entry count, that
+  every entry's `api`, `purpose` and at least one knob are populated, that
+  apis are unique, and that `entry.build(entry.knobs)` returns a widget
+  without throwing at its defaults.
+
+  **And it must assert the one property the catalogue exists to guarantee**,
+  which the first two groups' tests did not: that `build` and `code` derive
+  from the same knobs, so they cannot drift. Tasks 5 and 6 both shipped test
+  groups where **every assertion passes against a `build` that ignores its
+  knobs argument entirely**, because nothing ever moved a knob off its
+  default. One of those tests is even named "every entry's code compiles from
+  its default knobs" and compiles nothing — it asserts `isNotEmpty`, which any
+  string satisfies, including a fabricated symbol.
+
+  So for each entry with a tunable knob: move that knob to a non-default
+  value, and assert **both** that `entry.build` reflects it and that
+  `renderSnippet(entry)` contains it. A test that only exercises defaults is
+  not evidence of derivation. Name the test for what it checks, not for what
+  Task 11 will check later.
 - [ ] **Step 2:** Run it; expect FAIL on the count.
 - [ ] **Step 3:** Write the entries. Every `code` function must produce Dart
   that actually compiles against the real API — Task 11 will compile them, so
