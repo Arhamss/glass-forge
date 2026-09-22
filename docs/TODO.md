@@ -162,6 +162,32 @@ and C3, see above.
 
 ## Known problems, none of them fixed
 
+- **`GlassDetentSheet` notifies its controller from inside its own build,
+  so a sibling that listens to that controller throws "setState called
+  during build" on mount.** Found while writing the catalogue's Chrome
+  entries, and verified in source rather than taken on report.
+
+  `build` calls `_syncDetents(available)` inside `LayoutBuilder.builder`
+  (`glass_detent_sheet.dart:354-357`), which calls
+  `_controller.setDetents(...)` (`:311`), which reaches `_publish()` and so
+  `notifyListeners()` (`glass_detent_sheet_controller.dart:137-151`). Any
+  sibling already built and subscribed — an `AnimatedBuilder` or a
+  `FadeTransition` driven by the same controller, which is exactly how a
+  caller fades a tab row out as the sheet rises — is asked to rebuild in the
+  middle of the build that is still running.
+
+  The deleted `SheetScene` had precisely that shape; `af7556b` added the
+  `FadeTransition`, and nothing tested it, so it went unnoticed until the
+  catalogue rebuilt the same handoff. The catalogue works around it
+  example-side with a listener that defers only that phase.
+
+  The workaround does not generalise. **`GlassScaffold` will hit this the
+  moment it automates the covered-surface presence handoff**, which is the
+  whole reason that widget is planned — and at that point the deferral has
+  to live in the package, not in each caller. The fix belongs in
+  `GlassDetentSheet`: resolve detents somewhere that is allowed to notify,
+  or defer the publish by a frame.
+
 - **`InteractiveGlass` changes its widget-tree *shape* with its parameters,
   so swapping one for another in the same slot can crash.** Found while
   writing the catalogue's Motion entries.
