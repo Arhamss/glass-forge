@@ -649,17 +649,23 @@ const double _legibilityHeight = _swatchHeight + 6 + 16 + 16 + 10 + 16;
 /// The tints this entry solves against.
 const GlassTints _tints = GlassTints();
 
-/// The scheme a surface that may *not* flip is stuck with over [backdrop].
+/// The scheme this entry solves in: the one [GlassTints.schemeFor] did not
+/// pick for [backdrop].
 ///
-/// [GlassTints.schemeFor] names the scheme whose labels read better there,
-/// and a `GlassAdaptation.flip` role takes it and is finished — over these
-/// photographs that is the dark scheme, which clears 7:1 with no tint at
-/// all. An `adapt` role, which is what a sheet or a card is, keeps the
-/// ambient scheme instead and can only thicken.
+/// `GlassSurfaceSpec.resolve` runs `opacityForContrast` for **both**
+/// `flip` and `adapt` roles — only `GlassAdaptation.none` is exempt. What
+/// differs is the scheme the solver starts from. A `flip` role takes
+/// `schemeFor`'s answer, which over these photographs is the dark ramp,
+/// already past 7:1 with no tint at all, so its solver returns the floor
+/// and there is nothing to watch. An `adapt` role keeps the **ambient**
+/// scheme, whatever the platform says, and can only thicken from there.
 ///
-/// So this entry solves for the ramp that *lost*, because that is the only
-/// case [GlassLegibility.opacityForContrast] exists to handle: everything a
-/// flipping surface needs, `schemeFor` already gave it.
+/// Those two are not the same thing, and this function returns neither:
+/// it returns `schemeFor`'s loser. That is a stand-in for the case worth
+/// showing — an adapting surface whose ambient scheme is the harder one
+/// over this backdrop — chosen because it is the same on every device,
+/// where the genuinely ambient scheme would leave this entry showing a
+/// flat solver to anyone reading it on a dark phone.
 Brightness _adaptingScheme(Color backdrop) =>
     _tints.schemeFor(backdrop) == Brightness.dark
     ? Brightness.light
@@ -860,9 +866,10 @@ final CatalogueEntry _glassLegibility = CatalogueEntry(
     return 'const backdrop = Color(${_hex(_backdrop.panelBackdrop)});\n'
         'const tints = GlassTints();\n'
         '\n'
-        '// The scheme an adapting surface is stuck with: schemeFor\n'
-        '// names the one that reads better, a flipping role takes it,\n'
-        '// and a sheet or a card has to tint its way there instead.\n'
+        '// Both flip and adapt roles run this solver; what differs\n'
+        '// is the scheme they start from. A flipping role starts from\n'
+        '// schemeFor and is already clear here, so this is the other\n'
+        '// ramp — an adapting surface tinting its way to the target.\n'
         'final ramp = tints.of(Brightness.$scheme);\n'
         '\n'
         'GlassLegibility.opacityForContrast(\n'

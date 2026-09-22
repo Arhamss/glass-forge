@@ -1518,34 +1518,65 @@ void main() {
         // infinite width, so a specimen whose root takes
         // `constraints.biggest` never lays out. Every root in this group
         // is a doubly-tight `SizedBox`, and this is what says so.
+        //
+        // Every individual `FlutterErrorDetails` is captured and matched
+        // against the known first-frame bug's own signature, rather than
+        // one `tester.takeException()` discarding whichever of them it
+        // returns. That shortcut cannot fail: the binding collapses
+        // several errors from one `pumpWidget` into a synthetic
+        // "Multiple exceptions" string and throws the originals away, and
+        // every entry here has a `Glass`, so the known bug fires at least
+        // once before any regression exists to be seen. Same collector and
+        // same signature as compositionEntries — see the long note there.
         for (final entry in designSystemEntries) {
-          await tester.pumpWidget(
-            MaterialApp(
-              home: GlassLayer(
-                child: SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.all(
-                      Radius.circular(10),
-                    ),
-                    child: FittedBox(
-                      fit: BoxFit.cover,
-                      child: KeyedSubtree(
-                        key: ValueKey(entry.api),
-                        child: entry.build(entry.knobs),
+          final caught = <FlutterErrorDetails>[];
+          final originalOnError = FlutterError.onError;
+          FlutterError.onError = caught.add;
+          try {
+            await tester.pumpWidget(
+              MaterialApp(
+                home: GlassLayer(
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.all(
+                        Radius.circular(10),
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        child: KeyedSubtree(
+                          key: ValueKey(entry.api),
+                          child: entry.build(entry.knobs),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          );
-          // The known first-frame `getTransformTo` throw under a
-          // not-yet-laid-out transform ancestor, tolerated exactly as the
-          // composition group tolerates it. This test is here for the
-          // other failure: one that keeps throwing past that frame.
-          tester.takeException();
+            );
+          } finally {
+            FlutterError.onError = originalOnError;
+          }
+
+          for (final details in caught) {
+            final isKnownFirstFrameBug =
+                details.exception.toString().contains(
+                  "Failed assertion: line 2251 pos 12: 'hasSize'",
+                ) &&
+                details.stack.toString().contains(
+                  'RenderGlassShape._syncGeometry',
+                );
+            expect(
+              isKnownFirstFrameBug,
+              isTrue,
+              reason:
+                  '${entry.api} threw under an unbounded-width FittedBox '
+                  'with something other than the known, tolerated '
+                  'first-frame geometry exception: ${details.exception}',
+            );
+          }
+
           await tester.pumpAndSettle();
           expect(
             tester.takeException(),

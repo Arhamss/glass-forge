@@ -11,6 +11,30 @@ import 'package:glass_forge_example/src/theme.dart';
 /// matters more than it looks: a `GlassSurface.navigationBar` is thin enough
 /// to flip its whole scheme against a bright backdrop, and a segmented
 /// control that had hard-coded white would then be white on white.
+///
+/// **Segments are sized from their labels, not cut into equal shares.** Equal
+/// shares are the obvious layout and they quietly break the one promise this
+/// catalogue makes: that every API name on screen is the real symbol. Five
+/// options in a phone-width control give each one about 67 points, and
+/// `navigationBar` needs about 84 — and because the labels cannot wrap (a
+/// symbol has nowhere to break) the reader sees `navigationBa` fading into
+/// nothing. A name shown truncated is worse than no name, because it is one
+/// the reader will search for and not find.
+///
+/// So each segment gets its own label's width first, and whatever is left
+/// over is split evenly between them. When the labels are short — which is
+/// every other knob in the catalogue — the leftover dominates and the result
+/// is the equal-share layout this control has always had, to within a point
+/// or two. When one label is long it takes the room it needs from the slack
+/// rather than from its neighbours' text.
+///
+/// Only when the labels do not fit at all does it fall back to splitting the
+/// width in proportion to them, so the longest still gets the most room, and
+/// [TextOverflow.fade] finally takes over. That case exists because two
+/// knobs in this catalogue are typed with records whose `toString()` runs
+/// past a hundred characters; it is their label that is wrong, not this
+/// control's layout, and widening or scrolling for them would turn one bad
+/// label into a bad control.
 class SegmentedControl<T> extends StatelessWidget {
   const SegmentedControl({
     required this.options,
@@ -25,68 +49,149 @@ class SegmentedControl<T> extends StatelessWidget {
   final ValueChanged<T> onChanged;
   final String Function(T) labelOf;
 
+  /// How wide [text] wants to be, laid out once and thrown away.
+  ///
+  /// Measured at the *selected* weight for every option, not at each one's
+  /// current weight: the labels animate between w500 and w600 as the
+  /// selection moves, and widths taken from the live style would make the
+  /// segment boundaries breathe on every frame of that animation.
+  static double _naturalWidth(
+    String text,
+    TextStyle style,
+    TextScaler scaler,
+    TextDirection direction,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: direction,
+      textScaler: scaler,
+      maxLines: 1,
+    )..layout();
+    final width = painter.width;
+    painter.dispose();
+    return width;
+  }
+
+  /// How the available width is divided between labels of [naturals].
+  ///
+  /// Natural width plus an equal share of the slack while there is slack;
+  /// proportional to natural width once there is not. See the class doc for
+  /// why those are the two cases.
+  static List<double> _segmentWidths(List<double> naturals, double available) {
+    final total = naturals.fold<double>(0, (sum, width) => sum + width);
+    if (total <= 0) {
+      return <double>[for (final _ in naturals) available / naturals.length];
+    }
+    final slack = available - total;
+    if (slack >= 0) {
+      final share = slack / naturals.length;
+      return <double>[for (final natural in naturals) natural + share];
+    }
+    return <double>[
+      for (final natural in naturals) available * natural / total,
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final index = options.indexOf(selected);
-    final count = options.length;
     final duration = sceneDuration(context, const Duration(milliseconds: 240));
+    final measuringStyle = context.label.copyWith(
+      fontWeight: FontWeight.w600,
+    );
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.of(context);
+
     return SizedBox(
       // An explicit height. A `Container` with an alignment inside a bounded
       // slot expands to fill it, which in a bar this size means swallowing
       // the screen.
       height: 40,
-      child: Stack(
-        children: [
-          // The travelling selection, behind the labels so the label a finger
-          // is on never flickers under it.
-          AnimatedAlign(
-            duration: duration,
-            curve: Curves.easeOutCubic,
-            alignment: count == 1
-                ? Alignment.center
-                : Alignment(-1 + 2 * index / (count - 1), 0),
-            child: FractionallySizedBox(
-              widthFactor: 1 / count,
-              heightFactor: 1,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: context.inkFill,
-                  borderRadius: const BorderRadius.all(Radius.circular(20)),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final widths = _segmentWidths(
+            <double>[
+              for (final option in options)
+                _naturalWidth(
+                  labelOf(option),
+                  measuringStyle,
+                  scaler,
+                  direction,
+                ),
+            ],
+            constraints.maxWidth,
+          );
+
+          // Integer flexes rather than laid-out pixel widths, so the row can
+          // never sum to a hair more than the width it was given and
+          // overflow. The pill is positioned from the same integers over the
+          // same sum, so it lands exactly on the segment it belongs to.
+          final flexes = <int>[
+            for (final width in widths)
+              (width * 1000).round().clamp(1, 1 << 30),
+          ];
+          final totalFlex = flexes.fold<int>(0, (sum, flex) => sum + flex);
+          final before = flexes
+              .take(index < 0 ? 0 : index)
+              .fold<int>(
+                0,
+                (sum, flex) => sum + flex,
+              );
+          final selectedFlex = index < 0 ? 0 : flexes[index];
+
+          return Stack(
+            children: [
+              // The travelling selection, behind the labels so the label a
+              // finger is on never flickers under it. It resizes as it
+              // travels now that the segments are not all one width.
+              AnimatedPositioned(
+                duration: duration,
+                curve: Curves.easeOutCubic,
+                left: constraints.maxWidth * before / totalFlex,
+                width: constraints.maxWidth * selectedFlex / totalFlex,
+                top: 0,
+                bottom: 0,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: context.inkFill,
+                    borderRadius: const BorderRadius.all(Radius.circular(20)),
+                  ),
                 ),
               ),
-            ),
-          ),
-          Row(
-            children: [
-              for (final option in options)
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => onChanged(option),
-                    child: Center(
-                      child: AnimatedDefaultTextStyle(
-                        duration: duration,
-                        style: context.label.copyWith(
-                          color: option == selected
-                              ? context.ink
-                              : context.inkTertiary,
-                          fontWeight: option == selected
-                              ? FontWeight.w600
-                              : FontWeight.w500,
-                        ),
-                        child: Text(
-                          labelOf(option),
-                          maxLines: 1,
-                          overflow: TextOverflow.fade,
-                          softWrap: false,
+              Row(
+                children: [
+                  for (var i = 0; i < options.length; i++)
+                    Expanded(
+                      flex: flexes[i],
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => onChanged(options[i]),
+                        child: Center(
+                          child: AnimatedDefaultTextStyle(
+                            duration: duration,
+                            style: context.label.copyWith(
+                              color: options[i] == selected
+                                  ? context.ink
+                                  : context.inkTertiary,
+                              fontWeight: options[i] == selected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                            ),
+                            child: Text(
+                              labelOf(options[i]),
+                              maxLines: 1,
+                              overflow: TextOverflow.fade,
+                              softWrap: false,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
+                ],
+              ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
