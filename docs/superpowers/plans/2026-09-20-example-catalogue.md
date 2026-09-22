@@ -915,15 +915,44 @@ git commit -m "test(example): compile every catalogue snippet"
 `SceneShell`, `BackdropInfo.name` and `.blurb`, which every scene depended
 on, so they could not survive its `flutter analyze` gate.
 
+Pre-flighted: `example/lib` and `example/test` are already clean of every
+scene class. The one surviving mention is a doc comment at
+`entries/motion.dart:23` that names "the deleted `MotionScene`" to explain
+where a value came from. **Leave it.** It is accurate history and says
+"deleted" in the same breath; scrubbing it would trade a true provenance
+note for nothing.
+
 So this step is now a verification, not a deletion. Confirm
 `example/lib/src/scenes/` does not exist and that no `SceneShell`,
 `LensScene`, `EdgeScene`, `BlendScene`, `MotionScene`, `SystemScene` or
 `SheetScene` reference survives in `example/lib`, `example/test`, the example
 README or the root README. A barrel export or an import is not a use.
 
+- [ ] **Step 1b: Restore a way to read the font licences**
+
+Pre-flighted before dispatch. `example/lib/main.dart:10` still calls
+`LicenseRegistry.addLicense` for Geist and Geist Mono, but the only UI that
+ever displayed them was the **System scene's Licences button**, which went
+with the scenes in Task 3. Nothing replaced it, and no `showLicensePage`
+call survives anywhere in `example/lib`.
+
+The fonts are OFL-licensed and the example README tells the reader that
+button exists. Shipping an app that bundles OFL fonts with no way to read
+the licence is an attribution regression, not a cosmetic one — registration
+alone means `showLicensePage` *would* find them, but nothing calls it. Give
+the catalogue an affordance that does, and only then update the README
+sentence to match.
+
 - [ ] **Step 2: Update the example README and the root README**
 
-Both describe a five-scene app. Rewrite for the catalogue. If the root
+Pre-flighted, and the two are not equally stale. `example/README.md` needs a
+real rewrite: line 3 opens "Five scenes over five photographs", lines 18-31
+are a scenes table pointing at `lib/src/scenes/`, line 44 describes the tab
+bar's overlap order, and lines 69 and 85 refer to the System scene's
+Licences button and `geometry` row. The **root README appears fine** — its
+`run_scene_benchmarks.dart` lines (175, 180) are the benchmark harness, not
+the example's scenes, and "five semantic surfaces" (145) is `GlassSurfaces`.
+Check it rather than assume, but do not rewrite it for the sake of it. If the root
 README's code blocks change, `test/readme_examples_test.dart` will catch a
 mistake — run it.
 
