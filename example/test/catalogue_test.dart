@@ -668,6 +668,15 @@ void main() {
           renderSnippet(moved),
           contains('GlassPressStretch.none()'),
         );
+        expect(
+          renderSnippet(moved),
+          contains('jiggle'),
+          reason:
+              'the entry shows one channel resolved explicitly and one '
+              'neutralised for free, and the snippet is the only place a '
+              'reader can be told about the second — leave it out and the '
+              'untouched jiggle reads as an oversight',
+        );
       },
     );
   });
@@ -939,6 +948,14 @@ void main() {
 
         expect(gap.width, 120.0);
         expect(renderSnippet(moved), contains('SizedBox(width: 120.0)'));
+        expect(
+          renderSnippet(moved),
+          contains('centres are 240.0 apart'),
+          reason:
+              'the distance the glow has to cross is the gap plus a '
+              "shape's width, and it moves with the knob — a fixed number "
+              'in the comment would be right at one position only',
+        );
       },
     );
 
@@ -988,6 +1005,15 @@ void main() {
               'glow_gating_test.dart proves lands on screen',
         );
         expect(glow!.value.radius, 320);
+        expect(
+          renderSnippet(entry),
+          contains('${glow!.value.radius.toStringAsFixed(0)} points'),
+          reason:
+              'the reach is what the top of this knob runs out of, and it '
+              "is InteractiveGlass's own private constant — so the snippet "
+              'has to name the number the widget actually published, or a '
+              'reader reads a dark neighbour as a broken feature',
+        );
 
         await gesture.up();
         await tester.pumpAndSettle();
@@ -1160,6 +1186,44 @@ void main() {
 
     CatalogueEntry entryNamed(String api) =>
         chromeEntries.firstWhere((entry) => entry.api == api);
+
+    // The frame is the one thing on these pages that is not the reader's
+    // own code, and it changes what every fraction and gap printed below
+    // it means. A `///` saying so reaches nobody — `CatalogueEntry` has no
+    // prose field past `purpose` — so the snippet has to say it, and this
+    // is what stops it being deleted as noise. `GlassDetent` is named
+    // explicitly rather than skipped: it resolves three detents against a
+    // knob instead of standing a sheet in a frame, so a note about a frame
+    // there would be false.
+    test('every snippet that stands a sheet in the frame discloses it', () {
+      for (final api in <String>[
+        'GlassDetentSheet',
+        'GlassDetentSheetController',
+        'GlassSheetScrollPhysics',
+      ]) {
+        final snippet = renderSnippet(entryNamed(api));
+        expect(
+          snippet,
+          contains('248-point tall frame'),
+          reason: '$api prints fractions of a frame it never names',
+        );
+        expect(
+          snippet,
+          contains('MediaQuery.paddingOf(context).top'),
+          reason:
+              '$api says the specimen is framed but not what a real sheet '
+              'measures against instead',
+        );
+      }
+
+      expect(
+        renderSnippet(entryNamed('GlassDetent')),
+        isNot(contains('248-point tall frame')),
+        reason:
+            'GlassDetent resolves against its own knob, so claiming a '
+            'frame would be claiming something untrue',
+      );
+    });
 
     /// Mounts [entry] and hands back the controller the sheet it built is
     /// actually driven by, read off the real `GlassDetentSheetScope` the
@@ -1731,6 +1795,15 @@ void main() {
           contains('follows the platform'),
           reason: 'the default position says what null means',
         );
+        expect(
+          renderSnippet(entry),
+          contains('Neither surface is given a backdrop'),
+          reason:
+              'a reader who adds one finds the knob stops reaching the '
+              'control, which is the size gate doing its job and not the '
+              'theme failing — and the snippet is the only place they can '
+              'be told',
+        );
       },
     );
 
@@ -1833,6 +1906,21 @@ void main() {
           renderSnippet(moved),
           contains('GlassRadiusScale(extraLarge: 20.0)'),
         );
+        // The radius knob stops well short of what GlassRadiusScale takes,
+        // and the reason is this specimen's own height rather than the
+        // token: a corner radius clamps to half the shorter side. A
+        // ceiling with no stated reason reads as the token's limit.
+        expect(entry.knobs[1].max, 58.0, reason: 'sanity: the ceiling');
+        expect(
+          renderSnippet(moved),
+          contains('stops at 58.0'),
+          reason: 'the snippet names the ceiling the knob actually has',
+        );
+        expect(
+          renderSnippet(moved),
+          contains('clamps to half the shorter side'),
+          reason: 'and says whose limit it is, not just that there is one',
+        );
       },
     );
 
@@ -1872,6 +1960,15 @@ void main() {
           reason: 'and the ramp is monotone, so the surface got thicker',
         );
         expect(renderSnippet(moved), contains('GlassTintStep.opaque'));
+        expect(
+          renderSnippet(moved),
+          contains('No backdrop on the card'),
+          reason:
+              'the tintOpacity printed beside the specimen is the number a '
+              'reader would copy, and in an app that supplies a backdrop '
+              'the solver raises it — so the snippet has to say the '
+              'backdrop is missing on purpose',
+        );
       },
     );
 

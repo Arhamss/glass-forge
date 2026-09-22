@@ -6,6 +6,13 @@ import 'package:glass_forge_example/src/catalogue/catalogue_entry.dart';
 ///
 /// `GlassShape` is a closed set of exactly three silhouettes plus one
 /// widget that joins them — one entry per member of that set.
+///
+/// Nothing in a `///` in this file reaches the app: a [CatalogueEntry] has
+/// no prose field beyond `purpose`, so anything a reader needs in order to
+/// read a specimen correctly belongs in `purpose`, painted on the specimen,
+/// or in a comment line inside the rendered snippet. The four `purpose`
+/// lines below already carry what there is — the corner clamp among it —
+/// which is why no snippet here opens with a comment.
 final List<CatalogueEntry> shapesEntries = <CatalogueEntry>[
   _glassRoundedRectangle,
   _glassOval,

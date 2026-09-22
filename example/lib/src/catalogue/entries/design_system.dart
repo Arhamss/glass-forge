@@ -192,6 +192,10 @@ class _ThemeCard extends StatelessWidget {
 /// it is what the `GlassSurface` entry shows. This entry is the other half
 /// of the rule: with nothing to adapt to, everything under one `GlassTheme`
 /// resolves in the scheme it names, down to the colour of the labels.
+///
+/// A reader adding a backdrop to the snippet would find the knob stop
+/// reaching the control, so the snippet's comment slot says so. Nothing in
+/// a `///` reaches the app.
 final CatalogueEntry _glassTheme = CatalogueEntry(
   api: 'GlassTheme',
   purpose:
@@ -245,6 +249,10 @@ final CatalogueEntry _glassTheme = CatalogueEntry(
         : 'const GlassThemeData(brightness: $brightness),';
     return 'GlassTheme(\n'
         '  data: $data\n'
+        '  // Neither surface is given a backdrop. With one, the\n'
+        '  // control — under the flip size gate at 44 points —\n'
+        '  // would take its scheme off the photograph instead of\n'
+        '  // this theme, and the knob would stop reaching it.\n'
         '  child: const Column(\n'
         '    crossAxisAlignment: CrossAxisAlignment.stretch,\n'
         '    children: [\n'
@@ -413,6 +421,10 @@ final CatalogueEntry _glassSurface = CatalogueEntry(
 /// Room for a `radius.extraLarge` at the top of its slider: the shape's
 /// radius is clamped to half the shorter side at paint time, so anything
 /// over 58 here would stop being a number the reader can see move.
+///
+/// That is why the knob's `max` is half this, and a ceiling with no stated
+/// reason reads as the token's own limit — so the snippet's comment slot
+/// says whose limit it is.
 const double _tokensHeight = 116;
 
 /// The facts a token override lands on.
@@ -500,6 +512,10 @@ final CatalogueEntry _glassTokens = CatalogueEntry(
         '      // radius: extraLarge, so these two rungs are the ones\n'
         '      // that reach it. Every other scale stays fitted.\n'
         '      blur: GlassBlurScale(thick: $thick),\n'
+        '      // The knob above stops at ${_tokensHeight / 2}, and the token is\n'
+        '      // not what stops it: this surface is $_tokensHeight tall and a\n'
+        '      // corner radius clamps to half the shorter side, so\n'
+        '      // anything past that would print but not paint.\n'
         '      radius: GlassRadiusScale(extraLarge: $extraLarge),\n'
         '    ),\n'
         '  ),\n'
@@ -573,6 +589,12 @@ class _TintFacts extends StatelessWidget {
 /// wrong thing about what the steps are. The contrast printed underneath is
 /// still measured against this photograph, because that is the colour this
 /// card is genuinely sitting over.
+///
+/// The `tintOpacity` this entry prints is the one a reader would copy, and
+/// in an app that supplies a backdrop it is not the one they would get — so
+/// that much is said in the snippet's comment slot as well. Nothing in a
+/// `///` reaches the app: a [CatalogueEntry] has no prose field beyond
+/// `purpose`.
 final CatalogueEntry _glassTintStep = CatalogueEntry(
   api: 'GlassTintStep',
   purpose:
@@ -613,6 +635,11 @@ final CatalogueEntry _glassTintStep = CatalogueEntry(
         '      ),\n'
         '    ),\n'
         '  ),\n'
+        '  // No backdrop on the card: with one, the legibility solver\n'
+        '  // would raise the tint above whichever step this names\n'
+        "  // whenever that step undershoots the role's 4.5:1, and the\n"
+        "  // knob's lower half would all print one opacity. The\n"
+        '  // contrast underneath is still measured over the photograph.\n'
         '  child: GlassSurface.card(child: facts),\n'
         ')';
   },

@@ -337,6 +337,11 @@ final CatalogueEntry _glassMotion = CatalogueEntry(
 /// spring here settles instantly once Reduce Motion is on, so velocity
 /// never leaves zero. That asymmetry — one channel resolved explicitly,
 /// the other for free — is what this entry exists to show.
+///
+/// Which means it has to be said where a reader can see it: the toggle not
+/// flipping the real setting is in this entry's `purpose`, and the untouched
+/// `jiggle` is in the snippet's comment slot. Nothing in a `///` reaches the
+/// app — a [CatalogueEntry] has no prose field beyond `purpose`.
 final CatalogueEntry _glassReduceMotion = CatalogueEntry(
   api: 'GlassReduceMotion',
   purpose:
@@ -375,8 +380,13 @@ final CatalogueEntry _glassReduceMotion = CatalogueEntry(
               '    squash: 0.4,\n'
               '    travel: 0.18,\n'
               '  )';
-    return 'InteractiveGlass(\n'
-        '  // GlassReduceMotion.instance.value == $reduced\n'
+    return '// GlassReduceMotion.instance.value is $reduced here — read\n'
+        '// off the platform, never written, so the knob above\n'
+        '// previews this swap rather than making it. jiggle is left\n'
+        '// alone on purpose: under the real setting every spring\n'
+        '// settles at once, so the velocity jiggle reads never\n'
+        '// leaves zero and the squash goes with it.\n'
+        'InteractiveGlass(\n'
         '  pressStretch: $pressStretch,\n'
         '  child: const Glass(\n'
         '    shape: GlassSuperellipse(\n'

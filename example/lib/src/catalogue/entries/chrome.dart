@@ -16,6 +16,11 @@ import 'package:glass_forge_example/src/theme.dart';
 /// inherited the real status-bar inset would be a different sheet on every
 /// device the catalogue runs on, and the numbers printed in its snippet
 /// would be true of none of them.
+///
+/// Which a reader has to be told, because the frame is the difference
+/// between what those numbers mean here and what they would mean in an app.
+/// Nothing in a `///` reaches the app — a [CatalogueEntry] has no prose
+/// field beyond `purpose` — so the three snippets open with [_frameNote].
 final List<CatalogueEntry> chromeEntries = <CatalogueEntry>[
   _glassDetentSheet,
   _glassDetent,
@@ -112,6 +117,21 @@ class _Frame extends StatelessWidget {
     );
   }
 }
+
+/// The line every snippet built around a [_Frame] opens with.
+///
+/// The frame is the one thing on these three pages that is not the reader's
+/// own code, and it changes what every number below it means: a detent
+/// fraction here is a fraction of [_frameHeight], and a gap here is a gap
+/// in a box that size. Left in a doc comment, a reader would copy the
+/// arithmetic and apply it to a screen it was never done against.
+final String _frameNote =
+    '// This specimen stands in a ${_frameHeight.toStringAsFixed(0)}-point '
+    'tall frame with the\n'
+    '// window insets already off it, so every fraction and gap below\n'
+    '// is sized to that rather than to a screen. A real sheet\n'
+    '// resolves its detents against the height it is given, less\n'
+    '// MediaQuery.paddingOf(context).top.\n';
 
 // ---------------------------------------------------------------------------
 // What the sheets carry
@@ -450,11 +470,18 @@ final CatalogueEntry _glassDetentSheet = CatalogueEntry(
   build: (knobs) => _DetentSheetDemo(lowestFraction: _asDouble(knobs[0])),
   code: (knobs) {
     final lowest = _asDouble(knobs[0]).toStringAsFixed(2);
-    return 'Stack(\n'
+    return '$_frameNote'
+        'Stack(\n'
         '  children: [\n'
         '    // The handoff: the tabs are gone before the sheet\n'
         '    // reaches them, so the two are never both glass over\n'
         '    // the same pixels.\n'
+        "    // Neither end is a constant: the bar's own height\n"
+        '    // against bottomGap is where both come from. The gap\n'
+        '    // shrinks to $_barHeight and sets the sheet down on the bar\n'
+        '    // at 1 - $_barHeight / $_bottomGap; the ramp opens six points of\n'
+        '    // gap before that. A taller bar, or a bottomGap no\n'
+        '    // bigger than the bar, moves or breaks both.\n'
         '    GlassPresence(\n'
         '      presence: controller.presenceUnder(\n'
         '        start: lowest + $_clearance * span,\n'
@@ -735,9 +762,8 @@ final CatalogueEntry _glassDetentSheetController = CatalogueEntry(
   code: (knobs) {
     final name = knobs[0].value! as String;
     final index = _detentNames.indexOf(name);
-    return 'final controller = GlassDetentSheetController(vsync: this);\n'
-        '\n'
-        'controller.animateToDetent($index); // $name\n'
+    return '$_frameNote'
+        'final controller = GlassDetentSheetController(vsync: this);\n'
         '\n'
         'GlassDetentSheet(\n'
         '  detents: const [\n'
@@ -746,8 +772,15 @@ final CatalogueEntry _glassDetentSheetController = CatalogueEntry(
         '    GlassDetent.fraction(1),\n'
         '  ],\n'
         '  controller: controller,\n'
+        '  // Where it opens. The sheet resolves its detents inside\n'
+        '  // its own LayoutBuilder, so animateToDetent before that\n'
+        '  // first frame is a documented no-op.\n'
+        '  initialDetent: $index,\n'
         '  child: ListView(children: places),\n'
-        ')';
+        ');\n'
+        '\n'
+        '// Afterwards, from anywhere holding the controller:\n'
+        'controller.animateToDetent($index); // $name';
   },
   seeAlso: const <String>[
     'GlassDetentSheet',
@@ -817,7 +850,8 @@ final CatalogueEntry _glassSheetScrollPhysics = CatalogueEntry(
   code: (knobs) {
     final overridden = knobs[0].value! as String == 'overridden';
     final physics = overridden ? 'const BouncingScrollPhysics()' : 'null';
-    return 'GlassDetentSheet(\n'
+    return '$_frameNote'
+        'GlassDetentSheet(\n'
         '  detents: const [\n'
         '    GlassDetent.fraction(0.45),\n'
         '    GlassDetent.fraction(1),\n'

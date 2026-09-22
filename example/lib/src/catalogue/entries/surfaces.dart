@@ -10,6 +10,14 @@ import 'package:glass_forge_example/src/catalogue/catalogue_entry.dart';
 /// highlight, contour, thickness, dispersion — are parameters of one type,
 /// not eight types, so they share a single entry ("Material knobs") rather
 /// than each claiming a row of their own.
+///
+/// Nothing in a `///` in this file reaches the app: a [CatalogueEntry] has
+/// no prose field beyond `purpose`, so anything a reader needs in order to
+/// read a specimen correctly — a stand-in value, a knob whose range is
+/// narrower than the API's, a framing this catalogue supplies and an app
+/// would not — belongs in `purpose`, painted on the specimen, or in a
+/// comment line inside the rendered snippet. Every `///` below is a
+/// maintainer's note, and was checked against that question.
 final List<CatalogueEntry> surfacesEntries = <CatalogueEntry>[
   _glass,
   _glassLayer,

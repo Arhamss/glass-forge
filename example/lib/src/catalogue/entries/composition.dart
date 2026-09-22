@@ -12,6 +12,11 @@ import 'package:glass_forge_example/src/theme.dart';
 /// its own; `GlassGlow` is the one thing that deliberately spills across a
 /// pass's surfaces; the fourth entry is the diagnostic that fires when
 /// nothing above avoided the bug.
+///
+/// Nothing in a `///` in this file reaches the app — a [CatalogueEntry] has
+/// no prose field beyond `purpose` — so anything a reader needs in order to
+/// read a specimen correctly is said in `purpose` or in the snippet's own
+/// comment slot, and what is left here is for whoever maintains the entry.
 final List<CatalogueEntry> compositionEntries = <CatalogueEntry>[
   _glassPresence,
   _glassHostScope,
@@ -31,6 +36,11 @@ const _shape = GlassSuperellipse(
 /// size and separation `test/src/composition/glow_gating_test.dart` proves
 /// a 320-radius glow reaches at: two 120-square shapes 40 apart, 160
 /// centre to centre.
+///
+/// The knob runs to 200, which is 320 centre to centre — the far end of
+/// that same reach, where the neighbour stops brightening. A reader who
+/// was not told the light has a radius would read the top of the slider as
+/// a broken feature, so the snippet's comment slot says it.
 const _glowShape = GlassRoundedRectangle(
   radius: BorderRadius.all(Radius.circular(24)),
 );
@@ -164,6 +174,9 @@ final CatalogueEntry _glassHostScope = CatalogueEntry(
         '    // On content: nothing above it is glass yet.\n'
         '    $chip,\n'
         '    // Inside a glass toolbar: the same control paints.\n'
+        '    // Not a preference: Glass.build asserts on a Glass\n'
+        '    // built anywhere inside the subtree another Glass\n'
+        '    // returns, which is the stacked backdrop filter.\n'
         '    SizedBox.square(\n'
         '      dimension: 160,\n'
         '      child: Glass(\n'
@@ -211,7 +224,15 @@ final CatalogueEntry _glassGlow = CatalogueEntry(
   },
   code: (knobs) {
     final separation = _asDouble(knobs[0]).toStringAsFixed(1);
-    return 'Row(\n'
+    final centres = (_asDouble(knobs[0]) + 120).toStringAsFixed(1);
+    return '// GlassGlow is not constructed by a caller. InteractiveGlass\n'
+        '// publishes one under the finger, at a radius of its own —\n'
+        '// 320 points — onto the channel every Glass in the same\n'
+        '// GlassLayer reads. These two centres are $centres apart;\n'
+        '// slide them past that radius and the neighbour is out of\n'
+        '// reach, which is the knob running out rather than the\n'
+        '// light failing.\n'
+        'Row(\n'
         '  children: [\n'
         '    const SizedBox.square(\n'
         '      dimension: 120,\n'
@@ -384,7 +405,11 @@ final CatalogueEntry _crossPassOverlap = CatalogueEntry(
   },
   code: (knobs) {
     final offset = _asDouble(knobs[0]).toStringAsFixed(1);
-    return 'Stack(\n'
+    return '// The text under the shapes is not something this package\n'
+        '// draws. RenderGlassLayer prints that warning through\n'
+        '// debugPrint, to the console; the catalogue borrows\n'
+        '// debugPrint for the life of this page to put it on screen.\n'
+        'Stack(\n'
         '  children: [\n'
         '    const Positioned(\n'
         '      left: 0,\n'
