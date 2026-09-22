@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' show Scaffold;
+import 'package:flutter/material.dart' show Scaffold, showLicensePage;
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_example/src/backdrop.dart';
@@ -6,6 +6,7 @@ import 'package:glass_forge_example/src/backdrop_info.dart';
 import 'package:glass_forge_example/src/catalogue/catalogue.dart';
 import 'package:glass_forge_example/src/catalogue/catalogue_entry.dart';
 import 'package:glass_forge_example/src/catalogue/entry_page.dart';
+import 'package:glass_forge_example/src/chrome.dart';
 import 'package:glass_forge_example/src/theme.dart';
 
 /// The catalogue's home: every entry, grouped, before any one of them is
@@ -141,6 +142,14 @@ class CatalogueIndexPage extends StatelessWidget {
 /// sitting below it: an inset told apart from the bar reads as a status-bar
 /// gap above a floating pill, and the comp this implements draws the glass
 /// running all the way to the top of the frame instead.
+///
+/// It carries the app's one trailing action, and it has to: `main()`
+/// registers the Geist and Geist Mono OFL text with `LicenseRegistry`, and
+/// registration alone only means `showLicensePage` *would* find the text.
+/// The app bundles the fonts, so something on screen has to be able to
+/// reach it, and the index's bar is the only chrome every reader passes
+/// through. A trailing action beside a large title is the idiom the rest of
+/// this bar is already borrowing.
 class _TopBar extends StatelessWidget {
   const _TopBar({required this.backdrop, required this.topInset});
 
@@ -156,9 +165,23 @@ class _TopBar extends StatelessWidget {
       backdrop: backdrop,
       child: Padding(
         padding: EdgeInsets.fromLTRB(20, topInset + 12, 20, 12),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Text('Catalogue', style: context.display),
+        child: Row(
+          children: [
+            Expanded(child: Text('Catalogue', style: context.display)),
+            const SizedBox(width: 12),
+            PillButton(
+              label: 'Licences',
+              // Flutter's own page, not one this example draws: it is
+              // already the thing every `LicenseRegistry` entry in the
+              // process shows up in, including Flutter's own, and an
+              // example that hand-rolled a second licence screen would be
+              // showing the reader less than the platform gives for free.
+              onTap: () => showLicensePage(
+                context: context,
+                applicationName: 'glass_forge',
+              ),
+            ),
+          ],
         ),
       ),
     );
