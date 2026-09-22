@@ -1,8 +1,376 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_example/src/catalogue/catalogue_entry.dart';
+import 'package:glass_forge_example/src/theme.dart';
 
-/// The Composition group: `GlassBlendGroup` and how shapes merge into one
-/// surface.
+/// The Composition group: how several surfaces, or several passes, share
+/// one screen.
 ///
-/// Populated by Task 8. Empty here is correct — `entriesIn` and the index
-/// page both tolerate a group with no entries yet.
-final List<CatalogueEntry> compositionEntries = <CatalogueEntry>[];
+/// Four entries. `GlassPresence` and `GlassHostScope` are the two ways a
+/// single surface avoids the flutter#187820 stacked-backdrop-filter bug on
+/// its own; `GlassGlow` is the one thing that deliberately spills across a
+/// pass's surfaces; the fourth entry is the diagnostic that fires when
+/// nothing above avoided the bug.
+final List<CatalogueEntry> compositionEntries = <CatalogueEntry>[
+  _glassPresence,
+  _glassHostScope,
+  _glassGlow,
+  _crossPassOverlap,
+];
+
+double _asDouble(Knob<Object?> knob) => knob.value! as double;
+
+/// The silhouette `GlassPresence` and `GlassHostScope`'s on-content chip
+/// sit on.
+const _shape = GlassSuperellipse(
+  radius: BorderRadius.all(Radius.circular(40)),
+);
+
+/// The silhouette both `GlassGlow` surfaces sit on — the exact shape,
+/// size and separation `test/src/composition/glow_gating_test.dart` proves
+/// a 320-radius glow reaches at: two 120-square shapes 40 apart, 160
+/// centre to centre.
+const _glowShape = GlassRoundedRectangle(
+  radius: BorderRadius.all(Radius.circular(24)),
+);
+
+// ---------------------------------------------------------------------------
+// GlassPresence
+// ---------------------------------------------------------------------------
+
+final CatalogueEntry _glassPresence = CatalogueEntry(
+  api: 'GlassPresence',
+  purpose:
+      'Ramps a glass subtree in or out, then drops the backdrop pass '
+      'entirely below the epsilon — glass has no alpha to fade.',
+  group: 'Composition',
+  knobs: <Knob<Object?>>[
+    Knob<double>(name: 'presence', value: 1, min: 0, max: 1),
+  ],
+  build: (knobs) {
+    final presence = _asDouble(knobs[0]);
+    return SizedBox.square(
+      dimension: 200,
+      child: GlassPresence(
+        presence: AlwaysStoppedAnimation<double>(presence),
+        child: const Glass(shape: _shape),
+      ),
+    );
+  },
+  code: (knobs) {
+    final presence = _asDouble(knobs[0]).toStringAsFixed(2);
+    return 'GlassPresence(\n'
+        '  presence: AlwaysStoppedAnimation<double>($presence),\n'
+        '  child: const Glass(\n'
+        '    shape: GlassSuperellipse(\n'
+        '      radius: BorderRadius.all(Radius.circular(40)),\n'
+        '    ),\n'
+        '  ),\n'
+        ')';
+  },
+  seeAlso: const <String>['GlassHostScope', 'Glass'],
+);
+
+// ---------------------------------------------------------------------------
+// GlassHostScope
+// ---------------------------------------------------------------------------
+
+/// The one control this entry places twice — directly on content, and
+/// inside a glass toolbar.
+///
+/// Mirrors `GlassHostScope`'s own class-doc example: off glass it is a
+/// real `Glass`; on glass it paints, because nesting a second `Glass`
+/// inside the first's child is the one composition this renderer refuses
+/// to draw (`Glass.build` asserts on it).
+class _HostAwareChip extends StatelessWidget {
+  const _HostAwareChip({required this.radius});
+
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    if (GlassHostScope.isOnGlass(context)) {
+      return const SizedBox.square(
+        dimension: 96,
+        child: ColoredBox(color: Color(0x33FFFFFF)),
+      );
+    }
+    return SizedBox.square(
+      dimension: 96,
+      child: Glass(
+        shape: GlassRoundedRectangle(
+          radius: BorderRadius.all(Radius.circular(radius)),
+        ),
+      ),
+    );
+  }
+}
+
+final CatalogueEntry _glassHostScope = CatalogueEntry(
+  api: 'GlassHostScope',
+  purpose:
+      'One control, aware of whether it already sits on glass — real '
+      'glass on content, painted inside a glass toolbar.',
+  group: 'Composition',
+  knobs: <Knob<Object?>>[
+    Knob<double>(name: 'radius', value: 20, min: 4, max: 40),
+  ],
+  build: (knobs) {
+    final radius = _asDouble(knobs[0]);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        // On content: nothing above it is glass yet, so the control
+        // draws its own.
+        _HostAwareChip(radius: radius),
+        // Inside a glass toolbar: the same control paints instead of
+        // nesting a second Glass inside this one's child.
+        SizedBox.square(
+          dimension: 160,
+          child: Glass(
+            shape: const GlassSuperellipse(
+              radius: BorderRadius.all(Radius.circular(32)),
+            ),
+            child: Center(child: _HostAwareChip(radius: radius)),
+          ),
+        ),
+      ],
+    );
+  },
+  code: (knobs) {
+    final radius = _asDouble(knobs[0]).toStringAsFixed(1);
+    return 'GlassHostScope.isOnGlass(context)\n'
+        '    ? const ColoredBox(color: Color(0x33FFFFFF))\n'
+        '    : Glass(\n'
+        '        shape: GlassRoundedRectangle(\n'
+        '          radius: BorderRadius.all(Radius.circular($radius)),\n'
+        '        ),\n'
+        '      )';
+  },
+  seeAlso: const <String>['Glass', 'GlassLayer'],
+);
+
+// ---------------------------------------------------------------------------
+// GlassGlow
+// ---------------------------------------------------------------------------
+
+final CatalogueEntry _glassGlow = CatalogueEntry(
+  api: 'GlassGlow',
+  purpose:
+      'The light under a held finger spreads onto a neighbour sharing '
+      'the same backdrop pass — press one, watch the other brighten.',
+  group: 'Composition',
+  knobs: <Knob<Object?>>[
+    Knob<double>(name: 'separation', value: 40, min: 0, max: 200),
+  ],
+  build: (knobs) {
+    final separation = _asDouble(knobs[0]);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const SizedBox.square(
+          dimension: 120,
+          child: InteractiveGlass(child: Glass(shape: _glowShape)),
+        ),
+        SizedBox(width: separation),
+        const SizedBox.square(
+          dimension: 120,
+          child: InteractiveGlass(child: Glass(shape: _glowShape)),
+        ),
+      ],
+    );
+  },
+  code: (knobs) {
+    final separation = _asDouble(knobs[0]).toStringAsFixed(1);
+    return 'Row(\n'
+        '  children: [\n'
+        '    const SizedBox.square(\n'
+        '      dimension: 120,\n'
+        '      child: InteractiveGlass(\n'
+        '        child: Glass(\n'
+        '          shape: GlassRoundedRectangle(\n'
+        '            radius: BorderRadius.all(Radius.circular(24)),\n'
+        '          ),\n'
+        '        ),\n'
+        '      ),\n'
+        '    ),\n'
+        '    SizedBox(width: $separation),\n'
+        '    const SizedBox.square(\n'
+        '      dimension: 120,\n'
+        '      child: InteractiveGlass(\n'
+        '        child: Glass(\n'
+        '          shape: GlassRoundedRectangle(\n'
+        '            radius: BorderRadius.all(Radius.circular(24)),\n'
+        '          ),\n'
+        '        ),\n'
+        '      ),\n'
+        '    ),\n'
+        '  ],\n'
+        ')';
+  },
+  seeAlso: const <String>['InteractiveGlass', 'GlassLayer'],
+);
+
+// ---------------------------------------------------------------------------
+// Cross-pass overlap
+// ---------------------------------------------------------------------------
+
+/// Two overlapping shapes in differing materials, with the real
+/// `debugPrint` warning `RenderGlassLayer` fires for them captured and
+/// shown on screen rather than left in the console.
+///
+/// `debugPrint` is a plain top-level field
+/// (`DebugPrintCallback debugPrint`), so this borrows it in `initState`
+/// and hands it back in `dispose` — the technique the brief asks for,
+/// and the only way to put a package diagnostic on screen rather than
+/// merely describe it.
+class _OverlapWarningDemo extends StatefulWidget {
+  const _OverlapWarningDemo({required this.offset});
+
+  /// How far the second shape sits from the first, in logical pixels.
+  final double offset;
+
+  @override
+  State<_OverlapWarningDemo> createState() => _OverlapWarningDemoState();
+}
+
+class _OverlapWarningDemoState extends State<_OverlapWarningDemo> {
+  /// What [debugPrint] pointed at before this widget borrowed it.
+  late final DebugPrintCallback _previousDebugPrint;
+
+  /// The warning's own text, once `RenderGlassLayer` has printed one.
+  String? _captured;
+
+  @override
+  void initState() {
+    super.initState();
+    _previousDebugPrint = debugPrint;
+    debugPrint = (message, {wrapWidth}) {
+      if (message != null && message.startsWith('glass_forge:')) {
+        // The warning fires from inside paint, where a synchronous
+        // setState is not legal — the frame it fires in is still
+        // building the tree a rebuild would need. Deferred to the next
+        // frame instead.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() => _captured = message);
+          }
+        });
+      }
+      _previousDebugPrint(message, wrapWidth: wrapWidth);
+    };
+  }
+
+  @override
+  void dispose() {
+    debugPrint = _previousDebugPrint;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 140,
+          child: Stack(
+            children: [
+              const Positioned(
+                left: 0,
+                child: SizedBox.square(
+                  dimension: 100,
+                  child: Glass(shape: GlassOval()),
+                ),
+              ),
+              Positioned(
+                left: widget.offset,
+                child: const SizedBox.square(
+                  dimension: 100,
+                  child: Glass(
+                    shape: GlassOval(),
+                    // Not `GlassMaterial.clear()`: its frost is 0, so on a
+                    // backend without shader-filter support
+                    // `GlassComposition.willRender` — the same gate the
+                    // overlap check itself defers to — would call it
+                    // incapable of drawing anything and the two shapes
+                    // would never be judged as overlapping passes at all.
+                    // A nonzero frost keeps this entry honest everywhere.
+                    material: GlassMaterial(
+                      variant: GlassVariant.clear,
+                      frost: 8,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 48,
+          child: Text(
+            _captured ?? 'watching for the paint-time warning…',
+            textAlign: TextAlign.center,
+            style: context.mono.copyWith(color: context.inkSecondary),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The offset baked into a built `Cross-pass overlap` widget.
+///
+/// `_OverlapWarningDemo` is private, so nothing outside this file can name
+/// its type to cast against it — this is the one typed door left open for
+/// the catalogue's own tests to confirm the `offset` knob actually reached
+/// the widget, without resorting to a dynamic call.
+@visibleForTesting
+double debugCrossPassOverlapOffset(Widget widget) =>
+    (widget as _OverlapWarningDemo).offset;
+
+final CatalogueEntry _crossPassOverlap = CatalogueEntry(
+  api: 'Cross-pass overlap',
+  purpose:
+      'Two materials whose shapes overlap sample last frame across '
+      'passes — deliberately provoked here, with the debug warning '
+      'captured live.',
+  group: 'Composition',
+  knobs: <Knob<Object?>>[
+    Knob<double>(name: 'offset', value: 30, min: 0, max: 140),
+  ],
+  build: (knobs) {
+    final offset = _asDouble(knobs[0]);
+    return _OverlapWarningDemo(offset: offset);
+  },
+  code: (knobs) {
+    final offset = _asDouble(knobs[0]).toStringAsFixed(1);
+    return 'Stack(\n'
+        '  children: [\n'
+        '    const Positioned(\n'
+        '      left: 0,\n'
+        '      child: SizedBox.square(\n'
+        '        dimension: 100,\n'
+        '        child: Glass(shape: GlassOval()),\n'
+        '      ),\n'
+        '    ),\n'
+        '    Positioned(\n'
+        '      left: $offset,\n'
+        '      child: const SizedBox.square(\n'
+        '        dimension: 100,\n'
+        '        child: Glass(\n'
+        '          shape: GlassOval(),\n'
+        '          material: GlassMaterial(\n'
+        '            variant: GlassVariant.clear,\n'
+        '            frost: 8,\n'
+        '          ),\n'
+        '        ),\n'
+        '      ),\n'
+        '    ),\n'
+        '  ],\n'
+        ')';
+  },
+  seeAlso: const <String>['GlassLayer', 'GlassBlendGroup', 'GlassPresence'],
+);

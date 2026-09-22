@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_example/src/catalogue/catalogue_entry.dart';
+import 'package:glass_forge_example/src/catalogue/entries/composition.dart';
 import 'package:glass_forge_example/src/catalogue/entries/motion.dart';
 import 'package:glass_forge_example/src/catalogue/entries/shapes.dart';
 import 'package:glass_forge_example/src/catalogue/entries/surfaces.dart';
@@ -652,6 +653,301 @@ void main() {
         expect(
           renderSnippet(moved),
           contains('GlassPressStretch.none()'),
+        );
+      },
+    );
+  });
+
+  group('compositionEntries', () {
+    test('the group has its promised four entries', () {
+      expect(compositionEntries, hasLength(4));
+    });
+
+    test('every entry names its api, its purpose and at least one knob', () {
+      for (final entry in compositionEntries) {
+        expect(entry.api, isNotEmpty, reason: 'a nameless entry');
+        expect(
+          entry.purpose,
+          isNotEmpty,
+          reason: '${entry.api} has no purpose',
+        );
+        expect(
+          entry.knobs,
+          isNotEmpty,
+          reason: '${entry.api} has nothing to move',
+        );
+      }
+    });
+
+    test('every entry names the Composition group', () {
+      for (final entry in compositionEntries) {
+        expect(entry.group, 'Composition');
+      }
+    });
+
+    test('every entry api is unique', () {
+      final names = compositionEntries.map((entry) => entry.api).toList();
+      expect(names.toSet(), hasLength(names.length));
+    });
+
+    test(
+      'entry.build(entry.knobs) constructs without throwing, for every '
+      "entry's default knobs",
+      () {
+        for (final entry in compositionEntries) {
+          expect(
+            () => entry.build(entry.knobs),
+            returnsNormally,
+            reason: '${entry.api} threw building its default widget',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'every entry mounts and paints under a real GlassLayer, at default '
+      'knobs',
+      (tester) async {
+        // Keyed by api, same as motionEntries' equivalent test: GlassGlow
+        // mounts two `InteractiveGlass`es, and a mismatched tree shape
+        // between two entries sharing a slot is exactly what this repo's
+        // InteractiveGlass tree-shape bug (docs/TODO.md) reaches.
+        for (final entry in compositionEntries) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: GlassLayer(
+                child: Center(
+                  child: KeyedSubtree(
+                    key: ValueKey(entry.api),
+                    child: entry.build(entry.knobs),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: '${entry.api} threw once mounted',
+          );
+        }
+      },
+    );
+
+    // Not a compile check — see the equivalent comment in surfacesEntries.
+    // The knob-move tests below guard the drift-free property.
+    test("every entry's code is non-empty at its default knobs", () {
+      for (final entry in compositionEntries) {
+        expect(
+          renderSnippet(entry),
+          isNotEmpty,
+          reason: '${entry.api} rendered no snippet',
+        );
+      }
+    });
+
+    // --- moving a knob moves both build and code -------------------------
+
+    CatalogueEntry entryNamed(String api) =>
+        compositionEntries.firstWhere((entry) => entry.api == api);
+
+    test(
+      'GlassPresence — moving presence changes the built animation value '
+      'and the snippet',
+      () {
+        final entry = entryNamed('GlassPresence');
+        expect(entry.knobs[0].value, 1.0, reason: 'sanity: default');
+
+        final moved = entry.withKnob(0, 0.0);
+        final built =
+            (moved.build(moved.knobs) as SizedBox).child! as GlassPresence;
+
+        expect(built.presence.value, 0.0);
+        expect(
+          renderSnippet(moved),
+          contains('AlwaysStoppedAnimation<double>(0.00)'),
+        );
+      },
+    );
+
+    testWidgets(
+      'GlassHostScope — moving radius changes the on-content Glass and '
+      'the snippet',
+      (tester) async {
+        final entry = entryNamed('GlassHostScope');
+        expect(entry.knobs[0].value, 20.0, reason: 'sanity: default');
+
+        final moved = entry.withKnob(0, 36.0);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: GlassLayer(child: Center(child: moved.build(moved.knobs))),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        bool isRoundedRectGlass(Widget widget) =>
+            widget is Glass && widget.shape is GlassRoundedRectangle;
+        final onContent = tester.widget<Glass>(
+          find.byWidgetPredicate(isRoundedRectGlass),
+        );
+        expect(
+          (onContent.shape as GlassRoundedRectangle).radius,
+          const BorderRadius.all(Radius.circular(36)),
+        );
+        expect(renderSnippet(moved), contains('Radius.circular(36.0)'));
+      },
+    );
+
+    testWidgets(
+      'GlassHostScope — the on-content control is real glass and the '
+      'toolbar one paints instead, with no assertion thrown',
+      (tester) async {
+        final entry = entryNamed('GlassHostScope');
+        await tester.pumpWidget(
+          MaterialApp(
+            home: GlassLayer(child: Center(child: entry.build(entry.knobs))),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // On content: exactly one real Glass draws the rounded-rect
+        // control. If the toolbar's copy also drew a Glass, nesting one
+        // inside the toolbar's own Glass would have asserted below.
+        bool isRoundedRectGlass(Widget widget) =>
+            widget is Glass && widget.shape is GlassRoundedRectangle;
+        expect(
+          find.byWidgetPredicate(isRoundedRectGlass),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    test(
+      'GlassGlow — moving separation changes the built gap and the '
+      'snippet',
+      () {
+        final entry = entryNamed('GlassGlow');
+        expect(entry.knobs[0].value, 40.0, reason: 'sanity: default');
+
+        final moved = entry.withKnob(0, 120.0);
+        final row = moved.build(moved.knobs) as Row;
+        final gap = row.children[1] as SizedBox;
+
+        expect(gap.width, 120.0);
+        expect(renderSnippet(moved), contains('SizedBox(width: 120.0)'));
+      },
+    );
+
+    testWidgets(
+      'GlassGlow — pressing one surface publishes into the shared layer '
+      "channel the neighbour's pass reads",
+      (tester) async {
+        final entry = entryNamed('GlassGlow');
+        ValueNotifier<GlassGlow>? glow;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: GlassLayer(
+              child: Center(
+                child: Builder(
+                  builder: (context) {
+                    glow = GlassGlowScope.maybeOf(context)?.glow;
+                    return entry.build(entry.knobs);
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(glow, isNotNull);
+        expect(glow!.value.strength, 0, reason: 'sanity: nothing pressed');
+
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byType(InteractiveGlass).first),
+        );
+        // Several short pumps, not one long one: the press spring's
+        // `Ticker` advances from its own last tick, so one 150ms jump
+        // evaluates a single simulation step while ten 16ms ones (roughly
+        // a frame each) let it climb the way a real press would.
+        for (var i = 0; i < 10; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+
+        expect(
+          glow!.value.strength,
+          greaterThan(0),
+          reason:
+              'both surfaces share one GlassLayer, so a press on '
+              "either writes into the same channel the neighbour's pass "
+              'reads every paint — the mechanism the 320-radius reach in '
+              'glow_gating_test.dart proves lands on screen',
+        );
+        expect(glow!.value.radius, 320);
+
+        await gesture.up();
+        await tester.pumpAndSettle();
+      },
+    );
+
+    test(
+      'Cross-pass overlap — moving offset changes the built widget and '
+      'the snippet',
+      () {
+        final entry = entryNamed('Cross-pass overlap');
+        expect(entry.knobs[0].value, 30.0, reason: 'sanity: default');
+
+        final moved = entry.withKnob(0, 100.0);
+        final built = moved.build(moved.knobs);
+
+        expect(debugCrossPassOverlapOffset(built), 100.0);
+        expect(renderSnippet(moved), contains('left: 100.0'));
+      },
+    );
+
+    testWidgets(
+      'Cross-pass overlap — the demo captures the real debugPrint '
+      'warning on screen',
+      (tester) async {
+        final entry = entryNamed('Cross-pass overlap');
+        await tester.pumpWidget(
+          MaterialApp(
+            home: GlassLayer(child: Center(child: entry.build(entry.knobs))),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.textContaining('glass_forge: two glass shapes'),
+          findsOneWidget,
+          reason:
+              'the default offset overlaps two differing materials, '
+              'so the real RenderGlassLayer warning must have fired and '
+              'been captured on screen, not just described',
+        );
+      },
+    );
+
+    testWidgets(
+      'Cross-pass overlap — separating the shapes leaves the warning '
+      'unfired',
+      (tester) async {
+        final entry = entryNamed('Cross-pass overlap');
+        final separated = entry.withKnob(0, 140.0);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: GlassLayer(
+              child: Center(child: separated.build(separated.knobs)),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.textContaining('glass_forge: two glass shapes'),
+          findsNothing,
         );
       },
     );
