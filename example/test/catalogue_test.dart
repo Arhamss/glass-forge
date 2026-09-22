@@ -748,39 +748,72 @@ void main() {
         // axis it scales. A Stack whose only children are Positioned
         // then takes constraints.biggest, gets infinite width and never
         // lays out at all (docs/TODO.md, "the FittedBox also imposes
-        // unbounded width") — found in Cross-pass overlap, which used
-        // to keep throwing every frame there, unlike its three siblings.
+        // unbounded width") — found in Cross-pass overlap.
+        //
+        // A single `tester.takeException()` right after `pumpWidget`
+        // cannot guard this: both the known, tolerated first-frame
+        // `getTransformTo` exception (docs/TODO.md bug #1 — every entry
+        // here has a `Glass`, so every entry hits it) *and* the Stack
+        // regression this test exists to catch fire during that same
+        // `pumpWidget` call, and calling `takeException()` once
+        // discards whichever it returns without telling them apart —
+        // confirmed by reverting the fix with this test left as
+        // originally written and watching it still report "All tests
+        // passed!". So every individual `FlutterErrorDetails` raised
+        // during that call is captured here instead, and each one is
+        // checked against the known bug's own exact signature —
+        // `RenderGlassShape._syncGeometry` calling `getTransformTo`
+        // into a not-yet-laid-out ancestor — rather than merely
+        // counting or discarding them.
         for (final entry in compositionEntries) {
-          await tester.pumpWidget(
-            MaterialApp(
-              home: GlassLayer(
-                child: SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.all(
-                      Radius.circular(10),
-                    ),
-                    child: FittedBox(
-                      fit: BoxFit.cover,
-                      child: KeyedSubtree(
-                        key: ValueKey(entry.api),
-                        child: entry.build(entry.knobs),
+          final caught = <FlutterErrorDetails>[];
+          final originalOnError = FlutterError.onError;
+          FlutterError.onError = caught.add;
+          try {
+            await tester.pumpWidget(
+              MaterialApp(
+                home: GlassLayer(
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.all(
+                        Radius.circular(10),
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        child: KeyedSubtree(
+                          key: ValueKey(entry.api),
+                          child: entry.build(entry.knobs),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          );
-          // A not-yet-laid-out transform ancestor (FittedBox included)
-          // makes `getTransformTo` throw on the very first frame — a
-          // known, unfixed package bug (docs/TODO.md) unrelated to this
-          // test, which every entry hits here and recovers from once its
-          // geometry re-syncs on its own next paint. Tolerated, not
-          // asserted away: this test exists to catch the *other*
-          // failure, one that keeps throwing past that first frame.
-          tester.takeException();
+            );
+          } finally {
+            FlutterError.onError = originalOnError;
+          }
+
+          for (final details in caught) {
+            final isKnownFirstFrameBug =
+                details.exception.toString().contains(
+                  "Failed assertion: line 2251 pos 12: 'hasSize'",
+                ) &&
+                details.stack.toString().contains(
+                  'RenderGlassShape._syncGeometry',
+                );
+            expect(
+              isKnownFirstFrameBug,
+              isTrue,
+              reason:
+                  '${entry.api} threw under an unbounded-width FittedBox '
+                  'with something other than the known, tolerated '
+                  'first-frame geometry exception: ${details.exception}',
+            );
+          }
+
           await tester.pumpAndSettle();
           expect(
             tester.takeException(),
