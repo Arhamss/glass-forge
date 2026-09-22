@@ -133,9 +133,19 @@ final CatalogueEntry _glassLayer = CatalogueEntry(
 // GlassMaterial — regular / clear / dome
 // ---------------------------------------------------------------------------
 
-/// A fitted look, its constructor call and the material it builds carried
+/// A fitted look, its constructor call and the call that builds it carried
 /// together — one declaration, read by both `build` and `code`, so there is
 /// nothing left to keep in sync between them.
+///
+/// The material is a function of a [BuildContext] rather than a value,
+/// because one of the three needs one. `GlassMaterial.regular` takes a
+/// `brightness` and sets frost, saturation, tint and tint opacity from it,
+/// so a preset that pinned one would hand every reader of this page — and
+/// every reader who copied its first line — a material fitted to the scheme
+/// half of them are not in. `GlassMaterial.clear` and `GlassMaterial.dome`
+/// take no brightness at all: clear computes its scrim in-shader from
+/// sampled backdrop luminance, which is why its own doc says the parameter
+/// would have nothing to do.
 ///
 /// `name` is the third thing the declaration carries, and it is there
 /// because a record cannot name itself: its synthesised `toString()` is a
@@ -146,24 +156,28 @@ final CatalogueEntry _glassLayer = CatalogueEntry(
 typedef _MaterialPreset = ({
   String name,
   String constructorCode,
-  GlassMaterial material,
+  GlassMaterial Function(BuildContext context) resolve,
 });
 
 final List<_MaterialPreset> _materialPresets = <_MaterialPreset>[
   (
     name: 'regular',
-    constructorCode: 'GlassMaterial.regular(brightness: Brightness.dark)',
-    material: GlassMaterial.regular(brightness: Brightness.dark),
+    constructorCode:
+        'GlassMaterial.regular(\n'
+        '    brightness: GlassTheme.brightnessOf(context),\n'
+        '  )',
+    resolve: (context) =>
+        GlassMaterial.regular(brightness: GlassTheme.brightnessOf(context)),
   ),
   (
     name: 'clear',
     constructorCode: 'GlassMaterial.clear()',
-    material: GlassMaterial.clear(),
+    resolve: (context) => GlassMaterial.clear(),
   ),
   (
     name: 'dome',
     constructorCode: 'GlassMaterial.dome()',
-    material: GlassMaterial.dome(),
+    resolve: (context) => GlassMaterial.dome(),
   ),
 ];
 
@@ -185,7 +199,14 @@ final CatalogueEntry _glassMaterial = CatalogueEntry(
     final preset = knobs[0].value! as _MaterialPreset;
     return SizedBox.square(
       dimension: 200,
-      child: Glass(shape: _shape, material: preset.material),
+      // A `Builder`, so the scheme `regular` fits itself to is the one the
+      // reader is actually in. Resolving it out here instead would pin it
+      // to whatever this file guessed, which is the same wrong answer the
+      // snippet would then be printing.
+      child: Builder(
+        builder: (context) =>
+            Glass(shape: _shape, material: preset.resolve(context)),
+      ),
     );
   },
   code: (knobs) {

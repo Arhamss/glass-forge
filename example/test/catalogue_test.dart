@@ -201,28 +201,110 @@ void main() {
       },
     );
 
-    test(
+    testWidgets(
       'GlassMaterial — moving the preset changes the built material and '
       'the printed constructor',
-      () {
+      (tester) async {
         final entry = entryNamed('GlassMaterial');
-        final defaultPreset = entry.knobs[0].value;
-        final otherPreset = entry.knobs[0].options.firstWhere(
-          (option) => option != defaultPreset,
+
+        /// The material [variant]'s specimen actually resolved to, with
+        /// the platform pinned.
+        ///
+        /// `copyWith` off the real `MediaQuery` inside the app, the same
+        /// way designSystemEntries pins a scheme, so the view's own size
+        /// and padding survive and the brightness is the only thing moved.
+        /// Keyed on the knob so a second mount replaces the specimen
+        /// rather than updating it in place — `regular` reads the scheme
+        /// through the element tree, and an updated subtree would leave
+        /// the second assertion passing for the first mount's reasons.
+        Future<GlassMaterial?> materialUnder(
+          CatalogueEntry variant, {
+          required Brightness platformBrightness,
+        }) async {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Builder(
+                builder: (context) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(platformBrightness: platformBrightness),
+                  child: GlassLayer(
+                    tier: GeometryTier.none,
+                    child: Center(
+                      child: KeyedSubtree(
+                        key: ValueKey<String>('$platformBrightness'),
+                        child: variant.build(variant.knobs),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          return tester.widget<Glass>(find.byType(Glass)).material;
+        }
+
+        for (final preset in entry.knobs[0].options) {
+          final name = entry.knobs[0].labelFor(preset);
+          final moved = entry.withKnob(0, preset);
+          final constructorCode =
+              (preset!
+                      as ({
+                        String name,
+                        String constructorCode,
+                        GlassMaterial Function(BuildContext context) resolve,
+                      }))
+                  .constructorCode;
+          expect(
+            renderSnippet(moved),
+            contains(constructorCode),
+            reason: '$name printed a constructor it does not build',
+          );
+        }
+
+        // `regular` is the one preset that takes a brightness, and it is
+        // the knob's default — the first line a reader copies. It reads
+        // the scheme it is actually in rather than a value this file
+        // pinned, so the specimen and the snippet are both right in light
+        // mode and in dark. A pinned `Brightness.dark` would fit frost,
+        // saturation, tint and tint opacity to the wrong scheme for half
+        // of readers, and the snippet would print that wrong value.
+        expect(
+          entry.knobs[0].labelFor(entry.knobs[0].value),
+          'regular',
+          reason: 'sanity: the default position is the adaptive one',
         );
-        final preset =
-            otherPreset!
-                as ({
-                  String name,
-                  String constructorCode,
-                  GlassMaterial material,
-                });
 
-        final moved = entry.withKnob(0, otherPreset);
-        final glass = (moved.build(moved.knobs) as SizedBox).child! as Glass;
+        final inLight = await materialUnder(
+          entry,
+          platformBrightness: Brightness.light,
+        );
+        final inDark = await materialUnder(
+          entry,
+          platformBrightness: Brightness.dark,
+        );
 
-        expect(glass.material, preset.material);
-        expect(renderSnippet(moved), contains(preset.constructorCode));
+        expect(inLight, GlassMaterial.regular(brightness: Brightness.light));
+        expect(inDark, GlassMaterial.regular(brightness: Brightness.dark));
+        expect(
+          inLight,
+          isNot(inDark),
+          reason:
+              'the two fitted schemes differ, so a preset that pinned one '
+              'would be wrong wherever the reader is in the other',
+        );
+
+        final snippet = renderSnippet(entry);
+        expect(snippet, contains('GlassTheme.brightnessOf(context)'));
+        expect(
+          snippet,
+          isNot(contains('Brightness.dark')),
+          reason:
+              'the snippet hands a reader the call that resolves their own '
+              'scheme, never a literal fitted to one of the two',
+        );
+        expect(snippet, isNot(contains('Brightness.light')));
       },
     );
 
@@ -670,7 +752,10 @@ void main() {
         );
         expect(
           renderSnippet(moved),
-          contains('jiggle'),
+          contains('jiggle is left'),
+          // The disclosure itself, not the word. The snippet says
+          // "the velocity jiggle reads" a line later, so `contains('jiggle')`
+          // survives deleting the clause this guards and asserts nothing.
           reason:
               'the entry shows one channel resolved explicitly and one '
               'neutralised for free, and the snippet is the only place a '
@@ -949,6 +1034,18 @@ void main() {
         expect(gap.width, 120.0);
         expect(renderSnippet(moved), contains('SizedBox(width: 120.0)'));
         expect(
+          row.mainAxisAlignment,
+          MainAxisAlignment.center,
+          reason: 'sanity: the specimen centres its pair',
+        );
+        expect(
+          renderSnippet(moved),
+          contains('mainAxisAlignment: MainAxisAlignment.center'),
+          reason:
+              'and the snippet says so — a copied Row defaults to start, '
+              'which puts the two shapes somewhere else entirely',
+        );
+        expect(
           renderSnippet(moved),
           contains('centres are 240.0 apart'),
           reason:
@@ -1213,6 +1310,16 @@ void main() {
           reason:
               '$api says the specimen is framed but not what a real sheet '
               'measures against instead',
+        );
+        // The one omitted argument a reader is worse off without. The
+        // other four — gap, floatingRadius, flushRadius, backdrop — are
+        // miniatures fitted to this frame, and the note above licenses
+        // leaving them out. A sheet with no semanticLabel is unlabelled
+        // to a screen reader, and nothing on the page would say so.
+        expect(
+          snippet,
+          contains('semanticLabel:'),
+          reason: '$api would be copied into an unlabelled sheet',
         );
       }
 

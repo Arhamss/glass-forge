@@ -38,9 +38,12 @@ const _shape = GlassSuperellipse(
 /// centre to centre.
 ///
 /// The knob runs to 200, which is 320 centre to centre — the far end of
-/// that same reach, where the neighbour stops brightening. A reader who
-/// was not told the light has a radius would read the top of the slider as
-/// a broken feature, so the snippet's comment slot says it.
+/// that same reach. The falloff is `(1 - smoothstep(0, 320, d))²` from the
+/// finger, so the spill thins the whole way out and only reaches the noise
+/// floor near a separation of 155: the top quarter of the slider is where
+/// the neighbour stops visibly brightening. A reader who was not told the
+/// light has a radius would read that as a broken feature, so the
+/// snippet's comment slot says it.
 const _glowShape = GlassRoundedRectangle(
   radius: BorderRadius.all(Radius.circular(24)),
 );
@@ -233,6 +236,7 @@ final CatalogueEntry _glassGlow = CatalogueEntry(
         '// reach, which is the knob running out rather than the\n'
         '// light failing.\n'
         'Row(\n'
+        '  mainAxisAlignment: MainAxisAlignment.center,\n'
         '  children: [\n'
         '    const SizedBox.square(\n'
         '      dimension: 120,\n'

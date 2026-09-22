@@ -497,6 +497,7 @@ final CatalogueEntry _glassDetentSheet = CatalogueEntry(
         '      ],\n'
         '      controller: controller,\n'
         '      bottomGap: $_bottomGap,\n'
+        "      semanticLabel: 'Nearby places',\n"
         '      child: ListView(children: places),\n'
         '    ),\n'
         '  ],\n'
@@ -776,6 +777,7 @@ final CatalogueEntry _glassDetentSheetController = CatalogueEntry(
         '  // its own LayoutBuilder, so animateToDetent before that\n'
         '  // first frame is a documented no-op.\n'
         '  initialDetent: $index,\n'
+        "  semanticLabel: 'Nearby places',\n"
         '  child: ListView(children: places),\n'
         ');\n'
         '\n'
@@ -856,6 +858,7 @@ final CatalogueEntry _glassSheetScrollPhysics = CatalogueEntry(
         '    GlassDetent.fraction(0.45),\n'
         '    GlassDetent.fraction(1),\n'
         '  ],\n'
+        "  semanticLabel: 'Nearby places',\n"
         '  // The sheet installs GlassSheetScrollPhysics on every\n'
         '  // scrollable inside it, through a ScrollConfiguration.\n'
         '  // A list that names its own physics becomes their\n'

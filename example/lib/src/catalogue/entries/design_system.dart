@@ -512,7 +512,7 @@ final CatalogueEntry _glassTokens = CatalogueEntry(
         '      // radius: extraLarge, so these two rungs are the ones\n'
         '      // that reach it. Every other scale stays fitted.\n'
         '      blur: GlassBlurScale(thick: $thick),\n'
-        '      // The knob above stops at ${_tokensHeight / 2}, and the token is\n'
+        '      // The radius knob stops at ${_tokensHeight / 2}, and the token is\n'
         '      // not what stops it: this surface is $_tokensHeight tall and a\n'
         '      // corner radius clamps to half the shorter side, so\n'
         '      // anything past that would print but not paint.\n'
