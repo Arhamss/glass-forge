@@ -5,7 +5,10 @@ import 'package:flutter/material.dart' show MaterialApp;
 import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:glass_forge/glass_forge.dart' show GlassLayer;
 import 'package:glass_forge_example/src/catalogue/catalogue.dart';
+import 'package:glass_forge_example/src/catalogue/catalogue_entry.dart';
+import 'package:glass_forge_example/src/catalogue/entry_page.dart';
 import 'package:glass_forge_example/src/chrome.dart';
 
 /// The width a knob control is laid out in, on a phone [screen] points wide.
@@ -19,6 +22,30 @@ double _controlWidth(double screen) => screen - 40;
 /// most of this catalogue was measured on, and 320, the narrowest screen
 /// iOS still runs.
 const List<double> _phoneWidths = <double>[375, 320];
+
+/// The most characters a segment label may have before it stops being a
+/// name and starts being a dump.
+///
+/// `GlassSheetScrollPhysics` is 23 characters and is the longest identifier
+/// in this package's public API, so nothing a knob could honestly put on a
+/// 40pt pill reaches 30. A record's synthesised `toString()` — the defect
+/// this guards — runs to 108.
+const int _longestPlausibleLabel = 30;
+
+/// Every label currently drawn inside a mounted [SegmentedControl].
+///
+/// Read off the widget tree rather than computed from the knobs, which is
+/// the whole point: it is the only way to ask what `_KnobRow` actually put
+/// on screen rather than what the model would have said if asked.
+List<String> _renderedSegmentLabels(WidgetTester tester) {
+  final controls = find.byType(SegmentedControl<Object?>);
+  return tester
+      .widgetList<Text>(
+        find.descendant(of: controls, matching: find.byType(Text)),
+      )
+      .map((text) => text.data!)
+      .toList();
+}
 
 /// The five `GlassSurfaceRole` names, which is the longest set of labels any
 /// knob in the catalogue carries and the one that found this bug.
@@ -209,6 +236,122 @@ void main() {
         reason:
             'the catalogue has at least sixteen segmented knobs; this '
             'test reached $knobsChecked of them',
+      );
+    },
+  );
+
+  testWidgets(
+    'the entry page puts the label the knob supplies on the pill, whatever '
+    "the option's own toString says",
+    (tester) async {
+      // The layer the defect actually lived in. Every assertion above asks
+      // `Knob.labelFor` for a label and then checks the control renders it,
+      // which proves the model is right and proves nothing about who asks
+      // it. Replacing `labelOf: knob.labelFor` with the old inline rule in
+      // `_KnobRow._controlFor` restores the whole defect — both record
+      // knobs dump a hundred characters onto the pill again — and leaves
+      // every one of those assertions green, because none of them mounts a
+      // page.
+      //
+      // So this mounts one. The entry is synthetic rather than a catalogue
+      // one on purpose: its option is a record whose `toString()` is the
+      // failure mode itself, and its `build` is a bare `Text`, so the page
+      // costs a single cheap pump instead of a full glass specimen. The
+      // real catalogue's own two label-supplying knobs are mounted in the
+      // test below.
+      const dumped = (constructorCode: 'GlassMaterial.regular()', weight: 4);
+      final entry = CatalogueEntry(
+        api: 'Glass',
+        purpose: 'One glass surface.',
+        group: 'Surfaces',
+        knobs: <Knob<Object?>>[
+          Knob<({String constructorCode, int weight})>(
+            name: 'preset',
+            value: dumped,
+            options: const <({String constructorCode, int weight})>[dumped],
+            labelOf: (option) => 'regular',
+          ),
+        ],
+        build: (knobs) => const Text('specimen'),
+        code: (knobs) => 'Glass()',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: CatalogueEntryPage(entry: entry)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        _renderedSegmentLabels(tester),
+        <String>['regular'],
+        reason:
+            'the page has to ask the knob what to call its options; the '
+            "record's own toString() is `$dumped`",
+      );
+    },
+  );
+
+  testWidgets(
+    'every catalogue knob that supplies its own label has that label on '
+    'screen, and no rendered label is a dump',
+    (tester) async {
+      // The same statement against the shipped entries, mounted for real.
+      // Only the knobs that supply a `labelOf` are pumped: those are
+      // exactly the ones whose label cannot be recovered from the value, so
+      // they are exactly the ones where the wiring is load-bearing. A knob
+      // that forgets to supply one is caught a different way — its
+      // `labelFor` falls through to the value's `toString()`, and a record
+      // dump is 108 characters, which the clipping test above fails on at
+      // 335 points.
+      var pagesMounted = 0;
+      for (final group in catalogueGroups) {
+        for (final entry in entriesIn(group)) {
+          final labelled = entry.knobs
+              .where((knob) => knob.labelOf != null)
+              .toList();
+          if (labelled.isEmpty) {
+            continue;
+          }
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: GlassLayer(child: CatalogueEntryPage(entry: entry)),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          final rendered = _renderedSegmentLabels(tester);
+          for (final knob in labelled) {
+            for (final option in knob.options) {
+              expect(
+                rendered,
+                contains(knob.labelFor(option)),
+                reason:
+                    '${entry.api} — ${knob.name} names an option '
+                    '`${knob.labelFor(option)}`, and the page does not show '
+                    'it; what it shows is $rendered',
+              );
+            }
+          }
+          for (final label in rendered) {
+            expect(
+              label.length,
+              lessThanOrEqualTo(_longestPlausibleLabel),
+              reason:
+                  '${entry.api} put $label on a 40pt pill. No symbol in '
+                  'this package is that long, so it is a dump, not a name',
+            );
+          }
+          pagesMounted++;
+        }
+      }
+
+      expect(
+        pagesMounted,
+        greaterThanOrEqualTo(2),
+        reason:
+            'GlassMaterial and GlassMotion both supply labels; this test '
+            'mounted $pagesMounted page(s)',
       );
     },
   );
