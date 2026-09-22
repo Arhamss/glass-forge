@@ -245,7 +245,8 @@ void main() {
     expect(
       tooShort,
       unlit,
-      reason: 'a 140 radius cannot reach it at all — the regression this '
+      reason:
+          'a 140 radius cannot reach it at all — the regression this '
           'test exists to catch',
     );
   });
