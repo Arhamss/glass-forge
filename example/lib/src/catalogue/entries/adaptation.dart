@@ -631,12 +631,18 @@ class _EngineSpecimenState extends State<_EngineSpecimen> {
 /// The two live signals this catalogue cannot move are still live here:
 /// `thermalCeiling` and `accessibility` are read off the reader's own
 /// device, and both read `full` on a machine that is cool and has neither
-/// setting on.
+/// setting on. That is why a reader needs to be told what those two rows
+/// mean before a permanently-`full` one reads as a broken knob — and why
+/// the asymmetry is stated in this entry's `purpose` and in its snippet's
+/// comment slot rather than here. Nothing in this comment reaches the app:
+/// a [CatalogueEntry] has no prose field beyond `purpose`, so `///` here is
+/// for whoever maintains the entry, never for whoever reads it.
 final CatalogueEntry _glassTierEngine = CatalogueEntry(
   api: 'GlassTierEngine',
   purpose:
-      'The four tier signals — capabilities, heat, frame health and '
-      'accessibility — and the one tier they resolve to.',
+      'Four signals — capabilities, heat, frame health and accessibility '
+      '— resolved to one tier, and the pin that overrules the first '
+      'three but never the last.',
   group: 'Adaptation',
   knobs: <Knob<Object?>>[
     Knob<GraphicsBackend>(
@@ -671,9 +677,15 @@ final CatalogueEntry _glassTierEngine = CatalogueEntry(
         : 'requested: GlassTier.${tier.name},';
     return 'final engine = GlassTierEngine(\n'
         '  $requested\n'
-        '  // The other three signals are built and owned by the engine.\n'
-        '  // A ThermalSignal, a FrameWatchdog and an\n'
+        '  // The other three signals are built and owned by the engine:\n'
+        '  // a ThermalSignal, a FrameWatchdog and an\n'
         '  // AccessibilitySignalSource, each injectable the same way.\n'
+        '  // All three are live, which is why their ceilings do not move\n'
+        '  // with the knobs above — and why a pin never lifts the\n'
+        '  // accessibility one.\n'
+        '  //\n'
+        '  // This report is written out. An app omits it and lets\n'
+        '  // RenderCapabilityProbe measure one after the first frame.\n'
         '  capabilities: ${_capabilitiesCode(capabilities, '  ')},\n'
         ');\n'
         'await engine.start();\n'
