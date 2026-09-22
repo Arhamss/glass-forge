@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_example/src/catalogue/catalogue_entry.dart';
+import 'package:glass_forge_example/src/catalogue/entries/chrome.dart';
 import 'package:glass_forge_example/src/catalogue/entries/composition.dart';
 import 'package:glass_forge_example/src/catalogue/entries/motion.dart';
 import 'package:glass_forge_example/src/catalogue/entries/shapes.dart';
@@ -948,6 +949,384 @@ void main() {
         expect(
           find.textContaining('glass_forge: two glass shapes'),
           findsNothing,
+        );
+      },
+    );
+  });
+
+  group('chromeEntries', () {
+    test('the group has its promised four entries', () {
+      expect(chromeEntries, hasLength(4));
+    });
+
+    test('every entry names its api, its purpose and at least one knob', () {
+      for (final entry in chromeEntries) {
+        expect(entry.api, isNotEmpty, reason: 'a nameless entry');
+        expect(
+          entry.purpose,
+          isNotEmpty,
+          reason: '${entry.api} has no purpose',
+        );
+        expect(
+          entry.knobs,
+          isNotEmpty,
+          reason: '${entry.api} has nothing to move',
+        );
+      }
+    });
+
+    test('every entry names the Chrome group', () {
+      for (final entry in chromeEntries) {
+        expect(entry.group, 'Chrome');
+      }
+    });
+
+    test('every entry api is unique', () {
+      final names = chromeEntries.map((entry) => entry.api).toList();
+      expect(names.toSet(), hasLength(names.length));
+    });
+
+    test(
+      'entry.build(entry.knobs) constructs without throwing, for every '
+      "entry's default knobs",
+      () {
+        for (final entry in chromeEntries) {
+          expect(
+            () => entry.build(entry.knobs),
+            returnsNormally,
+            reason: '${entry.api} threw building its default widget',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'every entry mounts and paints under a real GlassLayer, at default '
+      'knobs',
+      (tester) async {
+        // Keyed by api, same as the motion and composition groups: three
+        // of these four build a `GlassDetentSheet` and one builds a row of
+        // bare `Glass`, and without a key Flutter's element diffing would
+        // update one entry's sheet in place into the next entry's — which
+        // is not what the real app does, since one catalogue page never
+        // turns into another without a route push between them.
+        for (final entry in chromeEntries) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: GlassLayer(
+                child: Center(
+                  child: KeyedSubtree(
+                    key: ValueKey(entry.api),
+                    child: entry.build(entry.knobs),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: '${entry.api} threw once mounted',
+          );
+        }
+      },
+    );
+
+    // Not a compile check — see the equivalent comment in surfacesEntries.
+    // The knob-move tests below guard the drift-free property.
+    test("every entry's code is non-empty at its default knobs", () {
+      for (final entry in chromeEntries) {
+        expect(
+          renderSnippet(entry),
+          isNotEmpty,
+          reason: '${entry.api} rendered no snippet',
+        );
+      }
+    });
+
+    // --- moving a knob moves both build and code -------------------------
+
+    CatalogueEntry entryNamed(String api) =>
+        chromeEntries.firstWhere((entry) => entry.api == api);
+
+    /// Mounts [entry] and hands back the controller the sheet it built is
+    /// actually driven by, read off the real `GlassDetentSheetScope` the
+    /// sheet publishes to its own content.
+    ///
+    /// Keyed by the knob's value so that mounting a second variant in one
+    /// test replaces the sheet rather than updating the first one in place
+    /// — which would leave the controller from the first mount attached and
+    /// make the assertion about the second meaningless.
+    ///
+    /// `GeometryTier.none`, the same tier the package's own chrome tests
+    /// use and for the same reason: off Impeller the runtime producer
+    /// rasterises the signed-distance field on the CPU, seconds per bake,
+    /// once per frame of a moving sheet. Nothing below reads the matte —
+    /// these assertions are about fields and heights — and the group's
+    /// `every entry mounts and paints` test above is where real geometry is
+    /// exercised.
+    Future<GlassDetentSheetController> mountSheet(
+      WidgetTester tester,
+      CatalogueEntry entry,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GlassLayer(
+            tier: GeometryTier.none,
+            child: Center(
+              child: KeyedSubtree(
+                key: ValueKey<Object?>(entry.knobs.first.value),
+                child: entry.build(entry.knobs),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return tester
+          .widget<GlassDetentSheetScope>(find.byType(GlassDetentSheetScope))
+          .controller;
+    }
+
+    testWidgets(
+      'GlassDetentSheet — moving lowest changes the built detent list, the '
+      'height it resolves to and the snippet',
+      (tester) async {
+        final entry = entryNamed('GlassDetentSheet');
+        expect(entry.knobs[0].value, 0.3, reason: 'sanity: default');
+
+        final atDefault = await mountSheet(tester, entry);
+        final lowestAtDefault = atDefault.lowest;
+
+        final moved = entry.withKnob(0, 0.42);
+        final atMoved = await mountSheet(tester, moved);
+        final sheet = tester.widget<GlassDetentSheet>(
+          find.byType(GlassDetentSheet),
+        );
+
+        expect(sheet.detents.first, const GlassDetent.fraction(0.42));
+        expect(
+          atMoved.lowest,
+          greaterThan(lowestAtDefault),
+          reason:
+              'the knob reached the resolved pixel heights, not only the '
+              'list of detents the sheet was handed',
+        );
+        expect(renderSnippet(moved), contains('GlassDetent.fraction(0.42)'));
+      },
+    );
+
+    testWidgets(
+      'GlassDetentSheet — the tab row hands off rather than rendering a '
+      'second backdrop pass under the sheet',
+      (tester) async {
+        final entry = entryNamed('GlassDetentSheet');
+        final controller = await mountSheet(tester, entry);
+
+        expect(
+          find.text('Explore'),
+          findsOneWidget,
+          reason:
+              'at the lowest detent the sheet still clears the row, so the '
+              'row is there to be handed off from',
+        );
+
+        controller.animateToDetent(2);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Explore'),
+          findsNothing,
+          reason:
+              "a flush sheet covers the row's pixels, so the presence ramp "
+              'must have taken the row out of the tree before the sheet '
+              'arrived — two backdrop passes over one region is '
+              'flutter#187820',
+        );
+      },
+    );
+
+    testWidgets(
+      'GlassDetent — moving available rescales the fraction, clamps the '
+      'fixed height and leaves the content one where it was',
+      (tester) async {
+        final entry = entryNamed('GlassDetent');
+        expect(entry.knobs[0].value, 200.0, reason: 'sanity: default');
+
+        // `GeometryTier.none` for the reason [mountSheet] gives: these are
+        // laid-out heights, and baking three signed-distance fields on the
+        // CPU to read them back costs seconds and proves nothing extra.
+        Future<Map<String, double>> barHeights(CatalogueEntry variant) async {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: GlassLayer(
+                tier: GeometryTier.none,
+                child: Center(child: variant.build(variant.knobs)),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          return <String, double>{
+            for (final name in const <String>['fraction', 'height', 'content'])
+              name: tester
+                  .getSize(
+                    find.descendant(
+                      of: find.byKey(ValueKey<String>(name)),
+                      matching: find.byType(Glass),
+                    ),
+                  )
+                  .height,
+          };
+        }
+
+        expect(await barHeights(entry), <String, double>{
+          'fraction': 100,
+          'height': 180,
+          'content': 96,
+        });
+
+        final moved = entry.withKnob(0, 140.0);
+        expect(
+          await barHeights(moved),
+          <String, double>{'fraction': 70, 'height': 140, 'content': 96},
+          reason:
+              'the fraction is half of whatever is available, the fixed '
+              'height is clamped down to it, and the content height is '
+              'below both and so unmoved',
+        );
+        expect(renderSnippet(moved), contains('available: 140.0'));
+      },
+    );
+
+    testWidgets(
+      'GlassDetentSheetController — moving the knob animates the real '
+      'controller to that detent, and the snippet says so',
+      (tester) async {
+        final entry = entryNamed('GlassDetentSheetController');
+        expect(entry.knobs[0].value, 'Peek', reason: 'sanity: default');
+
+        // Deliberately unkeyed, unlike [mountSheet]: this entry's knob is
+        // applied in `didUpdateWidget`, so the second pump has to *update*
+        // the same element rather than replace it — which is exactly what
+        // the entry page does when a knob moves. `GeometryTier.none` for
+        // the reason [mountSheet] gives.
+        Future<void> pump(CatalogueEntry variant) async {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: GlassLayer(
+                tier: GeometryTier.none,
+                child: Center(child: variant.build(variant.knobs)),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+
+        await pump(entry);
+        final controller = tester
+            .widget<GlassDetentSheetScope>(find.byType(GlassDetentSheetScope))
+            .controller;
+        expect(controller.detent, 0, reason: 'sanity: opened at Peek');
+        expect(controller.value, controller.lowest);
+
+        final moved = entry.withKnob(0, 'Full');
+        await pump(moved);
+
+        expect(controller.detent, 2);
+        expect(
+          controller.value,
+          controller.top,
+          reason: 'the spring actually carried the sheet there',
+        );
+        expect(renderSnippet(moved), contains('animateToDetent(2)'));
+      },
+    );
+
+    testWidgets(
+      "GlassSheetScrollPhysics — moving the knob changes the built list's "
+      'physics and the snippet',
+      (tester) async {
+        final entry = entryNamed('GlassSheetScrollPhysics');
+        expect(entry.knobs[0].value, 'inherited', reason: 'sanity: default');
+
+        await mountSheet(tester, entry);
+        // `AlwaysScrollableScrollPhysics`, not null: `ScrollView` fills a
+        // null `physics` in for a vertical list with no controller of its
+        // own, and that stand-in does not override
+        // `applyPhysicsToUserOffset` — so it delegates to its parent, which
+        // is the sheet's `GlassSheetScrollPhysics`, and the handoff still
+        // runs. The entry's snippet says `physics: null` because that is
+        // what the caller writes; this is what the widget records.
+        expect(
+          tester.widget<ListView>(find.byType(ListView)).physics,
+          isA<AlwaysScrollableScrollPhysics>(),
+          reason:
+              'inherited means the list takes whatever the sheet put in '
+              'its ScrollConfiguration',
+        );
+
+        final moved = entry.withKnob(0, 'overridden');
+        await mountSheet(tester, moved);
+        expect(
+          tester.widget<ListView>(find.byType(ListView)).physics,
+          isA<BouncingScrollPhysics>(),
+        );
+        expect(
+          renderSnippet(moved),
+          contains('physics: const BouncingScrollPhysics()'),
+        );
+      },
+    );
+
+    testWidgets(
+      'GlassSheetScrollPhysics — inherited, a drag on the list carries the '
+      'sheet; overridden, the same drag does not reach it',
+      (tester) async {
+        final entry = entryNamed('GlassSheetScrollPhysics');
+
+        /// How far the sheet rose while a drag on the list was still down.
+        ///
+        /// Measured mid-gesture rather than after it: the drag is well
+        /// short of the next detent, so a released sheet springs back to
+        /// where it started and a rise measured afterwards would be zero
+        /// in both cases.
+        Future<double> riseUnderDrag(CatalogueEntry variant) async {
+          final controller = await mountSheet(tester, variant);
+          final before = controller.value;
+          final gesture = await tester.startGesture(
+            tester.getCenter(find.byType(ListView)),
+          );
+          await tester.pump();
+          // Two moves, not one. `Scrollable` recognises a drag with
+          // `DragStartBehavior.start`, which rebases the gesture's origin on
+          // the frame it wins the arena — so the move that crosses the touch
+          // slop is consumed entirely by the start and carries no delta.
+          // Only the second one is a scroll offset anything sees.
+          await gesture.moveBy(const Offset(0, -kDragSlopDefault));
+          await tester.pump();
+          await gesture.moveBy(const Offset(0, -60));
+          await tester.pump();
+          final rise = controller.value - before;
+          await gesture.up();
+          await tester.pumpAndSettle();
+          return rise;
+        }
+
+        expect(
+          await riseUnderDrag(entry),
+          greaterThan(0),
+          reason:
+              'below the top detent the sheet owns every vertical delta, '
+              'and the physics is what hands them over',
+        );
+        expect(
+          await riseUnderDrag(entry.withKnob(0, 'overridden')),
+          0,
+          reason:
+              "a list that names its own physics becomes the handoff's "
+              'parent and never delegates to it — the documented opt-out '
+              'this knob exists to show',
         );
       },
     );
