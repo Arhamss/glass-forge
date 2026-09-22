@@ -128,15 +128,35 @@ final CatalogueEntry _glassLayer = CatalogueEntry(
 /// A fitted look, its constructor call and the material it builds carried
 /// together — one declaration, read by both `build` and `code`, so there is
 /// nothing left to keep in sync between them.
-typedef _MaterialPreset = ({String constructorCode, GlassMaterial material});
+///
+/// `name` is the third thing the declaration carries, and it is there
+/// because a record cannot name itself: its synthesised `toString()` is a
+/// debug dump of every field, so a segmented control fed one would show the
+/// same hundred-character prefix in all three of its positions. This is the
+/// named constructor on its own — the symbol a reader would search for, and
+/// what `Knob.labelFor` is pointed at below.
+typedef _MaterialPreset = ({
+  String name,
+  String constructorCode,
+  GlassMaterial material,
+});
 
 final List<_MaterialPreset> _materialPresets = <_MaterialPreset>[
   (
+    name: 'regular',
     constructorCode: 'GlassMaterial.regular(brightness: Brightness.dark)',
     material: GlassMaterial.regular(brightness: Brightness.dark),
   ),
-  (constructorCode: 'GlassMaterial.clear()', material: GlassMaterial.clear()),
-  (constructorCode: 'GlassMaterial.dome()', material: GlassMaterial.dome()),
+  (
+    name: 'clear',
+    constructorCode: 'GlassMaterial.clear()',
+    material: GlassMaterial.clear(),
+  ),
+  (
+    name: 'dome',
+    constructorCode: 'GlassMaterial.dome()',
+    material: GlassMaterial.dome(),
+  ),
 ];
 
 final CatalogueEntry _glassMaterial = CatalogueEntry(
@@ -150,6 +170,7 @@ final CatalogueEntry _glassMaterial = CatalogueEntry(
       name: 'preset',
       value: _materialPresets[0],
       options: _materialPresets,
+      labelOf: (option) => (option! as _MaterialPreset).name,
     ),
   ],
   build: (knobs) {

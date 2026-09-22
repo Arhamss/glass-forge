@@ -422,16 +422,13 @@ class _KnobRow extends StatelessWidget {
     return SegmentedControl<Object?>(
       options: knob.options,
       selected: knob.value,
-      labelOf: _labelFor,
+      // The knob names its own options. A control that invented labels
+      // here would have nothing to go on but the value's type, which for
+      // a record is a debug dump — see [Knob.labelFor].
+      labelOf: knob.labelFor,
       onChanged: (value) => onKnobChanged(index, value),
     );
   }
-
-  /// An enum's own name, or the value's [Object.toString] otherwise — most
-  /// of this catalogue's segmented knobs choose between enum constants, and
-  /// `GlassVariant.regular` reads worse on a 40pt pill than `regular` does.
-  static String _labelFor(Object? value) =>
-      value is Enum ? value.name : value.toString();
 }
 
 /// "SEE ALSO", and one painted chip per name in [CatalogueEntry.seeAlso].

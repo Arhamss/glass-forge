@@ -211,7 +211,12 @@ void main() {
           (option) => option != defaultPreset,
         );
         final preset =
-            otherPreset! as ({String constructorCode, GlassMaterial material});
+            otherPreset!
+                as ({
+                  String name,
+                  String constructorCode,
+                  GlassMaterial material,
+                });
 
         final moved = entry.withKnob(0, otherPreset);
         final glass = (moved.build(moved.knobs) as SizedBox).child! as Glass;
@@ -623,7 +628,12 @@ void main() {
           (option) => option != defaultPreset,
         );
         final preset =
-            otherPreset! as ({String constructorCode, GlassMotion motion});
+            otherPreset!
+                as ({
+                  String name,
+                  String constructorCode,
+                  GlassMotion motion,
+                });
 
         final moved = entry.withKnob(0, otherPreset);
         final built =

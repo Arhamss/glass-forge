@@ -30,11 +30,11 @@ import 'package:glass_forge_example/src/theme.dart';
 ///
 /// Only when the labels do not fit at all does it fall back to splitting the
 /// width in proportion to them, so the longest still gets the most room, and
-/// [TextOverflow.fade] finally takes over. That case exists because two
-/// knobs in this catalogue are typed with records whose `toString()` runs
-/// past a hundred characters; it is their label that is wrong, not this
-/// control's layout, and widening or scrolling for them would turn one bad
-/// label into a bad control.
+/// [TextOverflow.fade] finally takes over. No knob in this catalogue reaches
+/// that case — `segmented_control_test.dart` pumps every one of them at 375
+/// and at 320 points and none clips. It is kept for the label nobody has
+/// written yet, because a control that overflowed or grew its bar would be
+/// a worse answer to one bad label than a faded one is.
 class SegmentedControl<T> extends StatelessWidget {
   const SegmentedControl({
     required this.options,

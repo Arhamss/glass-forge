@@ -12,10 +12,18 @@ class Knob<T> {
   /// [options] is copied into an unmodifiable list, so holding a knob's
   /// [options] never grants a way to change it in place — the only way to
   /// change a knob is [withValue], which produces a new one.
+  ///
+  /// [labelOf] names one option for whatever control adjusts this knob; see
+  /// [labelFor] for when a knob has to supply one. It is typed over
+  /// `Object?` rather than over [T] deliberately: every knob is held as a
+  /// `Knob<Object?>` outside the entry that declares it, and a
+  /// `String Function(T)` read back through that covariant view would be
+  /// callable only by luck.
   Knob({
     required this.name,
     required this.value,
     List<T> options = const <Never>[],
+    this.labelOf,
     this.min,
     this.max,
   }) : options = List.unmodifiable(options);
@@ -35,11 +43,33 @@ class Knob<T> {
   /// The high end, for a knob adjusted by a slider.
   final double? max;
 
+  /// What this knob calls each of its [options], if the values cannot say
+  /// so themselves. See [labelFor], which is what callers should use.
+  final String Function(Object? option)? labelOf;
+
+  /// The text a segmented control puts in [option]'s segment.
+  ///
+  /// Without a `labelOf`, an enum constant's own name — most of this
+  /// catalogue's segmented knobs choose between enum constants, and
+  /// `GlassVariant.regular` reads worse on a 40pt pill than `regular`
+  /// does — or the value's [Object.toString] for anything else.
+  ///
+  /// A knob whose options are records **must** pass one. A record's
+  /// synthesised `toString()` is a debug dump of every field, which on a
+  /// 40pt pill is a hundred characters of identical prefix in every
+  /// segment: no API named, and no visible difference between positions.
+  /// The label belongs to the knob because only the entry that declares
+  /// the option type knows which of its fields is the symbol a reader
+  /// would go on to search for.
+  String labelFor(Object? option) =>
+      labelOf?.call(option) ?? (option is Enum ? option.name : '$option');
+
   /// This knob with [next] in place of [value].
   Knob<T> withValue(T next) => Knob<T>(
     name: name,
     value: next,
     options: options,
+    labelOf: labelOf,
     min: min,
     max: max,
   );

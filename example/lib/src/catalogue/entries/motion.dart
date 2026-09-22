@@ -246,21 +246,30 @@ final CatalogueEntry _glassDecay = CatalogueEntry(
 // GlassMotion — the spring presets
 // ---------------------------------------------------------------------------
 
-/// A spring preset, its constructor call and the motion it builds carried
-/// together — one declaration, read by both `build` and `code`, the same
-/// way `_MaterialPreset` does in `surfaces.dart`.
-typedef _SpringPreset = ({String constructorCode, GlassMotion motion});
+/// A spring preset, its name, its constructor call and the motion it builds
+/// carried together — one declaration, read by both `build` and `code`, the
+/// same way `_MaterialPreset` does in `surfaces.dart`, and carrying `name`
+/// for the same reason: a record's `toString()` is a debug dump, not a
+/// label a segmented control can put on a 40pt pill.
+typedef _SpringPreset = ({
+  String name,
+  String constructorCode,
+  GlassMotion motion,
+});
 
 final List<_SpringPreset> _springPresets = <_SpringPreset>[
   (
+    name: 'bouncy',
     constructorCode: 'GlassMotion.bouncy()',
     motion: const GlassMotion.bouncy(),
   ),
   (
+    name: 'snappy',
     constructorCode: 'GlassMotion.snappy()',
     motion: const GlassMotion.snappy(),
   ),
   (
+    name: 'smooth',
     constructorCode: 'GlassMotion.smooth()',
     motion: const GlassMotion.smooth(),
   ),
@@ -277,6 +286,7 @@ final CatalogueEntry _glassMotion = CatalogueEntry(
       name: 'settleMotion',
       value: _springPresets[0],
       options: _springPresets,
+      labelOf: (option) => (option! as _SpringPreset).name,
     ),
   ],
   build: (knobs) {
