@@ -27,8 +27,9 @@ GlassLayer(
 )
 ```
 
-The [example app](example/) shows the rest: the dome lens, Apple's two
-fitted materials side by side, liquid blending, spring motion, and the tier
+The [example app](example/) shows the rest: a catalogue of 33 entries, one
+per capability, each live beside the Dart that produced it — the dome lens,
+Apple's two fitted materials, liquid blending, spring motion, and the tier
 engine explaining its own decision.
 
 ## How it works, in one paragraph

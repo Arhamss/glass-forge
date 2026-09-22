@@ -1,9 +1,10 @@
 # glass_forge example
 
-Five scenes over five photographs. Each one is a working screen rather than a
-swatch, and everything on them is the package's own API — there is no wrapper
-layer between the reader and `GlassLayer`, `Glass`, `GlassMaterial`,
-`InteractiveGlass` and `GlassSurface`.
+A catalogue of the package's API: 33 entries in seven groups, index to
+detail. Each entry is one capability, live — the real widget on screen, a
+knob or two that move it, and the Dart that produced exactly what you are
+looking at, ready to copy. Everything on screen is the package's own API;
+where the example needs a control of its own it is painted, and it says so.
 
 ```sh
 cd example
@@ -15,47 +16,70 @@ web backends — `ui.ImageFilter.shader` throws, the frost is applied on its
 own, and the app still runs. That is the package's degradation story, not a
 broken build.
 
-## The scenes
+## The groups
 
-| Scene | What it shows |
-|---|---|
-| **Lens** | `GlassMaterial.dome()`: a sphere cap over the whole interior, so the middle magnifies and the rim compresses. Draggable, with a live `edgeRefraction` slider and the three shapes. |
-| **Edge** | `GlassMaterial.regular(brightness:)` and `.clear()` side by side, both fitted against real iOS 27 captures. Each carries a letterform, because the real difference between them is what happens to a label: regular exists to keep one readable over anything, clear is for media-rich content where the foreground is already bold. |
-| **Blend** | `GlassBlendGroup`: two ovals whose distance fields smooth-min into one another. Drag the right one and the neck stretches with it. |
-| **Motion** | `InteractiveGlass`: press, drag, fling, spring home, with squash and stretch read off the spring's own velocity. Three springs and a stretch limit. |
-| **System** | The five `GlassSurface` roles on one screen, the tier the engine resolved, and `ResolvedTier.describe()` explaining why. |
+| Group | Entries | What it covers |
+|---|---|---|
+| **Surfaces** | 6 | `Glass`, `GlassLayer`, `GlassMaterial`, `GlassVariant`, `GlassProfile`, and all eight material fields moved together. The rim-versus-dome split, and why regular adapts to its backdrop where clear does not. |
+| **Shapes** | 4 | `GlassRoundedRectangle`, `GlassOval`, `GlassSuperellipse`, and `GlassBlendGroup` — two shapes closer than `blend` joining through a smooth neck rather than stacking as cut-outs. |
+| **Motion** | 7 | `InteractiveGlass` and the six values that tune it: `GlassJiggle`, `GlassPressStretch`, `GlassOverdrag`, `GlassDecay`, `GlassMotion`, `GlassReduceMotion`. |
+| **Composition** | 4 | `GlassPresence`, `GlassHostScope`, `GlassGlow`, and cross-pass overlap — the one illegal composition, provoked on purpose with the debug warning captured live. |
+| **Chrome** | 4 | `GlassDetentSheet` and its detents, controller and scroll physics: one gesture crossing from the sheet into the list inside it and back. |
+| **Design system** | 5 | `GlassTheme`, `GlassSurface`, `GlassTokens`, `GlassTintStep`, `GlassLegibility` — the five semantic roles, and the contrast arithmetic behind every tint promise. |
+| **Adaptation** | 3 | `GlassTierScope`, `GlassTierEngine`, `GeometryTier` — the four signals that resolve a tier, and the pin that overrules three of them but never accessibility. |
+
+An entry names the symbol you would search for, so the index doubles as a
+map of the public API. Two entries are named for a subject rather than a
+symbol — *Material knobs* and *Cross-pass overlap* — because neither is one
+class.
 
 ## Reading the code
 
-`lib/main.dart` is the whole architecture: the tier scope, the theme, the one
-glass layer, the tab bar, and the Lens scene. The other four scenes are in
-`lib/src/scenes/`, and they are all the same shape — a specimen, a control
-row, and the line of code that produced what is on screen.
+`lib/main.dart` is the whole architecture in one file: the tier scope, the
+theme, and the index as `home`. The catalogue itself is under
+`lib/src/catalogue/` —
+
+- `catalogue.dart` — the seven groups, and the lookup a see-also chip uses
+  to decide whether it has anywhere to send you.
+- `catalogue_entry.dart` — `CatalogueEntry` and `Knob`. Both the widget and
+  the snippet are functions of the same knob list, which is what makes it
+  impossible for the code shown to disagree with the thing rendered above
+  it.
+- `index_page.dart`, `entry_page.dart` — the two screens, and the handoff
+  between them.
+- `entries/` — one file per group.
+
+A see-also name is a pill when the catalogue has an entry to open, and
+plain text when it does not. Eight of the names cross-referenced here are
+real exported symbols the catalogue deliberately spends no entry on; they
+are worth naming, but they do not get to look like a tap.
 
 ## Four rules the composition follows
 
 Each of these was a bug in this repository first.
 
-1. **At most one glass surface at any point on screen.** On a physical iPhone a
-   glass surface drawn over another reads a stale frame, including its own
-   previous output, and washes out white within a few frames
+1. **At most one glass surface at any point on screen.** On a physical
+   iPhone a glass surface drawn over another reads a stale frame, including
+   its own previous output, and washes out white within a few frames
    ([flutter#187820](https://github.com/flutter/flutter/issues/187820)). The
    simulator renders it correctly, so it ships by accident. Nothing here
-   overlaps: the specimen sits above the control panel, the panel above the tab
-   bar, and every control drawn *on* a glass surface is paint. Raising the
-   scrim removes every other surface in the same frame rather than fading over
-   them.
+   overlaps: one `GlassLayer` per page, the specimen bare on the
+   photograph, and every control drawn *on* a glass surface is paint.
+   Pushing an entry is a handoff, not a cross-fade — the index's glass
+   finishes fading before the entry's begins, so there is never a frame
+   carrying two backdrop passes over the same region.
 2. **Paint what the glass refracts behind the layer, never inside it.** A
-   backdrop filter can only bend what is already beneath it. The photographs
-   and the one scrim are painted before the `GlassLayer`; everything inside it
-   is drawn on top.
-3. **The backdrop must be coarser than the displacement.** The glass moves what
-   is behind it by tens of pixels. A pattern finer than that is pushed through
-   whole periods and lands looking identical, so the glass appears to do
-   nothing. Every photograph here was chosen for large structure — a ridge
-   line, a painted terrace, a curtain of light.
-4. **Bars and pills get explicit heights.** A `Container` with an `alignment`
-   in a bounded slot expands to fill it and swallows the screen.
+   backdrop filter can only bend what is already beneath it. The photograph
+   is painted before the `GlassLayer`; everything inside it is drawn on
+   top.
+3. **The backdrop must be coarser than the displacement.** The glass moves
+   what is behind it by tens of pixels. A pattern finer than that is pushed
+   through whole periods and lands looking identical, so the glass appears
+   to do nothing. Every photograph here was chosen for large structure — a
+   ridge line, a painted terrace, a curtain of light.
+4. **Bars and pills get explicit heights.** A `Container` with an
+   `alignment` in a bounded slot expands to fill it and swallows the
+   screen.
 
 There is a fifth that is easy to miss: anything pinned to the top of an
 edge-to-edge surface needs its own safe-area inset, or it prints through the
@@ -65,12 +89,12 @@ clock.
 
 | | |
 |---|---|
-| Photographs | Generated for this project. Five of them, 1.7 MB in total, each picked for large structure. |
-| Geist, Geist Mono | [SIL Open Font License 1.1](assets/licenses/geist_ofl.txt), © 2024 The Geist Project Authors. Registered with `LicenseRegistry` in `main()`, so the Licences button in the System scene shows the full text. |
+| Photographs | Generated for this project. Five of them, 1.6 MB in total, each picked for large structure and each with its backdrop colours measured in `lib/src/backdrop_info.dart`. The catalogue paints one of the five — the index and every entry page share it, so paging between them never swaps the picture. |
+| Geist, Geist Mono | [SIL Open Font License 1.1](assets/licenses/geist_ofl.txt), © 2024 The Geist Project Authors. Registered with `LicenseRegistry` in `main()`, and the **Licences** button in the index's top bar opens the full text. |
 
 Two dependencies, `flutter` and `glass_forge`. An example that also teaches a
-router or a state-management library is mostly teaching those; `Navigator`,
-`setState` and `ValueNotifier` carry this one.
+router or a state-management library is mostly teaching those; `Navigator`
+and `setState` carry this one.
 
 ## Enabling Flutter GPU
 
@@ -82,5 +106,5 @@ example opts in the way a consumer would:
   `android/app/src/main/AndroidManifest.xml`.
 
 Without either key the package still renders. It resolves one tier down, onto
-the runtime-effect producer, which is what the System scene's `geometry` row
-reports.
+the runtime-effect producer, which is what the **GeometryTier** entry in the
+Adaptation group reports.
