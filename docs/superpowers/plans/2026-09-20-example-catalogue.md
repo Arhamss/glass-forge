@@ -943,6 +943,29 @@ alone means `showLicensePage` *would* find them, but nothing calls it. Give
 the catalogue an affordance that does, and only then update the README
 sentence to match.
 
+- [ ] **Step 1c: Make a see-also chip with nowhere to go stop looking tappable**
+
+Pre-flighted and enumerated: **8 of the 38 distinct `seeAlso` targets have no
+entry**, so `_SeeAlsoChip` (`entry_page.dart:492`) renders each as a pill with
+`onTap: null` that looks exactly like the ones that navigate.
+
+| Target | Named from |
+|---|---|
+| `GlassShape` | `shapes.dart` |
+| `GlassSurfaces`, `GlassTintRamp`, `GlassTints` | `design_system.dart` |
+| `AccessibilitySignals`, `FrameWatchdog`, `ThermalSignal`, `RenderCapabilities` | `adaptation.dart` |
+
+**Do not delete them.** Every one is a real exported symbol and a genuine
+cross-reference; several are there because the plan deliberately decided not
+to spend an entry on them. The defect is that the app promises a tap it
+cannot honour. Give a target with no entry a label treatment distinct from a
+navigable chip, and add a test asserting that every chip which *looks*
+tappable resolves through `findEntryByApi`.
+
+While there: `adaptation.dart` names `AccessibilitySignals` where the engine
+owns an `AccessibilitySignalSource`. Both are real, so it is a wording fix,
+not a dead reference.
+
 - [ ] **Step 2: Update the example README and the root README**
 
 Pre-flighted, and the two are not equally stale. `example/README.md` needs a
