@@ -431,13 +431,20 @@ class _KnobRow extends StatelessWidget {
   }
 }
 
-/// "SEE ALSO", and one painted chip per name in [CatalogueEntry.seeAlso].
+/// "SEE ALSO", and one name per entry in [CatalogueEntry.seeAlso].
 ///
-/// A chip whose name resolves to a real entry pushes to it with the same
-/// [catalogueEntryRoute] an index row uses — the catalogue is not only
-/// index-to-detail, an entry can hand off to another entry the same way.
-/// One that does not resolve (most of them, until Tasks 5-10 populate the
-/// other groups) is still shown, just inert.
+/// A name that resolves to a real entry is a [PillButton] and pushes to it
+/// with the same [catalogueEntryRoute] an index row uses — the catalogue is
+/// not only index-to-detail, an entry can hand off to another entry the
+/// same way. A name with no entry is still worth printing, because it is
+/// still a real symbol the reader can go and look up; it is drawn as plain
+/// text instead, so the row never offers a tap it cannot honour. See
+/// [_SeeAlsoChip].
+///
+/// [WrapCrossAlignment.center] because the two treatments are different
+/// heights: a pill carries its own padding and an unpilled name does not,
+/// and aligning them at the top would step every plain name up out of its
+/// row.
 class _SeeAlso extends StatelessWidget {
   const _SeeAlso({required this.entry});
 
@@ -465,6 +472,7 @@ class _SeeAlso extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               for (final api in entry.seeAlso) _SeeAlsoChip(api: api),
             ],
@@ -475,11 +483,27 @@ class _SeeAlso extends StatelessWidget {
   }
 }
 
-/// One see-also name, painted as a pill.
+/// One see-also name, in whichever of the two treatments it has earned.
 ///
-/// Painted, not glass — a row of chips this small would each cost their
-/// own backdrop pass for no visual gain, since none of them need to
-/// refract anything.
+/// **A pill only when there is an entry to open.** Eight of the names this
+/// catalogue cross-references — `GlassShape`, `GlassSurfaces`,
+/// `GlassTintRamp`, `GlassTints`, `AccessibilitySignalSource`,
+/// `FrameWatchdog`, `ThermalSignal`, `RenderCapabilities` — are real
+/// exported symbols that the plan deliberately spends no entry on. They are
+/// worth naming anyway, so they stay; what they cannot do is wear the same
+/// pill as a name that navigates, which is what they used to do while
+/// carrying a null `onTap`. A control that looks pressable and does nothing
+/// reads as a broken app, not as a missing page.
+///
+/// The unpilled treatment is the same pair [SegmentedControl] already uses
+/// for the half of itself that is not selected: no fill, and
+/// [SurfaceInk.inkTertiary] rather than the full label colour. Both steps
+/// resolve off the enclosing surface, so the distinction survives a bar
+/// that flipped its scheme.
+///
+/// Painted either way, never glass — a row of chips this small would each
+/// cost their own backdrop pass for no visual gain, since none of them need
+/// to refract anything.
 class _SeeAlsoChip extends StatelessWidget {
   const _SeeAlsoChip({required this.api});
 
@@ -488,21 +512,20 @@ class _SeeAlsoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final target = findEntryByApi(api);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: target == null
-          ? null
-          : () => Navigator.of(context).push(catalogueEntryRoute(target)),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: context.inkTrack,
-          borderRadius: const BorderRadius.all(Radius.circular(999)),
+    if (target == null) {
+      return Padding(
+        // The pill's own vertical padding, so a run of plain names sets at
+        // the same rhythm as a run of pills rather than closing up.
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Text(
+          api,
+          style: context.label.copyWith(color: context.inkTertiary),
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Text(api, style: context.label),
-        ),
-      ),
+      );
+    }
+    return PillButton(
+      label: api,
+      onTap: () => Navigator.of(context).push(catalogueEntryRoute(target)),
     );
   }
 }

@@ -703,7 +703,11 @@ final CatalogueEntry _glassTierEngine = CatalogueEntry(
     'RenderCapabilities',
     'ThermalSignal',
     'FrameWatchdog',
-    'AccessibilitySignals',
+    // The source object the engine owns and this snippet's own comment
+    // names, not the immutable `AccessibilitySignals` reading it hands
+    // out. Both are real symbols; only one of them is what `accessibility`
+    // takes.
+    'AccessibilitySignalSource',
   ],
 );
 

@@ -1,6 +1,57 @@
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge_example/src/theme.dart';
 
+/// A label in a painted pill, which goes somewhere when it is tapped.
+///
+/// **The catalogue's one tappable-chrome shape, and only that.** A pill
+/// promises a destination; anything with nowhere to send the reader is
+/// drawn without one. The rule exists because `entry_page.dart`'s see-also
+/// row mixes names that open another entry with names the catalogue does
+/// not cover, and a row where both look identical promises a tap it cannot
+/// honour. `see_also_test.dart` holds the rule: every pill on an entry page
+/// has to resolve through `findEntryByApi`.
+///
+/// Painted, not glass, for the reason every other control in this file is:
+/// these sit on a glass bar, and a second piece of glass on top of the
+/// first is the one composition this renderer cannot draw.
+///
+/// The fill is [SurfaceInk.inkTrack] over the enclosing surface's own label
+/// colour, which is the same pair the selected half of a
+/// [SegmentedControl] uses — so a pill inverts with its bar instead of
+/// staying white on a bar that flipped to the light scheme.
+class PillButton extends StatelessWidget {
+  /// Creates a pill reading [label] that calls [onTap].
+  const PillButton({required this.label, required this.onTap, super.key});
+
+  /// The text inside the pill.
+  final String label;
+
+  /// Where it goes. Non-null by construction: a pill with nothing to do is
+  /// the defect this widget exists to make impossible to write.
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: context.inkTrack,
+          borderRadius: const BorderRadius.all(Radius.circular(999)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Text(
+            label,
+            style: context.label.copyWith(color: context.ink),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// A row of choices, painted onto a glass surface.
 ///
 /// Painted, not glass: a glass control drawn on top of a glass bar is the one
