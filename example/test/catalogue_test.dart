@@ -213,10 +213,11 @@ void main() {
         /// `copyWith` off the real `MediaQuery` inside the app, the same
         /// way designSystemEntries pins a scheme, so the view's own size
         /// and padding survive and the brightness is the only thing moved.
-        /// Keyed on the knob so a second mount replaces the specimen
-        /// rather than updating it in place — `regular` reads the scheme
-        /// through the element tree, and an updated subtree would leave
-        /// the second assertion passing for the first mount's reasons.
+        /// Keyed on the knob *and* the brightness so every mount replaces
+        /// the specimen rather than updating it in place — `regular` reads
+        /// the scheme through the element tree, and an updated subtree
+        /// would leave one assertion passing for an earlier mount's
+        /// reasons.
         Future<GlassMaterial?> materialUnder(
           CatalogueEntry variant, {
           required Brightness platformBrightness,
@@ -232,7 +233,12 @@ void main() {
                     tier: GeometryTier.none,
                     child: Center(
                       child: KeyedSubtree(
-                        key: ValueKey<String>('$platformBrightness'),
+                        key: ValueKey<String>(
+                          '$platformBrightness|'
+                          '${variant.knobs.map(
+                            (knob) => '${knob.value}',
+                          ).join('|')}',
+                        ),
                         child: variant.build(variant.knobs),
                       ),
                     ),
@@ -245,20 +251,64 @@ void main() {
           return tester.widget<Glass>(find.byType(Glass)).material;
         }
 
+        // What each preset must build, and what it must print, stated
+        // here rather than read back off the entry.
+        //
+        // Reading `preset.constructorCode` and asserting the snippet
+        // contains it is the assertion this replaces: `code` interpolates
+        // that same field, so it compared a string to itself and passed
+        // for a preset that printed `GlassMaterial.clear()` while
+        // building `GlassMaterial.dome()`. An expectation taken from the
+        // thing under test cannot observe the thing under test. The
+        // materials below are constructed independently and compared to
+        // what `build` really resolved to on screen, which costs one
+        // pump per preset — three, at `GeometryTier.none`.
+        //
+        // `regular` is pinned to light here because the loop mounts in
+        // light; the two-scheme assertions below are what prove it is
+        // resolved rather than pinned.
+        final expected = <String, ({GlassMaterial material, String printed})>{
+          'regular': (
+            material: GlassMaterial.regular(brightness: Brightness.light),
+            printed:
+                'material: GlassMaterial.regular(\n'
+                '    brightness: GlassTheme.brightnessOf(context),\n'
+                '  ),',
+          ),
+          'clear': (
+            material: GlassMaterial.clear(),
+            printed: 'material: GlassMaterial.clear(),',
+          ),
+          'dome': (
+            material: GlassMaterial.dome(),
+            printed: 'material: GlassMaterial.dome(),',
+          ),
+        };
+
+        expect(
+          entry.knobs[0].options.map(entry.knobs[0].labelFor).toSet(),
+          expected.keys.toSet(),
+          reason:
+              'a preset with no expectation here would otherwise be '
+              'carried by the loop without being checked at all',
+        );
+
         for (final preset in entry.knobs[0].options) {
           final name = entry.knobs[0].labelFor(preset);
           final moved = entry.withKnob(0, preset);
-          final constructorCode =
-              (preset!
-                      as ({
-                        String name,
-                        String constructorCode,
-                        GlassMaterial Function(BuildContext context) resolve,
-                      }))
-                  .constructorCode;
+          final built = await materialUnder(
+            moved,
+            platformBrightness: Brightness.light,
+          );
+
+          expect(
+            built,
+            expected[name]!.material,
+            reason: '$name built a material that is not the one it names',
+          );
           expect(
             renderSnippet(moved),
-            contains(constructorCode),
+            contains(expected[name]!.printed),
             reason: '$name printed a constructor it does not build',
           );
         }

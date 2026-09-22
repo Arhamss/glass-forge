@@ -479,8 +479,8 @@ final CatalogueEntry _glassDetentSheet = CatalogueEntry(
         "    // Neither end is a constant: the bar's own height\n"
         '    // against bottomGap is where both come from. The gap\n'
         '    // shrinks to $_barHeight and sets the sheet down on the bar\n'
-        '    // at 1 - $_barHeight / $_bottomGap; the ramp opens six points of\n'
-        '    // gap before that. A taller bar, or a bottomGap no\n'
+        '    // at 1 - $_barHeight / $_bottomGap; the ramp opens six\n'
+        '    // points of gap before that. A taller bar, or a bottomGap no\n'
         '    // bigger than the bar, moves or breaks both.\n'
         '    GlassPresence(\n'
         '      presence: controller.presenceUnder(\n'
