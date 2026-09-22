@@ -828,7 +828,24 @@ rather than spending entries on them; the group stays at 5.
 ### Task 10 — Adaptation (3)
 
 `GlassTierScope` with tier degradation (the tier segmented control from the
-System scene) · the thermal / frame-rate / accessibility signals · 
+System scene) · `GlassTierEngine` · `GeometryTier`.
+
+Pre-flighted against `lib/` before dispatch, the same check that caught
+`GlassTint`. `GlassTierScope` and `GeometryTier` are real and exported.
+**"the thermal / frame-rate / accessibility signals" is prose, not a
+symbol** — the real ones are `ThermalSignal`, `FrameWatchdog`,
+`AccessibilitySignals` / `AccessibilitySignalSource`, and they are fused by
+`GlassTierEngine`, whose own doc comment describes it as owning the signals
+and publishing the one tier they resolve to. That is the symbol a caller
+names, so it is the entry's `api`; name the individual signals in its copy
+and see-also. The group stays at **3**.
+
+Two traps for that entry's author. `GlassTierEngine` owns **four** signals,
+not three — capability probing (`RenderCapabilities`) is the fourth, and
+`resolveTier` gives them different precedence: a requested tier beats
+capability, heat and frame health, and does **not** beat accessibility.
+Second, `GlassTier` (`tier_profile.dart:281`) and `GeometryTier`
+(`producer_registry.dart:8`) are two different exported enums. This entry is
 `GeometryTier`.
 
 - [ ] **Extra step for Task 10:** remove the `skip:` from the count test at
