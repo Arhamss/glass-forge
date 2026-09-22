@@ -162,6 +162,39 @@ and C3, see above.
 
 ## Known problems, none of them fixed
 
+- **`InteractiveGlass` changes its widget-tree *shape* with its parameters,
+  so swapping one for another in the same slot can crash.** Found while
+  writing the catalogue's Motion entries.
+
+  `build` wraps its child in a `GestureDetector` only when
+  `widget.drag.enabled || widget.onTap != null`:
+
+  ```dart
+  if (widget.drag.enabled || widget.onTap != null) {
+    result = GestureDetector(
+      onPanStart: widget.drag.enabled ? _onPanStart : null,
+      ...
+    );
+  }
+  ```
+
+  Two `InteractiveGlass`es that differ only in whether drag is enabled
+  therefore produce differently-shaped subtrees. Flutter's element diffing
+  tries to update the old element in place, and the mismatch surfaces as
+  `RenderGlassMotion.performLayout` failing `sizeAccessAllowed`.
+
+  **The outer `if` buys nothing** — every callback inside is already
+  individually nulled when drag is off, so always building the
+  `GestureDetector` is behaviourally identical and keeps the tree shape
+  stable. That is the fix.
+
+  Reachable by any consumer who swaps a draggable surface for a
+  non-draggable one at the same position. The catalogue does not hit it,
+  because entries are reached through a `Navigator` push rather than a
+  direct widget swap, and the task that found it worked around it test-side
+  with a `KeyedSubtree`.
+
+
 - **A `Glass` under a transform-bearing ancestor that has not been laid out
   yet throws on first layout.** Two symptoms found so far, one cause.** Found while building the catalogue example. It is a
   package bug, not an example one, and it hits the headline use case — glass
