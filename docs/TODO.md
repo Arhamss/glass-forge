@@ -162,6 +162,31 @@ and C3, see above.
 
 ## Known problems, none of them fixed
 
+- **`_events`'s `handleError` cannot catch what it documents, and its doc
+  comment says the opposite.** `lib/src/platform/glass_forge_method_channel.dart:102`
+  explains the choice of `handleError` over a `try` by saying "the failure
+  arrives as the first event, after the stream is already open". It does not.
+  `EventChannel.receiveBroadcastStream`'s `onListen` reports a failed
+  activation through `FlutterError.reportError`, not by adding an error to the
+  stream — so the `handleError(..., test: (e) => e is MissingPluginException)`
+  one line below never sees it.
+
+  The intent is right and stated in the comment above it: "a platform with no
+  implementation must look like a platform with nothing to say, not like an
+  error a consumer has to catch." On a host with no plugin — Windows and
+  Linux, per that file's own comment — it currently looks like two red errors
+  instead.
+
+  Found while building the catalogue's snippet guard, whose
+  `GlassTierEngine` mirror has to answer both event channels with null or the
+  test reads two `MissingPluginException`s instead of the snippet. That mock
+  is a real necessity for the test, but it also hides this.
+
+  **Verified to the extent of the comment and the mechanism, not on a
+  plugin-less host.** Whoever fixes it should confirm on Windows or Linux
+  first, then either catch it where Flutter actually raises it or correct the
+  comment to say the failure is unreachable from here.
+
 - **A `sizeAccessAllowed` assertion fires when one catalogue entry page
   replaces another in place — culprit unidentified.** Recorded because it
   reproduces, not because it is understood. Latent, not live: no route in the
