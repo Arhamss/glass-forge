@@ -30,15 +30,19 @@ import 'package:glass_forge_example/src/theme.dart';
 ///
 /// The last test, `every symbol a snippet names is named here too`, narrows
 /// that gap without closing it. It renders all 33 snippets through
-/// [renderSnippet], strips their comments and string literals, pulls every
-/// capitalised identifier out of what is left, and fails if one of those
-/// names appears nowhere in this file's own text. A `code` closure that
-/// starts emitting `GlassShape.capsule()` therefore fails that test, and
-/// the only way to satisfy it is to write that name here — where the
-/// compiler rejects it. What it does not cover: argument names, argument
-/// values, nesting, and a symbol *dropped* from a snippet; and the match is
-/// file-wide rather than per entry, so a name some other entry already uses
-/// satisfies it. It catches new phantoms, not silent divergence.
+/// [renderSnippet], pulls every capitalised identifier out of them, and
+/// fails unless each one is *written as code* in this file. Both sides get
+/// the same treatment — comments off, string literals off, and the match on
+/// a whole word — so a name that only turns up in prose, inside a string,
+/// or as a prefix of some longer name does not count as compiled. A `code`
+/// closure that starts emitting `GlassShape.capsule()` therefore fails that
+/// test, and the only way to satisfy it is to write that name here, where
+/// the compiler rejects it. What it does not cover: argument names,
+/// argument values, nesting, and a symbol *dropped* from a snippet; names
+/// that are not capitalised, such as `context.inkFill` or `engine.start`;
+/// and the match is file-wide rather than per entry, so a name some other
+/// entry already uses satisfies it. It catches new phantoms, not silent
+/// divergence.
 ///
 /// Where a snippet names something only the running app has — `facts`,
 /// `places`, `controller`, `context` — the mirror substitutes a real
@@ -626,7 +630,10 @@ void main() {
       floor: ramp.legible,
       ceiling: ramp.opaque,
     );
-    expect(opacity, inInclusiveRange(ramp.legible, ramp.opaque));
+    // The number the snippet prints to the reader, in its closing comment.
+    // Not a range between the solver's own two arguments: a solver that
+    // returned `floor` and nothing else would satisfy that identically.
+    expect(opacity, closeTo(0.353, 1e-3));
   });
 
   // -- Adaptation ----------------------------------------------------------
@@ -736,11 +743,10 @@ void main() {
           'this test reads its own file, so it has to run from the example '
           'package root; ${Directory.current.path} is not it',
     );
-    // Comments off, and this file's own prose with them. The first draft
-    // compared against the whole file and passed a deliberately broken
-    // snippet, because the header above names `GlassShape.capsule()` while
-    // explaining it — a mention is not a thing the compiler has read.
-    final source = _withoutComments(mirror.readAsStringSync());
+    // Reduced to code, the same way a snippet is: see [_codeOnly] for the
+    // three ways a name that nothing compiled has already talked its way
+    // past this check.
+    final source = _codeOnly(mirror.readAsStringSync());
 
     final missing = <String, Set<String>>{};
     final silent = <String>[];
@@ -753,7 +759,7 @@ void main() {
           silent.add('${entry.group} | ${entry.api}');
         }
         final unnamed = named
-            .where((symbol) => !source.contains(symbol))
+            .where((symbol) => !_namesSymbol(source, symbol))
             .toSet();
         if (unnamed.isNotEmpty) {
           missing['${entry.group} | ${entry.api}'] = unnamed;
@@ -827,26 +833,41 @@ const Widget _tabs = SizedBox(height: 48);
 const Widget _bands = SizedBox.expand();
 const List<Widget> _places = <Widget>[SizedBox(height: 40)];
 
-/// [source] with every `//` comment taken off, line by line.
-String _withoutComments(String source) => source
+/// [source] with everything that is not code taken out of it.
+///
+/// Comments come off first, line by line, so prose is never mistaken for
+/// code; string literals come off second, because by then the only
+/// apostrophes left are the ones that open and close a string.
+///
+/// Both sides of the tie-back check go through this, and it matters that
+/// they do. Leaving comments on the mirror let a header that *explains*
+/// `GlassShape.capsule()` stand in for one nobody had compiled; leaving
+/// string literals on it let a `semanticLabel: 'GlassShape.capsule'` do the
+/// same. A name only counts when it is written as code.
+String _codeOnly(String source) => source
     .split('\n')
     .map((line) {
       final comment = line.indexOf('//');
       return comment == -1 ? line : line.substring(0, comment);
     })
-    .join('\n');
+    .join('\n')
+    .replaceAll(RegExp("'[^']*'"), '')
+    .replaceAll(RegExp('"[^"]*"'), '');
 
 /// Every capitalised identifier [snippet] names, dotted member included.
+Set<String> _symbolsIn(String snippet) =>
+    RegExp(r'\b[A-Z][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?\b')
+        .allMatches(_codeOnly(snippet))
+        .map((match) => match[0]!)
+        .toSet();
+
+/// Whether [code] writes [symbol] as a whole word.
 ///
-/// Comments come off first, so the prose in a snippet's own notes is not
-/// mistaken for code; string literals come off second, because by then the
-/// only apostrophes left are the ones that open and close a string.
-Set<String> _symbolsIn(String snippet) {
-  final code = _withoutComments(
-    snippet,
-  ).replaceAll(RegExp("'[^']*'"), '').replaceAll(RegExp('"[^"]*"'), '');
-  return RegExp(r'\b[A-Z][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?\b')
-      .allMatches(code)
-      .map((match) => match[0]!)
-      .toSet();
-}
+/// A plain substring search is the wrong question. `GlassRoundedRectangl` —
+/// a real constructor name with its last letter dropped, which is precisely
+/// the shape of phantom this file guards against — is a substring of
+/// `GlassRoundedRectangle`, so `contains` would find it and report the
+/// snippet fine. The word boundaries make the answer "is this name here",
+/// not "does this text appear somewhere".
+bool _namesSymbol(String code, String symbol) =>
+    RegExp('\\b${RegExp.escape(symbol)}\\b').hasMatch(code);
