@@ -38,8 +38,10 @@ this package's own API.
   design system exists to provide.
 - **Colours behind glass must be measured, not guessed.** `GlassSurface`
   cannot sample its backdrop; it can only keep labels readable if told what
-  is behind them. Reuse the five measured backdrops in `scene.dart`. Do not
-  introduce an unmeasured one.
+  is behind them. Reuse the five measured backdrops in
+  `example/lib/src/backdrop_info.dart` (`backdrops`, `backdropFor`,
+  `catalogueBackdropPhoto`) — Task 3 Step 5 renamed `scene.dart` to it. Do
+  not introduce an unmeasured one.
 - **Snippets are derived, never hand-written.** See Task 2. A hand-written
   snippet string in any entry is a plan violation.
 - **33 entries, per the spec's inventory.** Surfaces 6, Shapes 4, Motion 7,
@@ -738,6 +740,15 @@ entry page replaces it.
 - [ ] **Step 5:** `cd example && flutter analyze && dart format --set-exit-if-changed --output=none lib test`
 - [ ] **Step 6:** Commit, e.g. `git commit -m "feat(example): the Surfaces catalogue entries"`
 
+> **Every "starting point" named in Tasks 5-10 has already been deleted.**
+> Task 3 removed `example/lib/src/scenes/` wholesale, because `SceneShell`,
+> `BackdropInfo.name` and `.blurb` went with it and nothing under `scenes/`
+> compiled without them. The scene files are still the right source for entry
+> copy — recover the one you need from history, e.g.
+> `git show 7ec90e7^:example/lib/src/scenes/sheet_scene.dart` — but treat it
+> as prose to draw on, never as code to restore. The directory stays gone;
+> Task 12 Step 1 verifies it.
+
 ### Task 5 — Surfaces (6)
 
 `Glass` · `GlassLayer` · `GlassMaterial` (regular / clear / dome, as a
@@ -809,8 +820,10 @@ named-surfaces entry.
 System scene) · the thermal / frame-rate / accessibility signals · 
 `GeometryTier`.
 
-- [ ] **Extra step for Task 10:** remove the `skip:` from the 29-entry count
-  test added in Task 3 Step 3 and confirm it passes. That test is the
+- [ ] **Extra step for Task 10:** remove the `skip:` from the count test at
+  `example/test/index_page_test.dart:35` (added in Task 3 Step 3) and confirm
+  it passes. It asserts **33**, not the 29 an earlier draft of this plan
+  said. That test is the
   inventory contract; it must be live before this plan is done.
 
 ---
