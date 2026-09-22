@@ -162,6 +162,47 @@ and C3, see above.
 
 ## Known problems, none of them fixed
 
+- **A `sizeAccessAllowed` assertion fires when one catalogue entry page
+  replaces another in place — culprit unidentified.** Recorded because it
+  reproduces, not because it is understood. Latent, not live: no route in the
+  example replaces an entry page without a key, and it has only ever been
+  seen under `flutter test`, never on a device.
+
+  Verbatim:
+
+  ```
+  'package:flutter/src/rendering/box.dart': Failed assertion: line 2268
+  pos 11: 'sizeAccessAllowed': RenderBox.size accessed beyond the scope of
+  resize, layout, or permitted parent access. ... If you hit this assert
+  trying to access a child's size, pass "parentUsesSize: true" to that
+  child's layout() in RenderGlassMotion.performLayout.
+  ```
+
+  **`RenderGlassMotion` is the victim, not the culprit, and the trailing
+  `.performLayout` is template text.** `box.dart:2274` builds that sentence
+  with `objectRuntimeType(this, 'RenderBox')`, where `this` is the box whose
+  `size` getter was *read*. So the message names `RenderGlassMotion` because
+  `RenderGlassMotion.size` was accessed, and then phrases the remedy as
+  though the reader were the victim's parent. `RenderGlassMotion` has no
+  `performLayout` override at all — it is a `RenderProxyBox`, and
+  `RenderProxyBoxMixin.performLayout` already passes `parentUsesSize: true`.
+  Anyone chasing this must ignore the class name in the message and find what
+  `RenderObject.debugActiveLayout` actually was.
+
+  **Reproduction.** A throwaway widget test looping every catalogue entry
+  that has an option knob, pumping `MaterialApp(home: GlassLayer(child:
+  CatalogueEntryPage(entry: entry)))` then `pumpAndSettle()`, **with no key**,
+  so elements are reused between pumps. It fires on the pump replacing the
+  `GlassMotion` page with the `GlassReduceMotion` one. Pumped alone,
+  `GlassReduceMotion` is clean; wrapping each page in a `KeyedSubtree` reaches
+  the same transition and is also clean. So it needs element reuse across
+  that specific transition.
+
+  **What is missing is the stack.** The only capture so far used
+  `tester.takeException()` and kept the message alone. To locate it, install
+  `FlutterError.onError` and read `details.stack` — which will name the object
+  actually laying out.
+
 - **`GlassDetentSheet` notifies its controller from inside its own build,
   so a sibling that listens to that controller throws "setState called
   during build" on mount.** Found while writing the catalogue's Chrome
