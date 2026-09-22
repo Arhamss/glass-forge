@@ -626,6 +626,10 @@ final CatalogueEntry _glassDetent = CatalogueEntry(
         '].map(\n'
         '  (detent) => detent.resolve(\n'
         '    available: $available,\n'
+        '    // A real GlassDetentSheet has nothing measuring its\n'
+        '    // child yet and passes double.infinity here, so inside\n'
+        '    // one a content() detent resolves to available, not to\n'
+        '    // this number.\n'
         '    contentHeight: $_detentContentHeight,\n'
         '  ),\n'
         ')';

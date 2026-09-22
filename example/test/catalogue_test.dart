@@ -2,9 +2,11 @@ import 'package:flutter/material.dart' show MaterialApp;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
+import 'package:glass_forge_example/src/backdrop_info.dart';
 import 'package:glass_forge_example/src/catalogue/catalogue_entry.dart';
 import 'package:glass_forge_example/src/catalogue/entries/chrome.dart';
 import 'package:glass_forge_example/src/catalogue/entries/composition.dart';
+import 'package:glass_forge_example/src/catalogue/entries/design_system.dart';
 import 'package:glass_forge_example/src/catalogue/entries/motion.dart';
 import 'package:glass_forge_example/src/catalogue/entries/shapes.dart';
 import 'package:glass_forge_example/src/catalogue/entries/surfaces.dart';
@@ -1393,6 +1395,485 @@ void main() {
               'parent and never delegates to it — the documented opt-out '
               'this knob exists to show',
         );
+      },
+    );
+  });
+  group('designSystemEntries', () {
+    test('the group has its promised five entries', () {
+      expect(designSystemEntries, hasLength(5));
+    });
+
+    test('every entry names its api, its purpose and at least one knob', () {
+      for (final entry in designSystemEntries) {
+        expect(entry.api, isNotEmpty, reason: 'a nameless entry');
+        expect(
+          entry.purpose,
+          isNotEmpty,
+          reason: '${entry.api} has no purpose',
+        );
+        expect(
+          entry.knobs,
+          isNotEmpty,
+          reason: '${entry.api} has nothing to move',
+        );
+      }
+    });
+
+    test('every entry names the Design system group', () {
+      for (final entry in designSystemEntries) {
+        expect(entry.group, 'Design system');
+      }
+    });
+
+    test('every entry api is unique', () {
+      final names = designSystemEntries.map((entry) => entry.api).toList();
+      expect(names.toSet(), hasLength(names.length));
+    });
+
+    test(
+      'entry.build(entry.knobs) constructs without throwing, for every '
+      "entry's default knobs",
+      () {
+        for (final entry in designSystemEntries) {
+          expect(
+            () => entry.build(entry.knobs),
+            returnsNormally,
+            reason: '${entry.api} threw building its default widget',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'every entry mounts and paints under a real GlassLayer, at default '
+      'knobs',
+      (tester) async {
+        // Keyed by api, same as the groups above: four of these five build
+        // a `GlassSurface`, and without a key Flutter would update one
+        // entry's surface in place into the next entry's — which is not
+        // what the real app does, since one catalogue page never turns
+        // into another without a route push between them.
+        for (final entry in designSystemEntries) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: GlassLayer(
+                child: Center(
+                  child: KeyedSubtree(
+                    key: ValueKey(entry.api),
+                    child: entry.build(entry.knobs),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: '${entry.api} threw once mounted',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'every entry lays out inside the FittedBox thumbnail slot '
+      '_EntryRow uses, at default knobs',
+      (tester) async {
+        // The same unbounded-width slot compositionEntries is checked
+        // against, and for the same reason: `FittedBox` hands its child
+        // infinite width, so a specimen whose root takes
+        // `constraints.biggest` never lays out. Every root in this group
+        // is a doubly-tight `SizedBox`, and this is what says so.
+        for (final entry in designSystemEntries) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: GlassLayer(
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.all(
+                      Radius.circular(10),
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: KeyedSubtree(
+                        key: ValueKey(entry.api),
+                        child: entry.build(entry.knobs),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          // The known first-frame `getTransformTo` throw under a
+          // not-yet-laid-out transform ancestor, tolerated exactly as the
+          // composition group tolerates it. This test is here for the
+          // other failure: one that keeps throwing past that frame.
+          tester.takeException();
+          await tester.pumpAndSettle();
+          expect(
+            tester.takeException(),
+            isNull,
+            reason:
+                '${entry.api} kept throwing under an unbounded-width '
+                'FittedBox past the first, known frame',
+          );
+        }
+      },
+    );
+
+    // Not a compile check — see the equivalent comment in surfacesEntries.
+    // The knob-move tests below guard the drift-free property.
+    test("every entry's code is non-empty at its default knobs", () {
+      for (final entry in designSystemEntries) {
+        expect(
+          renderSnippet(entry),
+          isNotEmpty,
+          reason: '${entry.api} rendered no snippet',
+        );
+      }
+    });
+
+    // --- moving a knob moves both build and code -------------------------
+
+    CatalogueEntry entryNamed(String api) =>
+        designSystemEntries.firstWhere((entry) => entry.api == api);
+
+    /// Mounts [variant] with the platform pinned to [platformBrightness].
+    ///
+    /// Pinned rather than left to the test binding, because three of these
+    /// entries resolve a scheme and every number they land on — a tint
+    /// opacity, a label colour, a contrast — is a different number in the
+    /// other one. `copyWith` off the real `MediaQuery` rather than a bare
+    /// `MediaQueryData`, so the view's own size and padding survive.
+    ///
+    /// Keyed on the knob values so that mounting a second variant replaces
+    /// the specimen rather than updating the first in place: a
+    /// `GlassSurface` reads its theme through `dependOnInheritedWidget`,
+    /// and an updated-in-place subtree would leave an assertion about the
+    /// second variant passing for reasons belonging to the first.
+    ///
+    /// `GeometryTier.none` for the reason chromeEntries gives: off
+    /// Impeller the signed-distance field is baked on the CPU, and nothing
+    /// below reads the matte — these assertions are about materials,
+    /// radii and painted colours. The group's `mounts and paints` test
+    /// above is where real geometry is exercised.
+    Future<void> pump(
+      WidgetTester tester,
+      CatalogueEntry variant, {
+      Brightness platformBrightness = Brightness.light,
+    }) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(platformBrightness: platformBrightness),
+              child: GlassLayer(
+                tier: GeometryTier.none,
+                child: Center(
+                  child: KeyedSubtree(
+                    key: ValueKey<String>(
+                      variant.knobs.map((knob) => '${knob.value}').join('|'),
+                    ),
+                    child: variant.build(variant.knobs),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    /// The material [glass] was actually given.
+    ///
+    /// `Glass.material` is nullable because a bare `Glass` inherits its
+    /// layer's, and every `Glass` read below was built by a `GlassSurface`,
+    /// which always names one. Asserting that rather than reaching through
+    /// it with `!` means a surface that ever stopped resolving its own
+    /// material fails here with a sentence instead of a null error.
+    GlassMaterial materialOf(Glass glass) {
+      final material = glass.material;
+      expect(
+        material,
+        isNotNull,
+        reason: 'a GlassSurface resolves its own material, never inherits',
+      );
+      return material!;
+    }
+
+    /// The one [Glass] the `GlassSurface` under [key] built.
+    Glass glassUnder(WidgetTester tester, String key) {
+      return tester.widget<Glass>(
+        find.descendant(
+          of: find.byKey(ValueKey<String>(key)),
+          matching: find.byType(Glass),
+        ),
+      );
+    }
+
+    testWidgets(
+      'GlassTheme — moving brightness moves the scheme every surface '
+      'under it resolves in, and the snippet',
+      (tester) async {
+        final entry = entryNamed('GlassTheme');
+        expect(entry.knobs[0].value, 'platform', reason: 'sanity: default');
+
+        final light = entry.withKnob(0, 'light');
+        await pump(tester, light, platformBrightness: Brightness.dark);
+        expect(
+          materialOf(glassUnder(tester, 'card')).tint,
+          GlassTintRamp.appleLight.color,
+          reason:
+              'a pinned brightness wins over the platform, or the theme '
+              'would not be the thing deciding',
+        );
+        expect(
+          materialOf(glassUnder(tester, 'control')).tint,
+          GlassTintRamp.appleLight.color,
+          reason: 'and it reaches every surface underneath, not just one',
+        );
+
+        final dark = entry.withKnob(0, 'dark');
+        await pump(tester, dark, platformBrightness: Brightness.dark);
+        expect(
+          materialOf(glassUnder(tester, 'card')).tint,
+          GlassTintRamp.appleDark.color,
+        );
+        expect(
+          materialOf(glassUnder(tester, 'control')).tint,
+          GlassTintRamp.appleDark.color,
+        );
+        expect(renderSnippet(dark), contains('brightness: Brightness.dark'));
+        expect(
+          renderSnippet(entry),
+          contains('follows the platform'),
+          reason: 'the default position says what null means',
+        );
+      },
+    );
+
+    testWidgets(
+      'GlassSurface — moving role changes the resolved radius the built '
+      'Glass carries, and the snippet',
+      (tester) async {
+        final entry = entryNamed('GlassSurface');
+        expect(
+          entry.knobs[0].value,
+          GlassSurfaceRole.card,
+          reason: 'sanity: default',
+        );
+
+        BorderRadius radiusOf(WidgetTester tester) {
+          final glass = tester.widget<Glass>(find.byType(Glass));
+          return (glass.shape as GlassSuperellipse).radius;
+        }
+
+        await pump(tester, entry);
+        expect(
+          radiusOf(tester),
+          BorderRadius.circular(const GlassRadiusScale().medium),
+          reason: 'GlassSurfaceSpec.card asks for the medium rung',
+        );
+
+        final moved = entry.withKnob(0, GlassSurfaceRole.navigationBar);
+        await pump(tester, moved);
+        expect(
+          radiusOf(tester),
+          BorderRadius.circular(const GlassRadiusScale().large),
+          reason:
+              'GlassSurfaceSpec.navigationBar asks for the large rung — '
+              'the knob reached the resolved style, not only the enum',
+        );
+        expect(renderSnippet(moved), contains('GlassSurface.navigationBar('));
+        expect(
+          renderSnippet(moved),
+          contains('radius large'),
+          reason: "the snippet's facts come off the role's real spec",
+        );
+      },
+    );
+
+    testWidgets(
+      'GlassSurface — every role resolves, and the surface prints the '
+      'contrast it actually reached over the measured backdrop',
+      (tester) async {
+        final entry = entryNamed('GlassSurface');
+        for (final role in GlassSurfaceRole.values) {
+          await pump(tester, entry.withKnob(0, role));
+          expect(
+            find.text(role.name),
+            findsOneWidget,
+            reason: '$role did not name itself',
+          );
+          expect(
+            find.textContaining(':1'),
+            findsOneWidget,
+            reason:
+                '$role printed no contrast, so the backdrop never reached '
+                'GlassSurfaceStyle.labelContrast',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'GlassTokens — moving a rung changes the frost and the radius the '
+      'built Glass carries, and the snippet',
+      (tester) async {
+        final entry = entryNamed('GlassTokens');
+        expect(entry.knobs[0].value, 14.0, reason: 'sanity: blur.thick');
+        expect(entry.knobs[1].value, 44.0, reason: 'sanity: radius.xl');
+
+        await pump(tester, entry);
+        final atDefault = tester.widget<Glass>(find.byType(Glass));
+        expect(
+          (atDefault.shape as GlassSuperellipse).radius,
+          BorderRadius.circular(44),
+        );
+
+        final moved = entry.withKnob(0, 28.0).withKnob(1, 20.0);
+        await pump(tester, moved);
+        final atMoved = tester.widget<Glass>(find.byType(Glass));
+
+        expect(
+          materialOf(atMoved).frost,
+          closeTo(materialOf(atDefault).frost * 2, 1e-9),
+          reason:
+              'blur steps are a ratio to the scale own regular, which the '
+              'knob left at 7 — so doubling thick doubles the sheet frost',
+        );
+        expect(
+          (atMoved.shape as GlassSuperellipse).radius,
+          BorderRadius.circular(20),
+        );
+        expect(renderSnippet(moved), contains('GlassBlurScale(thick: 28.0)'));
+        expect(
+          renderSnippet(moved),
+          contains('GlassRadiusScale(extraLarge: 20.0)'),
+        );
+      },
+    );
+
+    testWidgets(
+      'GlassTintStep — moving the step changes the tint opacity the built '
+      'Glass carries, and the snippet',
+      (tester) async {
+        final entry = entryNamed('GlassTintStep');
+        expect(
+          entry.knobs[0].value,
+          GlassTintStep.regular,
+          reason: 'sanity: default',
+        );
+
+        double opacityOf(WidgetTester tester) =>
+            materialOf(tester.widget<Glass>(find.byType(Glass))).tintOpacity;
+
+        // Pinned light, so the ramp these numbers come off is a stated
+        // one rather than whatever the binding defaulted to.
+        const ramp = GlassTintRamp.appleLight;
+
+        await pump(tester, entry);
+        expect(opacityOf(tester), closeTo(ramp.regular, 1e-9));
+
+        final moved = entry.withKnob(0, GlassTintStep.opaque);
+        await pump(tester, moved);
+        expect(
+          opacityOf(tester),
+          closeTo(ramp.opaque, 1e-9),
+          reason:
+              'the step reached GlassSurfaceSpec.card through the theme '
+              'and came out the other side as a real tint opacity',
+        );
+        expect(
+          opacityOf(tester),
+          greaterThan(ramp.regular),
+          reason: 'and the ramp is monotone, so the surface got thicker',
+        );
+        expect(renderSnippet(moved), contains('GlassTintStep.opaque'));
+      },
+    );
+
+    testWidgets(
+      'GlassLegibility — moving the target changes the solved opacity, '
+      'the colour painted from it, and the snippet',
+      (tester) async {
+        final entry = entryNamed('GlassLegibility');
+        expect(entry.knobs[0].value, 4.5, reason: 'sanity: default');
+
+        final backdrop = backdropFor(catalogueBackdropPhoto).panelBackdrop;
+        const tints = GlassTints();
+        // The scheme that *lost* — the one an adapting role is stuck with,
+        // and the only one the solver ever has work to do for. Over these
+        // photographs the winning scheme clears 7:1 with no tint at all,
+        // so a test written against it would pass with the knob disabled.
+        final ramp = tints.of(
+          tints.schemeFor(backdrop) == Brightness.dark
+              ? Brightness.light
+              : Brightness.dark,
+        );
+
+        Color raisedSwatch(WidgetTester tester) => tester
+            .widget<ColoredBox>(
+              find.byKey(const ValueKey<String>('raised')),
+            )
+            .color;
+
+        await pump(tester, entry);
+        final atDefault = raisedSwatch(tester);
+        expect(
+          GlassLegibility.contrastRatio(atDefault, ramp.label),
+          greaterThanOrEqualTo(4.5),
+          reason: 'the solver reached the target it was given',
+        );
+        expect(
+          find.text('The floor already clears it'),
+          findsOneWidget,
+          reason:
+              'at 4.5 the legible step is enough over this backdrop, and '
+              'the panel says which of the two rules is in force',
+        );
+
+        final moved = entry.withKnob(0, 7.0);
+        await pump(tester, moved);
+        final atMoved = raisedSwatch(tester);
+
+        expect(
+          atMoved,
+          isNot(atDefault),
+          reason:
+              'a higher target takes more tint, and the swatch is painted '
+              'with exactly the colour surfaceOver returns for it',
+        );
+        expect(
+          GlassLegibility.contrastRatio(atMoved, ramp.label),
+          greaterThanOrEqualTo(7),
+        );
+        expect(
+          find.text('Raised above the floor to reach it'),
+          findsOneWidget,
+          reason: 'and the caption crossed over with the solved opacity',
+        );
+        expect(
+          tester
+              .widget<ColoredBox>(find.byKey(const ValueKey<String>('floor')))
+              .color,
+          GlassLegibility.surfaceOver(
+            tint: ramp.color,
+            opacity: ramp.legible,
+            backdrop: backdrop,
+          ),
+          reason:
+              'the floor never moves — opacityForContrast only ever '
+              'raises tint, never lowers it',
+        );
+        expect(renderSnippet(moved), contains('target: 7.0'));
       },
     );
   });
