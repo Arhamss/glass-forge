@@ -810,9 +810,20 @@ keeps the tab row and the sheet from both being glass over the same pixels.
 ### Task 9 — Design system (5)
 
 `GlassTheme` · `GlassSurface` with `GlassSurfaces` · `GlassTokens` ·
-`GlassTint` · `GlassLegibility`. The System scene
+`GlassTintStep` · `GlassLegibility`. The System scene
 (`example/lib/src/scenes/system_scene.dart`) is the starting point for the
-named-surfaces entry.
+named-surfaces entry — recover it from history per the note above.
+
+**`GlassTint` does not exist**; an earlier draft of this plan named the file
+stem `glass_tint.dart` rather than a symbol, the same mistake as the comps'
+`GlassGroup`. The real symbols are `GlassTintStep` (the enum a caller
+writes — `legible` 3:1, `regular` Apple's fitted value, `readable` 4.5:1,
+`opaque` 7:1), `GlassTintRamp` (one scheme's colour and the opacities it is
+used at) and `GlassTints` (the light/dark pair that `GlassTokens.tint`
+holds). The entry's `api` is **`GlassTintStep`**, because that is the name
+that appears at a call site — `tint: GlassTintStep.readable` throughout
+`glass_surfaces.dart`. Name the other two in the entry's copy and see-also
+rather than spending entries on them; the group stays at 5.
 
 ### Task 10 — Adaptation (3)
 
