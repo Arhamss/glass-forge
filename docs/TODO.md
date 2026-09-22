@@ -255,6 +255,18 @@ and C3, see above.
   overscroll `Transform`, a `FittedBox`, or a plain `Transform` a consumer
   wrote. Fixing only the overscroll case would leave the other two.
 
+  **Third symptom, and the one that raises the priority.** The `FittedBox`
+  also imposes unbounded width on whatever it holds. A catalogue entry whose
+  specimen is a `Stack` of only `Positioned` children then takes
+  `constraints.biggest`, gets infinite width, and never lays out at all —
+  found in the Composition group's cross-pass overlap entry, which throws
+  permanently under that parent (eight exceptions, `size: MISSING`) where its
+  three siblings recover after the first-frame geometry exception. Each entry
+  can be written to survive it, and that one will be. But an API whose
+  specimens have to be authored around an unbounded-width thumbnail slot is
+  an API with a sharp edge, and this is the third distinct way the same
+  missing tolerance has drawn blood.
+
 - **Not publish-clean.** On a fresh checkout `flutter pub publish --dry-run`
   reports one warning: `pubspec.yaml` declares
   `build/shaderbundles/geometry.shaderbundle` as an asset, but `build/` is
