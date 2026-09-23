@@ -98,3 +98,15 @@ final backdrops = <BackdropInfo>[
     material: GlassMaterial.regular(brightness: Brightness.dark),
   ),
 ];
+
+/// [color] as the Dart literal a catalogue snippet would quote — the
+/// `0xFF29364C` inside a `const Color(...)`.
+///
+/// Derived from the value rather than typed beside it. Every colour a
+/// snippet prints comes out of [backdrops] or off the same photograph, and
+/// a hand-written hex is one edit away from describing a picture nobody is
+/// looking at. It lives here, with the colours, because the Adaptation,
+/// Chrome and Design system groups each need it and each used to carry
+/// their own copy of the same line.
+String hexLiteral(Color color) =>
+    '0x${color.toARGB32().toRadixString(16).toUpperCase().padLeft(8, '0')}';

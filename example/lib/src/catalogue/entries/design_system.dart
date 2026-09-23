@@ -32,14 +32,6 @@ final List<CatalogueEntry> designSystemEntries = <CatalogueEntry>[
 
 double _asDouble(Knob<Object?> knob) => knob.value! as double;
 
-/// A colour as the Dart literal a snippet would quote.
-///
-/// Derived from the value rather than typed beside it: every colour in this
-/// file comes out of [backdrops], and a hand-written hex is one edit away
-/// from describing a photograph nobody is looking at.
-String _hex(Color color) =>
-    '0x${color.toARGB32().toRadixString(16).toUpperCase().padLeft(8, '0')}';
-
 /// The photograph the whole catalogue sits over, and the colours measured
 /// off it.
 ///
@@ -400,7 +392,7 @@ final CatalogueEntry _glassSurface = CatalogueEntry(
         '  // Adaptation is at most ${spec.adaptation.name}; at $size '
         'the size\n'
         '  // gate leaves it ${resolved.name}.\n'
-        '  backdrop: const Color(${_hex(_backdrop.panelBackdrop)}),\n'
+        '  backdrop: const Color(${hexLiteral(_backdrop.panelBackdrop)}),\n'
         '  child: facts,\n'
         ')';
   },
@@ -891,7 +883,7 @@ final CatalogueEntry _glassLegibility = CatalogueEntry(
       ceiling: ramp.opaque,
     );
     final scheme = _adaptingScheme(_backdrop.panelBackdrop).name;
-    return 'const backdrop = Color(${_hex(_backdrop.panelBackdrop)});\n'
+    return 'const backdrop = Color(${hexLiteral(_backdrop.panelBackdrop)});\n'
         'const tints = GlassTints();\n'
         '\n'
         '// Both flip and adapt roles run this solver; what differs\n'

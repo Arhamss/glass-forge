@@ -99,19 +99,12 @@ const RenderCapabilities _fullCapabilities = RenderCapabilities(
   complete: true,
 );
 
-/// A colour as the Dart literal a snippet would quote.
-///
-/// Derived from the value rather than typed beside it: every colour in this
-/// file comes out of [backdrops], and a hand-written hex is one edit away
-/// from describing a photograph nobody is looking at.
-String _hex(Color color) =>
-    '0x${color.toARGB32().toRadixString(16).toUpperCase().padLeft(8, '0')}';
-
 /// [material] as the Dart literal a snippet would quote.
 ///
 /// Matched against the calls `GlassMaterial` exposes rather than typed
-/// beside the value, for the reason [_hex] gives one line up: every
-/// specimen in this file is built with `_backdrop.material`, and a literal
+/// beside the value, for the reason [hexLiteral] gives over in
+/// `backdrop_info.dart`: every specimen here is built from
+/// `_backdrop.material`, and a literal
 /// `GlassMaterial.dome()` written into a snippet goes on saying dome long
 /// after the material it claims to describe has moved.
 ///
@@ -725,7 +718,7 @@ final CatalogueEntry _glassTierEngine = CatalogueEntry(
         'GlassTierScope(\n'
         '  engine: engine, // the host owns it, so the host disposes it\n'
         '  child: GlassSurface.card(\n'
-        '    backdrop: const Color(${_hex(_backdrop.panelBackdrop)}),\n'
+        '    backdrop: const Color(${hexLiteral(_backdrop.panelBackdrop)}),\n'
         '    child: facts,\n'
         '  ),\n'
         ')';

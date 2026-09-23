@@ -1,4 +1,3 @@
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_example/src/backdrop_info.dart';
@@ -117,15 +116,6 @@ class _Frame extends StatelessWidget {
     );
   }
 }
-
-/// A colour as the Dart literal a snippet would quote.
-///
-/// Derived from the value rather than typed beside it, exactly as the
-/// Adaptation and Design system groups derive theirs: every colour in this
-/// file comes out of [backdrops], and a hand-written hex is one edit away
-/// from describing a photograph nobody is looking at.
-String _hex(Color color) =>
-    '0x${color.toARGB32().toRadixString(16).toUpperCase().padLeft(8, '0')}';
 
 /// What `GlassDetentSheet.flushRadius` is when a caller leaves it alone.
 ///
@@ -270,17 +260,15 @@ class _TabLabels extends StatelessWidget {
 /// * **At zero the bar leaves the tree**, rather than lingering as a
 ///   surface with nothing inside it.
 ///
-/// Its own listener rather than an `AnimatedBuilder`, because of *where*
-/// the controller publishes from. `GlassDetentSheet` resolves its detents
-/// inside its own `LayoutBuilder` and calls
-/// `GlassDetentSheetController.setDetents` from there, which notifies — and
-/// this bar is that sheet's sibling, not its descendant, so a synchronous
-/// `setState` from inside that build is exactly the "called during build"
-/// error. Deferring only that case to the end of the frame is the same
-/// technique the Composition group's overlap demo uses for the paint-time
-/// warning it captures. Every other publish — a drag, a spring tick —
-/// arrives in a phase where rebuilding is legal and is taken immediately,
-/// so nothing about the ramp lags a frame while it is moving.
+/// Its own listener rather than an `AnimatedBuilder`, and that is now a
+/// preference where it used to be a requirement. `GlassDetentSheet`
+/// resolves its detents inside its own `LayoutBuilder` and publishes from
+/// there, and a sibling asked to rebuild from inside somebody else's build
+/// throws "setState called during build" — an `AnimatedBuilder` calls
+/// `setState` for you and leaves nowhere to hold that one rebuild back, so
+/// this bar held it back by hand. `GlassDetentSheetController` holds it
+/// now, for every listener rather than this one, so the plain `setState`
+/// below is safe from every publish the controller makes.
 class _TabRow extends StatefulWidget {
   const _TabRow({required this.presence});
 
@@ -318,17 +306,6 @@ class _TabRowState extends State<_TabRow> {
   }
 
   void _onPresenceChanged() {
-    if (SchedulerBinding.instance.schedulerPhase ==
-        SchedulerPhase.persistentCallbacks) {
-      // Mid-frame: this is the build and layout pass, which is where the
-      // sheet resolves its detents and publishes from. See the class doc.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() => _value = widget.presence.value);
-        }
-      });
-      return;
-    }
     setState(() => _value = widget.presence.value);
   }
 
@@ -531,7 +508,7 @@ final CatalogueEntry _glassDetentSheet = CatalogueEntry(
         '      bottomGap: $_bottomGap,\n'
         '      floatingRadius: $_floatingRadius,\n'
         '      flushRadius: $_flushRadius,\n'
-        '      backdrop: const Color(${_hex(_backdrop.panelBackdrop)}),\n'
+        '      backdrop: const Color(${hexLiteral(_backdrop.panelBackdrop)}),\n'
         "      semanticLabel: 'Nearby places',\n"
         '      child: ListView(children: places),\n'
         '    ),\n'
@@ -815,7 +792,7 @@ final CatalogueEntry _glassDetentSheetController = CatalogueEntry(
         '  gap: $_sideGap,\n'
         '  floatingRadius: $_floatingRadius,\n'
         '  flushRadius: $_flushRadius,\n'
-        '  backdrop: const Color(${_hex(_backdrop.panelBackdrop)}),\n'
+        '  backdrop: const Color(${hexLiteral(_backdrop.panelBackdrop)}),\n'
         "  semanticLabel: 'Nearby places',\n"
         '  child: ListView(children: places),\n'
         ');\n'
@@ -900,7 +877,7 @@ final CatalogueEntry _glassSheetScrollPhysics = CatalogueEntry(
         '  gap: $_sideGap,\n'
         '  floatingRadius: $_floatingRadius,\n'
         '  flushRadius: $_flushRadius,\n'
-        '  backdrop: const Color(${_hex(_backdrop.panelBackdrop)}),\n'
+        '  backdrop: const Color(${hexLiteral(_backdrop.panelBackdrop)}),\n'
         "  semanticLabel: 'Nearby places',\n"
         '  // The sheet installs GlassSheetScrollPhysics on every\n'
         '  // scrollable inside it, through a ScrollConfiguration.\n'
