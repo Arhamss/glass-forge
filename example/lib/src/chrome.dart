@@ -335,19 +335,3 @@ class ValueSlider extends StatelessWidget {
     );
   }
 }
-
-/// A caption drawn inside a piece of glass.
-///
-/// Labels belong on the surface they describe rather than floating beside it
-/// on the photograph, where they would need a scrim of their own and would
-/// clutter the frame with a second kind of chrome.
-class GlassCaption extends StatelessWidget {
-  const GlassCaption(this.text, {super.key});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(text, textAlign: TextAlign.center, style: context.mono);
-  }
-}
