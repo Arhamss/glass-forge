@@ -354,6 +354,11 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
     return LayoutBuilder(
       builder: (context, constraints) {
         final available = constraints.maxHeight - padding.top;
+        // Resolved here because this is where the available height exists,
+        // and nowhere earlier does. That puts a controller notification
+        // inside a build, which would throw on any sibling already
+        // listening — so the controller holds that one notification to the
+        // end of the frame. See `GlassDetentSheetController._publish`.
         _syncDetents(available);
 
         // Built here rather than inside the `AnimatedBuilder`, and threaded

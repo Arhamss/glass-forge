@@ -195,7 +195,7 @@ and C3, see above.
 - **Sub-projects B, C, D** — no plans yet. Write each one when the one
   before it lands.
 
-## Known problems, none of them fixed
+## Known problems, struck through as they are fixed
 
 - **The `FittedBox` bug has two exception shapes, and the guards only know
   one.** Instrumenting the index test caught **14** errors: **9** are
@@ -376,31 +376,36 @@ and C3, see above.
   `FlutterError.onError` and read `details.stack` — which will name the object
   actually laying out.
 
-- **`GlassDetentSheet` notifies its controller from inside its own build,
-  so a sibling that listens to that controller throws "setState called
-  during build" on mount.** Found while writing the catalogue's Chrome
-  entries, and verified in source rather than taken on report.
+- **~~`GlassDetentSheet` notifies its controller from inside its own
+  build~~ — fixed 2026-09-23.** The chain the entry recorded was exact:
+  `_syncDetents(available)` inside `LayoutBuilder.builder` →
+  `_controller.setDetents(...)` → `_publish()` → `notifyListeners()`, and a
+  sibling already built and subscribed is not a descendant of the element
+  being built, so `markNeedsBuild` on it throws.
 
-  `build` calls `_syncDetents(available)` inside `LayoutBuilder.builder`
-  (`glass_detent_sheet.dart:354-357`), which calls
-  `_controller.setDetents(...)` (`:311`), which reaches `_publish()` and so
-  `notifyListeners()` (`glass_detent_sheet_controller.dart:137-151`). Any
-  sibling already built and subscribed — an `AnimatedBuilder` or a
-  `FadeTransition` driven by the same controller, which is exactly how a
-  caller fades a tab row out as the sheet rises — is asked to rebuild in the
-  middle of the build that is still running.
+  The detents are still resolved where they were, because the available
+  height is the one number only layout supplies and the
+  `contentHeight: double.infinity` fallback depends on that placement. What
+  changed is that `GlassDetentSheetController._publish` holds a
+  notification raised during `SchedulerPhase.persistentCallbacks` to the end
+  of the frame, and notifies normally in every other phase — drags run in
+  the idle phase and ticks in `transientCallbacks`, so neither is deferred.
+  Only the notification waits: the heights, the index and the position are
+  all in place synchronously, so the sheet's own subtree, built moments
+  later inside the same layout pass, still shows the resolved height on the
+  very first frame. The frame the siblings lose is the frame before the
+  sheet had a height at all.
 
-  The deleted `SheetScene` had precisely that shape; `af7556b` added the
-  `FadeTransition`, and nothing tested it, so it went unnoticed until the
-  catalogue rebuilt the same handoff. The catalogue works around it
-  example-side with a listener that defers only that phase.
+  `test/src/chrome/glass_detent_sheet_test.dart` — "a sibling listening to
+  the controller survives the mount" — mounts an `AnimatedBuilder` on the
+  controller beside the sheet, collects `FlutterError.onError` one
+  `FlutterErrorDetails` at a time rather than through `takeException`, and
+  asserts both that nothing was reported and that the sibling was handed the
+  60px the sheet resolved.
 
-  The workaround does not generalise. **`GlassScaffold` will hit this the
-  moment it automates the covered-surface presence handoff**, which is the
-  whole reason that widget is planned — and at that point the deferral has
-  to live in the package, not in each caller. The fix belongs in
-  `GlassDetentSheet`: resolve detents somewhere that is allowed to notify,
-  or defer the publish by a frame.
+  This is the deferral `GlassScaffold` needs, now in the package. The
+  catalogue's example-side workaround in
+  `example/lib/src/catalogue/entries/chrome.dart` is redundant and can go.
 
 - **`InteractiveGlass` changes its widget-tree *shape* with its parameters,
   so swapping one for another in the same slot can crash.** Found while

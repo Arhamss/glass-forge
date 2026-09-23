@@ -270,7 +270,47 @@ class GlassDetentSheetController extends Animation<double>
     }
   }
 
-  void _publish() => notifyListeners();
+  /// Notifies listeners, but never in the middle of somebody else's build.
+  ///
+  /// `GlassDetentSheet` resolves its detents inside a `LayoutBuilder`,
+  /// because the available height is the one number only layout can supply,
+  /// and resolving them calls [setDetents] — so on the first layout this
+  /// notifier would fire during the build/layout phase. A listener that has
+  /// already been built by then is a *sibling* of the sheet rather than a
+  /// descendant of it, and marking one of those dirty mid-build throws
+  /// "setState called during build". The arrangement is not exotic: a bottom
+  /// bar fading out under a rising sheet is exactly an `AnimatedBuilder` on
+  /// this controller standing next to the sheet.
+  ///
+  /// Only the *notification* waits. Everything the caller changed — the
+  /// detent heights, the index, the position — is already in place, so the
+  /// sheet's own subtree, which is built from this value moments later
+  /// inside that same layout pass, sees the new height on the very frame
+  /// that resolved it. The frame the siblings lose is the frame before the
+  /// sheet had a height at all.
+  void _publish() {
+    if (SchedulerBinding.instance.schedulerPhase !=
+        SchedulerPhase.persistentCallbacks) {
+      notifyListeners();
+      return;
+    }
+    if (_deferredPublish) {
+      return;
+    }
+    _deferredPublish = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _deferredPublish = false;
+      if (!_disposed) {
+        notifyListeners();
+      }
+    });
+  }
+
+  /// Whether a [_publish] is already waiting for the end of this frame.
+  bool _deferredPublish = false;
+
+  /// Whether [dispose] has run, so a deferred [_publish] can stand down.
+  bool _disposed = false;
 
   void _onReduceMotionChanged() {
     if (!GlassReduceMotion.instance.value || !isAnimating) {
@@ -304,6 +344,7 @@ class GlassDetentSheetController extends Animation<double>
 
   @override
   void dispose() {
+    _disposed = true;
     if (respectReduceMotion) {
       GlassReduceMotion.instance.removeListener(_onReduceMotionChanged);
     }

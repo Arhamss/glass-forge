@@ -484,4 +484,72 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets('a sibling listening to the controller survives the mount', (
+    tester,
+  ) async {
+    // The sheet resolves its detents inside a `LayoutBuilder`, which is the
+    // only place the available height exists, and resolving them notifies
+    // the controller. A listener built before the sheet laid out is a
+    // sibling rather than a descendant, so marking it dirty from inside
+    // that layout throws "setState called during build" — which is what a
+    // caller fading chrome out under a rising sheet gets on mount, and what
+    // `GlassScaffold` will assemble for them.
+    final controller = GlassDetentSheetController(vsync: const TestVSync());
+    addTearDown(controller.dispose);
+
+    final errors = <FlutterErrorDetails>[];
+    final reportToTest = FlutterError.onError;
+    // Collected one `FlutterErrorDetails` at a time rather than through
+    // `tester.takeException`, which folds every error from one pump into a
+    // single synthetic string and drops the originals.
+    FlutterError.onError = errors.add;
+
+    final seen = <double>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          // See the note on `_layer`: the software SDF bake is seconds per
+          // frame and nothing here reads the matte.
+          tier: GeometryTier.none,
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              AnimatedBuilder(
+                animation: controller,
+                builder: (context, _) {
+                  seen.add(controller.value);
+                  return const SizedBox.expand();
+                },
+              ),
+              GlassDetentSheet(
+                controller: controller,
+                detents: const <GlassDetent>[
+                  GlassDetent.fraction(0.1),
+                  GlassDetent.fraction(0.5),
+                ],
+                child: const SizedBox.expand(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    FlutterError.onError = reportToTest;
+
+    expect(
+      errors.map((details) => details.exceptionAsString()).toList(),
+      isEmpty,
+    );
+    // A tenth of the 600-high test window: the sibling was told the height
+    // the sheet resolved, rather than merely not crashing.
+    expect(
+      seen.last,
+      closeTo(60, 0.5),
+      reason: 'the sibling never heard the sheet resolve its detents',
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }
