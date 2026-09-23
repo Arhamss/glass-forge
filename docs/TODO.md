@@ -310,30 +310,38 @@ and C3, see above.
   chain is collected from `scene.firstShapeOwner` alone**. Look there before
   filing this under #187820.
 
-- **`_events`'s `handleError` cannot catch what it documents, and its doc
-  comment says the opposite.** `lib/src/platform/glass_forge_method_channel.dart:102`
-  explains the choice of `handleError` over a `try` by saying "the failure
-  arrives as the first event, after the stream is already open". It does not.
-  `EventChannel.receiveBroadcastStream`'s `onListen` reports a failed
-  activation through `FlutterError.reportError`, not by adding an error to the
-  stream — so the `handleError(..., test: (e) => e is MissingPluginException)`
-  one line below never sees it.
+- **~~`_events`'s `handleError` cannot catch what it documents~~ — fixed
+  2026-09-23.** The mechanism the entry recorded was right, and confirmed
+  against the SDK this repo builds on (Flutter 3.47.2,
+  `packages/flutter/lib/src/services/platform_channel.dart:693-740`):
+  `receiveBroadcastStream`'s `onListen` activates the stream by invoking
+  `listen` on a method channel of the same name and hands a failure to
+  `FlutterError.reportError`, never to the stream. So neither a `try` around
+  `receiveBroadcastStream()` nor a `handleError` on its result could ever
+  have seen the `MissingPluginException`. `onCancel` does the same thing
+  with `cancel`, so the count was four errors per open-and-close of the two
+  channels, not two.
 
-  The intent is right and stated in the comment above it: "a platform with no
-  implementation must look like a platform with nothing to say, not like an
-  error a consumer has to catch." On a host with no plugin — Windows and
-  Linux, per that file's own comment — it currently looks like two red errors
-  instead.
+  There is no seam to catch it from outside, so `_events` no longer calls
+  `receiveBroadcastStream`. `_openQuietly` owns the broadcast controller and
+  does the `listen`/`cancel` invocations itself through `_activate`, which
+  swallows a `MissingPluginException` and reports anything else exactly as
+  Flutter would. The rest of it mirrors the SDK deliberately, including the
+  one-listen/one-cancel shape the host's stream handler expects; that is the
+  drift to watch.
 
-  Found while building the catalogue's snippet guard, whose
-  `GlassTierEngine` mirror has to answer both event channels with null or the
-  test reads two `MissingPluginException`s instead of the snippet. That mock
-  is a real necessity for the test, but it also hides this.
+  `test/src/platform/event_channel_quiet_test.dart` pins all three claims: a
+  plugin-less host reports nothing and adds nothing to the stream, a host
+  that fails *inside* its handler is still reported, and an event the host
+  sends still arrives through the open-coded decode path. Still not run on
+  Windows or Linux — the plugin-less host is reproduced in
+  `flutter_test` by registering no mock handler, which is the same
+  `MissingPluginException` from the same call.
 
-  **Verified to the extent of the comment and the mechanism, not on a
-  plugin-less host.** Whoever fixes it should confirm on Windows or Linux
-  first, then either catch it where Flutter actually raises it or correct the
-  comment to say the failure is unreachable from here.
+  The catalogue's snippet guard (`example/test/snippet_compiles_test.dart`)
+  answers both event channels with null. That mock existed because of this
+  bug and is no longer needed for it, though it is harmless and the mirror
+  may want it for other reasons.
 
 - **A `sizeAccessAllowed` assertion fires when one catalogue entry page
   replaces another in place — culprit unidentified.** Recorded because it

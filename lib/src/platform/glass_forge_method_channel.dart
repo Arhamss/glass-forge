@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:glass_forge/src/platform/glass_forge_platform_interface.dart';
@@ -98,16 +100,78 @@ class MethodChannelGlassForge extends GlassForgePlatform {
   ///
   /// Same reasoning as [_ask]: a platform with no implementation must look
   /// like a platform with nothing to say, not like an error a consumer has
-  /// to catch. `handleError` rather than a `try` because the failure arrives
-  /// as the first event, after the stream is already open.
+  /// to catch.
   Stream<Object?> _events(EventChannel channel) {
-    return _streams.putIfAbsent(
-      channel.name,
-      () => channel.receiveBroadcastStream().handleError(
-        (Object _) {},
-        test: (error) => error is MissingPluginException,
-      ),
+    return _streams.putIfAbsent(channel.name, () => _openQuietly(channel));
+  }
+
+  /// [EventChannel.receiveBroadcastStream], minus the two red errors a host
+  /// with no plugin registered would otherwise print.
+  ///
+  /// Open-coded because the failure cannot be caught from outside. Flutter
+  /// activates the stream by invoking `listen` on a method channel of the
+  /// same name from the controller's `onListen`, and reports a failure there
+  /// through `FlutterError.reportError` — it does *not* add it to the
+  /// stream. So neither a `try` around `receiveBroadcastStream()` nor a
+  /// `handleError` on its result ever sees the [MissingPluginException] a
+  /// plugin-less host produces; the only place to catch it is the
+  /// `invokeMethod` call itself, which means owning the controller.
+  ///
+  /// Everything else here matches `receiveBroadcastStream` deliberately,
+  /// including the single-listen/single-cancel shape the host's stream
+  /// handler expects. Keep it that way: the pieces that differ are the two
+  /// [_activate] calls, and nothing else should drift.
+  Stream<Object?> _openQuietly(EventChannel channel) {
+    final control = MethodChannel(channel.name, channel.codec);
+    late final StreamController<Object?> controller;
+    controller = StreamController<Object?>.broadcast(
+      onListen: () async {
+        channel.binaryMessenger.setMessageHandler(channel.name, (reply) async {
+          if (reply == null) {
+            await controller.close();
+          } else {
+            try {
+              controller.add(channel.codec.decodeEnvelope(reply));
+            } on PlatformException catch (error) {
+              controller.addError(error);
+            }
+          }
+          return null;
+        });
+        await _activate(control, 'listen');
+      },
+      onCancel: () async {
+        channel.binaryMessenger.setMessageHandler(channel.name, null);
+        await _activate(control, 'cancel');
+      },
     );
+    return controller.stream;
+  }
+
+  /// Sends [method] — `listen` or `cancel` — to an event channel's host.
+  ///
+  /// A missing plugin is the answer "nothing to say" and is silent. Anything
+  /// else is a genuine fault and is reported exactly as Flutter's own
+  /// activation would report it, so a host that implemented the stream and
+  /// then failed inside it still shows up.
+  Future<void> _activate(MethodChannel control, String method) async {
+    try {
+      await control.invokeMethod<void>(method);
+    } on MissingPluginException {
+      return;
+    } catch (exception, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: exception,
+          stack: stack,
+          library: 'glass_forge',
+          context: ErrorDescription(
+            'while sending $method to the platform stream on channel '
+            '${control.name}',
+          ),
+        ),
+      );
+    }
   }
 
   /// Drops the cached streams so a test can observe a channel being opened
