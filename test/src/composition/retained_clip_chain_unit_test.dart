@@ -41,7 +41,7 @@ void main() {
     );
     _attachAndLayout(layer, const Size(100, 100));
 
-    final chain = RetainedClipChain()..collect(shape, layer);
+    final chain = RetainedClipChain()..collect(<RenderObject>[shape], layer);
 
     expect(chain.clips, hasLength(1));
     final captured = chain.clips.single;
@@ -68,7 +68,7 @@ void main() {
     );
     _attachAndLayout(layer, const Size(80, 80));
 
-    final chain = RetainedClipChain()..collect(shape, layer);
+    final chain = RetainedClipChain()..collect(<RenderObject>[shape], layer);
 
     expect(chain.clips, hasLength(1));
     final captured = chain.clips.single;
@@ -93,7 +93,7 @@ void main() {
     );
     _attachAndLayout(layer, const Size(100, 100));
 
-    final chain = RetainedClipChain()..collect(shape, layer);
+    final chain = RetainedClipChain()..collect(<RenderObject>[shape], layer);
 
     expect(chain.clips, hasLength(2));
     // Outermost (the RRect, nearest the layer) must come first, so it is
@@ -128,7 +128,7 @@ void main() {
       );
       _attachAndLayout(root, const Size(100, 100));
 
-      final chain = RetainedClipChain()..collect(shape, layer);
+      final chain = RetainedClipChain()..collect(<RenderObject>[shape], layer);
 
       // Only betweenClip (a RenderClipRect, so rrect is null) may appear;
       // outerClip (a RenderClipRRect, above the layer) must not.
@@ -152,7 +152,7 @@ void main() {
     );
     _attachAndLayout(layer, const Size(60, 60));
 
-    final chain = RetainedClipChain()..collect(shape, layer);
+    final chain = RetainedClipChain()..collect(<RenderObject>[shape], layer);
 
     expect(chain.clips, isEmpty);
   });
@@ -170,9 +170,9 @@ void main() {
     _attachAndLayout(layer, const Size(60, 60));
 
     final chain = RetainedClipChain()
-      ..collect(shape, layer)
-      ..collect(shape, layer)
-      ..collect(shape, layer);
+      ..collect(<RenderObject>[shape], layer)
+      ..collect(<RenderObject>[shape], layer)
+      ..collect(<RenderObject>[shape], layer);
 
     expect(chain.clips, hasLength(1));
   });
@@ -189,7 +189,7 @@ void main() {
     );
     _attachAndLayout(layer, const Size(60, 60));
 
-    final chain = RetainedClipChain()..collect(shape, layer);
+    final chain = RetainedClipChain()..collect(<RenderObject>[shape], layer);
     expect(chain.clips, isNotEmpty);
 
     chain.clear();
@@ -209,7 +209,7 @@ void main() {
         child: clip,
       );
       _attachAndLayout(layer, const Size(60, 60));
-      return RetainedClipChain()..collect(shape, layer);
+      return RetainedClipChain()..collect(<RenderObject>[shape], layer);
     }
 
     final a = buildChain();
@@ -229,7 +229,8 @@ void main() {
       child: RenderClipRect(child: oneClipShape),
     );
     _attachAndLayout(oneClipLayer, const Size(60, 60));
-    final oneClip = RetainedClipChain()..collect(oneClipShape, oneClipLayer);
+    final oneClip = RetainedClipChain()
+      ..collect(<RenderObject>[oneClipShape], oneClipLayer);
 
     final twoClipsShape = _leaf();
     final twoClipsLayer = RenderConstrainedBox(
@@ -243,7 +244,8 @@ void main() {
       ),
     );
     _attachAndLayout(twoClipsLayer, const Size(60, 60));
-    final twoClips = RetainedClipChain()..collect(twoClipsShape, twoClipsLayer);
+    final twoClips = RetainedClipChain()
+      ..collect(<RenderObject>[twoClipsShape], twoClipsLayer);
 
     expect(oneClip.matches(twoClips), isFalse);
     expect(twoClips.matches(oneClip), isFalse);
@@ -259,7 +261,8 @@ void main() {
       child: RenderClipRect(child: smallShape),
     );
     _attachAndLayout(smallLayer, const Size(60, 60));
-    final small = RetainedClipChain()..collect(smallShape, smallLayer);
+    final small = RetainedClipChain()
+      ..collect(<RenderObject>[smallShape], smallLayer);
 
     final bigShape = _leaf();
     final bigLayer = RenderConstrainedBox(
@@ -270,7 +273,8 @@ void main() {
       child: RenderClipRect(child: bigShape),
     );
     _attachAndLayout(bigLayer, const Size(90, 90));
-    final big = RetainedClipChain()..collect(bigShape, bigLayer);
+    final big = RetainedClipChain()
+      ..collect(<RenderObject>[bigShape], bigLayer);
 
     expect(small.matches(big), isFalse);
   });
@@ -285,7 +289,8 @@ void main() {
       child: RenderClipRect(clipBehavior: Clip.hardEdge, child: hardEdgeShape),
     );
     _attachAndLayout(hardEdgeLayer, const Size(60, 60));
-    final hardEdge = RetainedClipChain()..collect(hardEdgeShape, hardEdgeLayer);
+    final hardEdge = RetainedClipChain()
+      ..collect(<RenderObject>[hardEdgeShape], hardEdgeLayer);
 
     final antiAliasShape = _leaf();
     final antiAliasLayer = RenderConstrainedBox(
@@ -297,7 +302,7 @@ void main() {
     );
     _attachAndLayout(antiAliasLayer, const Size(60, 60));
     final antiAlias = RetainedClipChain()
-      ..collect(antiAliasShape, antiAliasLayer);
+      ..collect(<RenderObject>[antiAliasShape], antiAliasLayer);
 
     expect(hardEdge.matches(antiAlias), isFalse);
   });
@@ -332,7 +337,7 @@ void main() {
       );
       _attachAndLayout(layer, const Size(200, 200));
 
-      final chain = RetainedClipChain()..collect(shape, layer);
+      final chain = RetainedClipChain()..collect(<RenderObject>[shape], layer);
       expect(chain.clips, hasLength(2));
 
       // The same left-to-right fold _pushGlassLayers uses when it composes
@@ -366,7 +371,7 @@ void main() {
       );
       _attachAndLayout(layer, const Size(60, 60));
 
-      final chain = RetainedClipChain()..collect(shape, layer);
+      final chain = RetainedClipChain()..collect(<RenderObject>[shape], layer);
 
       // Not just "no crash": a clip this chain still tried to re-push
       // would be pointless work at best, since pushClipRect/pushClipRRect
@@ -393,7 +398,7 @@ void main() {
       );
       _attachAndLayout(layer, const Size(60, 60));
 
-      final chain = RetainedClipChain()..collect(shape, layer);
+      final chain = RetainedClipChain()..collect(<RenderObject>[shape], layer);
 
       expect(chain.clips, hasLength(1));
       // Not clip.paintBounds (0,0,60,60) -- the clipper's approximate rect,

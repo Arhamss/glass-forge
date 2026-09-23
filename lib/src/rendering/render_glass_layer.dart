@@ -734,12 +734,12 @@ class RenderGlassLayer extends RenderProxyBox {
     // render tree -- `getTransformTo` and the ancestors' own clip rects --
     // which layout has already settled. The scene lags only because it is a
     // cache that the shapes themselves write into as they paint.
-    final firstShape = scene.firstShapeOwner;
-    if (firstShape == null) {
-      _clipChain.clear();
-    } else {
-      _clipChain.collect(firstShape, this);
-    }
+    // Every shape, not one of them: a retained clip is re-pushed around
+    // this layer's whole backdrop pass, and the subtree paints inside the
+    // last of those passes, so a clip only one shape sits under would crop
+    // every other shape and every painted pixel in the layer to that one
+    // shape's box. `collect` keeps only what they all share.
+    _clipChain.collect(scene.shapeOwners, this);
 
     _pushGlassLayers(context, offset, passes, dormant);
   }

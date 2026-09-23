@@ -22,22 +22,21 @@ class GlassScene {
   /// The current revision. Changes only when the scene really changed.
   int get revision => _revision.value;
 
-  /// The render object that registered this scene's first shape, if any.
+  /// The render objects that registered this scene's shapes, in
+  /// registration order.
   ///
   /// Every shape registers under the render object that resolved it (see
-  /// `RenderGlassShape`), so this doubles as a starting point for walking
-  /// ancestor clips between a layer and its content: any registered shape
-  /// works equally well, since they all share this layer, so the first one
-  /// avoids scanning the whole scene to pick one arbitrarily. `null` both
-  /// when the scene is empty and when a caller registered under a key that
-  /// is not a render object, which only `GlassScene`'s own unit tests do.
-  RenderObject? get firstShapeOwner {
-    if (_shapes.isEmpty) {
-      return null;
-    }
-    final key = _shapes.keys.first;
-    return key is RenderObject ? key : null;
-  }
+  /// `RenderGlassShape`), so this is where a walk of the ancestor clips
+  /// between a layer and its content starts -- from all of them, never one.
+  /// A clip re-pushed by `RetainedClipChain` ends up wrapped around the
+  /// layer's whole backdrop pass, so it is only the layer's to re-push if
+  /// every shape in the scene sits under it; anchoring the walk on a single
+  /// arbitrary shape lets that shape's private clip crop everything else.
+  ///
+  /// Lazy, and skips keys that are not render objects -- which only
+  /// `GlassScene`'s own unit tests register.
+  Iterable<RenderObject> get shapeOwners =>
+      _shapes.keys.whereType<RenderObject>();
 
   /// Registers or updates the shape identified by [key].
   void register(Object key, ShapeGeometry geometry) {

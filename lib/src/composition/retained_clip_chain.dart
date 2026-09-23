@@ -78,8 +78,11 @@ class RetainedClip {
 /// arrangement: scrolling moves material through a viewport, not the
 /// viewport through the material.
 ///
-/// This chain walks only between a `GlassLayer` and one of its `Glass`
-/// shapes, as in `GlassLayer(child: ClipRRect(child: Glass(...)))`. It does
+/// Only clips *every* shape in the layer sits under are retained -- see
+/// [collect], where that condition and what violating it costs are set out.
+///
+/// This chain walks only between a `GlassLayer` and its `Glass` shapes, as
+/// in `GlassLayer(child: ClipRRect(child: Glass(...)))`. It does
 /// **not** walk past the layer to clips that are the layer's own ancestors,
 /// such as an enclosing `ListView`'s viewport or an outer `ClipRRect`
 /// wrapping the whole `GlassLayer`, and it deliberately does not need to --
@@ -92,32 +95,50 @@ class RetainedClipChain {
   List<RetainedClip> get clips => List<RetainedClip>.unmodifiable(_clips);
 
   /// Discards any previously captured clips.
-  ///
-  /// For a layer with no registered shapes: there is no shape to walk up
-  /// from, so there is nothing to clip.
   void clear() => _clips.clear();
 
-  /// Walks from [shape] up to [layer], capturing every clip on the way.
+  /// Captures the clips between [layer] and **every one** of [shapes].
   ///
-  /// [shape] and [layer] must be attached to the same render tree, with
-  /// [layer] an ancestor of [shape] -- the arrangement every registered
-  /// glass scene shape already satisfies. Clips found between them (for
+  /// Each of [shapes] must be attached to the same render tree as [layer],
+  /// with [layer] an ancestor of it -- the arrangement every registered
+  /// glass scene shape already satisfies. A clip found between them (for
   /// example a `ClipRRect` a caller nests directly inside a `GlassLayer`,
-  /// between it and one of its `Glass` shapes) are captured so they can be
-  /// re-pushed outside the layer's own backdrop pass, where they will not
+  /// between it and one of its `Glass` shapes) is captured so it can be
+  /// re-pushed outside the layer's own backdrop pass, where it will not
   /// move with it.
-  void collect(RenderObject shape, RenderObject layer) {
-    final found = <_Captured>[];
+  ///
+  /// **Only clips shared by all of [shapes] are kept**, and that is not a
+  /// refinement -- it is the whole correctness condition. A re-pushed clip
+  /// wraps the layer's entire backdrop pass, and the layer paints its whole
+  /// subtree inside the last of those passes (see
+  /// `RenderGlassLayer._pushBackdropPasses`). So a clip that bounds one
+  /// shape and not the others does not merely over-clip that shape's
+  /// backdrop: it crops every other shape, and every painted pixel in the
+  /// layer, to that one shape's box. Collecting from a single arbitrary
+  /// shape -- as this did until a list of catalogue rows, each row's
+  /// thumbnail in its own 44x44 `ClipRRect`, rendered as bare backdrop and
+  /// one 44x44 square -- is exactly that failure.
+  ///
+  /// Cost, since this runs on every paint of every glass layer: one walk
+  /// from the first shape to [layer], the same walk this always did. Each
+  /// further shape costs a second walk only while a candidate survives, and
+  /// that walk chases parent pointers without asking any node what it clips
+  /// -- it stops at the outermost surviving candidate rather than at
+  /// [layer], and the whole loop stops the moment nothing is left. The
+  /// overwhelmingly common case, a layer with no clips nested inside it at
+  /// all, therefore still costs exactly one walk however many shapes it
+  /// holds.
+  void collect(Iterable<RenderObject> shapes, RenderObject layer) {
+    final iterator = shapes.iterator;
+    if (!iterator.moveNext()) {
+      // No shape to walk up from, so there is nothing to clip.
+      _clips.clear();
+      return;
+    }
 
-    var child = shape;
-    var node = shape.parent;
-    while (node != null && !identical(node, layer)) {
-      final captured = _capture(node, child);
-      if (captured != null) {
-        found.add(captured);
-      }
-      child = node;
-      node = node.parent;
+    var found = _walk(iterator.current, layer);
+    while (found.isNotEmpty && iterator.moveNext()) {
+      found = _sharedWith(found, iterator.current, layer);
     }
 
     // [found] was built walking from the shape outward, so its last entry
@@ -142,6 +163,57 @@ class RetainedClipChain {
             ),
           ),
       ]);
+  }
+
+  /// Every clip between [shape] and [layer], innermost first.
+  static List<_Captured> _walk(RenderObject shape, RenderObject layer) {
+    final found = <_Captured>[];
+    var child = shape;
+    var node = shape.parent;
+    while (node != null && !identical(node, layer)) {
+      final captured = _capture(node, child);
+      if (captured != null) {
+        found.add(captured);
+      }
+      child = node;
+      node = node.parent;
+    }
+    return found;
+  }
+
+  /// The entries of [candidates] that are also ancestors of [shape].
+  ///
+  /// [candidates] is innermost first and every entry lies on one path down
+  /// from [layer], so the survivors are whatever sits at or above the point
+  /// where [shape]'s own path joins that one -- a suffix. Walking up from
+  /// [shape] can therefore stop at the outermost candidate: nothing above
+  /// it is in the running.
+  ///
+  /// Matches on node identity alone, and does not re-ask a surviving node
+  /// what it would clip *this* shape to. It cannot use a second answer if
+  /// it got one: exactly one clip is re-pushed per node, not one per shape.
+  /// Whether the node clips at all is settled by the walk that captured it.
+  static List<_Captured> _sharedWith(
+    List<_Captured> candidates,
+    RenderObject shape,
+    RenderObject layer,
+  ) {
+    final outermost = candidates.last.node;
+    final ancestors = <RenderObject>{};
+    var node = shape.parent;
+    while (node != null && !identical(node, layer)) {
+      ancestors.add(node);
+      if (identical(node, outermost)) {
+        break;
+      }
+      node = node.parent;
+    }
+    if (ancestors.isEmpty) {
+      return const <_Captured>[];
+    }
+    return candidates
+        .where((candidate) => ancestors.contains(candidate.node))
+        .toList(growable: false);
   }
 
   static _Captured? _capture(RenderObject node, RenderObject child) {

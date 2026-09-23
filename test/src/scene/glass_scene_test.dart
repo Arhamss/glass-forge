@@ -151,27 +151,27 @@ void main() {
     },
   );
 
-  test('firstShapeOwner is null for an empty scene', () {
-    expect(GlassScene().firstShapeOwner, isNull);
+  test('shapeOwners is empty for an empty scene', () {
+    expect(GlassScene().shapeOwners, isEmpty);
   });
 
   test(
-    'firstShapeOwner is null when shapes were registered under a key that '
-    'is not a render object',
+    'shapeOwners skips shapes registered under a key that is not a render '
+    'object',
     () {
       // Production code always registers under the RenderGlassShape that
       // resolved the geometry; only this file's own helper tests register
-      // under plain strings, for brevity. firstShapeOwner exists to hand a
-      // real starting point to the ancestor-clip walk, so it must refuse a
-      // key it cannot walk from rather than hand back something unusable.
+      // under plain strings, for brevity. shapeOwners exists to hand real
+      // starting points to the ancestor-clip walk, so it must drop a key
+      // it cannot walk from rather than hand back something unusable.
       final scene = GlassScene()..register('a', _geometry());
-      expect(scene.firstShapeOwner, isNull);
+      expect(scene.shapeOwners, isEmpty);
     },
   );
 
   test(
-    'firstShapeOwner returns the render object that registered the first '
-    'shape',
+    'shapeOwners returns every render object that registered a shape, in '
+    'registration order',
     () {
       final first = _FakeShape();
       final second = _FakeShape();
@@ -179,18 +179,21 @@ void main() {
         ..register(first, _geometry())
         ..register(second, _geometry(origin: const Offset(50, 0)));
 
-      expect(scene.firstShapeOwner, same(first));
+      // Order matters to the clip walk: the first entry is the one whose
+      // clips every later entry narrows, so a scene that shuffled them
+      // would make the retained chain depend on registration order.
+      expect(scene.shapeOwners.toList(), <Object>[first, second]);
     },
   );
 
   test(
-    'firstShapeOwner is null again once the last shape unregisters',
+    'shapeOwners is empty again once the last shape unregisters',
     () {
       final shape = _FakeShape();
       final scene = GlassScene()
         ..register(shape, _geometry())
         ..unregister(shape);
-      expect(scene.firstShapeOwner, isNull);
+      expect(scene.shapeOwners, isEmpty);
     },
   );
 
