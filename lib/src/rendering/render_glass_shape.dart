@@ -49,6 +49,13 @@ class RenderGlassShape extends RenderProxyBox {
   /// Whether a post-frame callback to repaint [_layer] is already queued.
   bool _layerRepaintScheduled = false;
 
+  /// Which of [_layer]'s subtree paints this shape last read its transform
+  /// in, or null if it has not read one since it attached.
+  ///
+  /// The layer sweeps whatever this does not match after its subtree has
+  /// painted — see [syncGeometryIfSubtreePaintMissedIt].
+  int? _readInSubtreePaint;
+
   /// The shape to render.
   GlassShape get shape => _shape;
   set shape(GlassShape value) {
@@ -193,6 +200,7 @@ class RenderGlassShape extends RenderProxyBox {
     _layer = null;
     _lastSyncedTransform = null;
     _justSyncedFromLayout = false;
+    _readInSubtreePaint = null;
     _leaveGroup();
     _presence?.removeListener(_onPresenceChanged);
     super.detach();
@@ -372,6 +380,7 @@ class RenderGlassShape extends RenderProxyBox {
     if (target == null || !hasSize || !attached) {
       return;
     }
+    _readInSubtreePaint = target.subtreePaint;
     final transform = getTransformTo(target);
     final wasPlaceholder = _justSyncedFromLayout;
     final needsExtraRepaint = !wasPlaceholder && !target.isPaintingSubtree;
@@ -384,6 +393,39 @@ class RenderGlassShape extends RenderProxyBox {
     if (needsExtraRepaint) {
       _scheduleLayerRepaint(target);
     }
+  }
+
+  /// Reads this shape's transform on [target]'s behalf, if this shape did
+  /// not already read it inside the subtree paint [target] has just made.
+  ///
+  /// A shape moves without painting whenever something between it and the
+  /// layer moves it and a repaint boundary in between absorbs the repaint —
+  /// every row of a `ListView` is wrapped in one, and a scroll re-lays out
+  /// nothing, so a scrolled row neither lays out nor paints. Nothing else
+  /// would ever ask it where it went, and what it holds is where it was
+  /// when it last painted. See `RenderGlassLayer._resyncShapesThatDidNotPaint`
+  /// for why the moment straight after the subtree paint is the one to ask
+  /// in, and what asking costs.
+  ///
+  /// Cheap when there is nothing to do: one identity check and one integer
+  /// comparison, no walk. A shape that did take part in that paint has
+  /// already registered this frame's transform and is left alone.
+  ///
+  /// A shape that has **never** painted is left alone too, and that is not
+  /// laziness. [_nowhereYet] is what such a shape holds, and it holds it
+  /// deliberately: a lazy list builds and lays out rows in the cache region
+  /// ahead of the viewport, and those rows are off-screen, so registering
+  /// them as shapes with no interior keeps them out of the pass and out of
+  /// the matte's bounds. What this method is for is the opposite case — a
+  /// shape that *did* paint somewhere real and has since been moved without
+  /// being asked to paint again.
+  void syncGeometryIfSubtreePaintMissedIt(RenderGlassLayer target) {
+    if (!identical(_layer, target) ||
+        _lastSyncedTransform == null ||
+        _readInSubtreePaint == target.subtreePaint) {
+      return;
+    }
+    _syncGeometryIfTransformChanged();
   }
 
   void _scheduleLayerRepaint(RenderGlassLayer target) {

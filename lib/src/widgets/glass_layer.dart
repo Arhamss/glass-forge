@@ -99,7 +99,7 @@ class _GlassLayerState extends State<GlassLayer> {
           material: effective,
           tier: geometry,
           glow: _glow,
-          child: widget.child,
+          child: _RepaintOnScroll(child: widget.child),
         ),
       ),
     );
@@ -168,6 +168,49 @@ class GlassLayerScope extends InheritedWidget {
   @override
   bool updateShouldNotify(GlassLayerScope oldWidget) =>
       oldWidget.material != material;
+}
+
+/// Marks the enclosing [RenderGlassLayer] for paint whenever anything
+/// beneath it scrolls.
+///
+/// A `Glass` reads where it is from its own `paint` and nowhere else, and
+/// the layer reads what did not paint straight afterwards (see
+/// `RenderGlassLayer._resyncShapesThatDidNotPaint`). Both depend on the
+/// layer being asked to paint at all, and a scroll does not ask it:
+/// `RenderViewportBase.isRepaintBoundary` is true, so a scroll marks the
+/// viewport and stops there. The layer outside it is not dirty in layout or
+/// in paint and never learns that everything it refracts just moved.
+/// Measured: a `ListView` scrolled by 30 logical pixels moved every row and
+/// did not paint the layer once.
+///
+/// A scroll notification is the signal that says so. It bubbles up the
+/// element tree from whichever `Scrollable` moved, so one listener at the
+/// layer covers every scroll view nested anywhere beneath it, however many,
+/// and fires nothing at all on a frame where nothing scrolled. The cost per
+/// notification is one hop up the element tree — this sits immediately
+/// inside the render object it is looking for — and one `markNeedsPaint` on
+/// a layer that is about to have to repaint anyway.
+class _RepaintOnScroll extends StatelessWidget {
+  const _RepaintOnScroll({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        final layer = context
+            .findAncestorRenderObjectOfType<RenderGlassLayer>();
+        if (layer != null && layer.attached) {
+          layer.markNeedsPaint();
+        }
+        // Never absorbed: a caller's own listener above this layer has to
+        // go on seeing every scroll its subtree reports.
+        return false;
+      },
+      child: child,
+    );
+  }
 }
 
 class _RawGlassLayer extends SingleChildRenderObjectWidget {

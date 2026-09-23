@@ -15,6 +15,7 @@ import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/geometry/runtime_geometry_producer.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/material/glass_profile.dart';
+import 'package:glass_forge/src/rendering/render_glass_shape.dart';
 import 'package:glass_forge/src/scene/glass_scene.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
 import 'package:glass_forge/src/shapes/shape_geometry.dart';
@@ -207,6 +208,19 @@ class RenderGlassLayer extends RenderProxyBox {
 
   /// Whether this layer is currently painting its own subtree.
   bool get isPaintingSubtree => _paintingSubtree;
+
+  /// Counts the paints of this layer's subtree, so a shape can say which of
+  /// them it last read its own transform in.
+  ///
+  /// See [_resyncShapesThatDidNotPaint] for what that is for.
+  int _subtreePaint = 0;
+
+  /// Which paint of this layer's subtree is in progress.
+  ///
+  /// `RenderGlassShape` stamps this on itself whenever it reads its
+  /// transform, which is how the sweep after the subtree paints tells a
+  /// shape that took part in it from one that did not.
+  int get subtreePaint => _subtreePaint;
 
   GeometryProducer _producer;
 
@@ -748,10 +762,59 @@ class RenderGlassLayer extends RenderProxyBox {
   /// layer is the thing painting it.
   void _paintSubtree(PaintingContext context, Offset offset) {
     _paintingSubtree = true;
+    _subtreePaint++;
     try {
       super.paint(context, offset);
+      _resyncShapesThatDidNotPaint();
     } finally {
       _paintingSubtree = false;
+    }
+  }
+
+  /// Asks every shape the subtree paint above did not reach where it is now.
+  ///
+  /// A shape reads its own transform from its own `paint` and nowhere else,
+  /// because paint is the only phase where the walk is both permitted and
+  /// correct (see `RenderGlassShape._syncGeometry`). That leaves a shape
+  /// which moves without repainting holding whatever it registered when it
+  /// last painted, and a `ListView` produces exactly that: every row is
+  /// wrapped in a `RepaintBoundary`, and scrolling re-lays out nothing, so a
+  /// scrolled row neither lays out nor paints while the viewport under it
+  /// slides. Measured before this sweep, rows belonging at y = 2.6, 102.6
+  /// and 202.6 were still registered at 467.5, 518.8 and 567.5 — where they
+  /// were last painted — and the pass refracted that stale backdrop.
+  ///
+  /// Right after the subtree paint is the moment to ask: layout is over, so
+  /// the walk is legal and correct; whichever repaint boundaries skipped
+  /// have already skipped, so what did not paint is settled; and the mattes
+  /// are still ahead, so what this registers is what they bake from.
+  ///
+  /// It only asks on frames this layer paints, and a scroll does not make
+  /// it paint — `RenderViewportBase.isRepaintBoundary` is true, so a scroll
+  /// marks the viewport and stops inside it. `GlassLayer` therefore listens
+  /// for scroll notifications and marks this layer itself; see
+  /// `_RepaintOnScroll` in `widgets/glass_layer.dart`. Neither half works
+  /// without the other, and each has its own failing case in
+  /// `test/src/rendering/scrolled_geometry_test.dart`.
+  ///
+  /// Cost, since this runs on every paint of every glass layer: one integer
+  /// comparison per registered shape, and a `getTransformTo` walk only for
+  /// the shapes that did not paint. In the ordinary case — everything under
+  /// the layer repainted with it — every shape is already stamped with
+  /// [_subtreePaint] and nothing walks at all. What it adds where it does
+  /// walk is one ancestor walk per silent shape, against the one the clip
+  /// chain already makes per shape from `paint` itself.
+  void _resyncShapesThatDidNotPaint() {
+    // A snapshot: re-registering a shape mutates `_records`' values, and
+    // iterating the map's own keys while that happens is only safe as long
+    // as nobody adds or removes one. Nothing here does, but a list of the
+    // handful of shapes one layer holds is cheap enough not to depend on
+    // that staying true.
+    final shapes = _records.keys.whereType<RenderGlassShape>().toList(
+      growable: false,
+    );
+    for (final shape in shapes) {
+      shape.syncGeometryIfSubtreePaintMissedIt(this);
     }
   }
 

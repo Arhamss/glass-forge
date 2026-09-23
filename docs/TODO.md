@@ -251,21 +251,59 @@ and C3, see above.
   Worth knowing, because a symmetric-looking API with an asymmetric failure
   is the kind of thing a test written in one direction will miss.
 
-- **A `Glass` in a scrolled lazy list keeps stale geometry.** Found while
-  fixing the paint-time transform walk (`62bb1d6`), and **not caused by it** —
-  the same probe gives the same numbers with that fix reverted. The
-  exceptions it removed were hiding this.
+- ~~**A `Glass` in a scrolled lazy list keeps stale geometry.**~~ Fixed, and
+  it took **two** halves, neither of which works alone.
 
-  `ListView` wraps each row in a `RepaintBoundary`, and scrolling re-lays out
-  nothing, so a scrolled row neither paints nor lays out. It therefore never
-  re-registers its transform. Measured after a fling: rows that should sit at
-  y = 2.6, 102.6 and 202.6 register at **467.5, 518.8 and 567.5** — the
-  positions they held when they were last painted.
+  The recorded diagnosis was right as far as it went: `ListView` wraps each
+  row in a `RepaintBoundary`, and scrolling re-lays out nothing, so a
+  scrolled row neither paints nor lays out and never re-registers. What it
+  missed is why nothing upstream noticed either. **`RenderViewportBase`
+  declares `isRepaintBoundary => true`**, so a scroll marks the viewport and
+  stops inside it: the `GlassLayer` around it is dirty in neither layout nor
+  paint and is never asked to paint at all. Measured with the layer
+  instrumented — a `ListView` scrolled by 30 logical pixels moved every row
+  and produced **zero** paints of the layer. So "make the layer re-read
+  transforms it has not seen painted this frame" could not work on its own;
+  there was no frame in which the layer ran.
 
-  What a user sees is refraction sampling the wrong part of the backdrop for
-  any glass row that has been scrolled without repainting. It wants its own
-  task; the fix is presumably to re-register on scroll, or to make the layer
-  re-read transforms it has not seen painted this frame.
+  1. `RenderGlassLayer._resyncShapesThatDidNotPaint` reads the transform of
+     every shape that did not take part in the subtree paint, straight after
+     that paint — the one moment when the walk is legal, when what skipped
+     has already skipped, and when the mattes are still ahead of it. A shape
+     stamps the layer's subtree-paint counter on itself when it reads its
+     own transform, so this is one integer comparison per shape and a walk
+     only for the silent ones.
+  2. `GlassLayer` listens for `ScrollNotification` and marks the layer for
+     paint (`_RepaintOnScroll`). Notifications bubble, so one listener at
+     the layer covers every scroll view nested anywhere beneath it, and
+     nothing fires on a frame where nothing scrolled.
+
+  A shape that has **never** painted is still left holding `_nowhereYet`
+  rather than given a real position: a lazy list builds rows into the cache
+  region ahead of the viewport, and those are off-screen, so a shape with no
+  interior is both right and cheaper than one that widens the matte.
+
+  Pinned by `test/src/rendering/scrolled_geometry_test.dart`, whose expected
+  positions all come from `tester.getCenter` rather than from the scene.
+  Each half was reverted separately and the test confirmed to fail both
+  ways.
+
+  **Cost.** Per layer paint, this adds one list of the layer's shapes and
+  one integer comparison each; the ancestor walk is paid only for shapes
+  that did not paint. The real new cost is that a scroll now repaints the
+  layer at all, which means a clip-chain walk and a **matte re-bake per
+  scroll frame** — unavoidable, since the shapes really did move and the
+  matte is what says where they are. `GlassScene.uniformTranslationSince`
+  exists for exactly this case ("the matte can be reused with shifted bounds
+  rather than re-rendered — the common case for a glass layer scrolling past
+  content") and **no producer calls it**; it is dead outside its own unit
+  tests. Wiring it up is the obvious follow-up and would make a scroll frame
+  cheaper than it was even before this fix. Second-order: a row that painted
+  and has since scrolled into the cache region now registers its real
+  off-screen position, so the matte's bounds grow by up to the cache extent
+  (250 logical pixels) at each end of a scrolling list. Clamping a pass's
+  matte to what the layer can actually show would recover that, and belongs
+  with the per-pass clipping `_pushBackdropPasses` already flags.
 
 - ~~**The `FittedBox` bug has two exception shapes, and the guards only know**~~ 
 
