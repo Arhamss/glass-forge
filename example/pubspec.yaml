@@ -25,6 +25,15 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  # Pin Swift Package Manager for this project, whatever the machine's
+  # global `flutter config` says. Without this the iOS build falls back to
+  # CocoaPods on any machine that has opted out globally, which rewrites the
+  # two tracked xcconfigs under ios/Flutter/ on every `pub get` and leaves
+  # them dirty. Project level beats global: `FlutterFeaturesConfig.isEnabled`
+  # resolves `_isEnabledAtProjectLevel(...) ?? _isEnabledByGlobalConfig(...)`.
+  config:
+    enable-swift-package-manager: true
+
   assets:
     - assets/images/
     - assets/licenses/
