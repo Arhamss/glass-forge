@@ -194,11 +194,30 @@ and C3, see above.
 
   It reads as a stale backdrop region, which makes flutter#187820 — stacked
   backdrop filters sampling the previous frame's backdrop, already recorded
-  below — the obvious suspect. **It is not confirmed as that**, and the
-  first-but-never-second pattern is a detail that issue does not obviously
-  predict, so it is recorded as an observation rather than filed under the
-  known one. Whoever picks it up should establish which it is before fixing
-  anything.
+  below — the obvious suspect. **It is not confirmed as that.** Evidence both
+  ways, gathered during Task 12's review and checked at source here:
+
+  *For.* **The precondition is present, and the README's own rule does not
+  prevent it.** `_pushBackdropPasses` (`lib/src/rendering/render_glass_layer.dart:932-946`)
+  pushes one `BackdropFilterLayer` **per material pass**, as siblings over the
+  whole layer rect. An entry page has at least two materials — the specimen
+  and its `GlassSurface.control` — so two backdrop filters really are stacked
+  over the same region *even though no two shapes overlap*. The README's rule
+  about overlap governs **shapes**, not **passes**. Worth stating plainly,
+  because the invariant everyone has been reasoning from does not cover this.
+
+  *Against.* The smear is hard-edged, static, and present from the first
+  frame. flutter#187820 is a progressive white wash that builds over
+  successive frames.
+
+  *The pattern is positional, not control-type.* The obvious benign
+  explanation was falsified: `GlassDetentSheet`'s first knob is a `double`
+  slider while `GlassMaterial`'s and `GlassTierEngine`'s are segmented
+  controls, and the smear lands on the first either way. That points instead
+  at `_clipChain.collect(firstShape, this)`
+  (`render_glass_layer.dart:737-741`), where the **entire pass's retained clip
+  chain is collected from `scene.firstShapeOwner` alone**. Look there before
+  filing this under #187820.
 
 - **`_events`'s `handleError` cannot catch what it documents, and its doc
   comment says the opposite.** `lib/src/platform/glass_forge_method_channel.dart:102`
@@ -384,6 +403,15 @@ and C3, see above.
   ancestor that has not been laid out**, whatever put it there — a stretch
   overscroll `Transform`, a `FittedBox`, or a plain `Transform` a consumer
   wrote. Fixing only the overscroll case would leave the other two.
+
+  **How often it actually fires, measured.** Not once on first launch, which
+  is what a casual look suggests. It fires on the **first layout of each
+  row**, and the catalogue index is a lazy `SliverList`, so ordinary scrolling
+  re-triggers it indefinitely. Counting the framework's exception tally in a
+  widget test at 393x852: **17** after the first frame, **81** after flinging
+  down, **144** after flinging back up, **160** after unmount and remount. The
+  thumbnails self-correct visually, which is why it reads as a first-launch
+  glitch and why it went unnoticed this long.
 
   **Third symptom, and the one that raises the priority.** The `FittedBox`
   also imposes unbounded width on whatever it holds. A catalogue entry whose
