@@ -73,34 +73,23 @@ class CatalogueIndexPage extends StatelessWidget {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    // A local override, not a reliance on `main.dart`'s
-                    // app-wide one — see `CatalogueEntryPage`'s own doc
-                    // comment for why a `CustomScrollView` with glass
-                    // inside it (every row's `InteractiveGlass` thumbnail,
-                    // once Tasks 5-10 populate the groups) needs this
-                    // regardless of what any ancestor `MaterialApp` set.
-                    child: ScrollConfiguration(
-                      behavior: ScrollConfiguration.of(
-                        context,
-                      ).copyWith(overscroll: false),
-                      child: CustomScrollView(
-                        slivers: [
-                          SliverPadding(
-                            padding: EdgeInsets.only(top: barHeight),
-                          ),
-                          for (final group in catalogueGroups) ...[
-                            SliverToBoxAdapter(child: _GroupHeader(group)),
-                            SliverList(
-                              delegate: SliverChildListDelegate(
-                                _rowsFor(entriesIn(group)),
-                              ),
+                    child: CustomScrollView(
+                      slivers: [
+                        SliverPadding(
+                          padding: EdgeInsets.only(top: barHeight),
+                        ),
+                        for (final group in catalogueGroups) ...[
+                          SliverToBoxAdapter(child: _GroupHeader(group)),
+                          SliverList(
+                            delegate: SliverChildListDelegate(
+                              _rowsFor(entriesIn(group)),
                             ),
-                          ],
-                          const SliverPadding(
-                            padding: EdgeInsets.only(bottom: 24),
                           ),
                         ],
-                      ),
+                        const SliverPadding(
+                          padding: EdgeInsets.only(bottom: 24),
+                        ),
+                      ],
                     ),
                   ),
                   Positioned(

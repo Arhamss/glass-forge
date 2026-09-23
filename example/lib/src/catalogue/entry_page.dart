@@ -135,18 +135,6 @@ Animation<double> outgoingCataloguePresence(Animation<double> covered) {
 /// pushing route supplies above it (see [catalogueEntryRoute]); this page
 /// never sets one up for itself; there is none to read when it is built
 /// directly, as in a test, which is the correct default — full presence.
-///
-/// Its `CustomScrollView` carries a local [ScrollConfiguration] turning
-/// the overscroll indicator off. That indicator wraps scrollable content
-/// in a `Transform` for its stretch effect — the shader path needs
-/// Impeller, unavailable in this widget-test environment, so it falls back
-/// to a plain one — and that `Transform` is not yet laid out on the frame
-/// a `Glass` inside the sliver first registers its geometry:
-/// `RenderGlassShape._syncGeometry` walks straight through it via
-/// `getTransformTo` and throws. A page-local override rather than relying
-/// on `main.dart`'s app-wide one, because this page is built directly in
-/// tests under a plain `MaterialApp` that never gets `main.dart`'s
-/// `scrollBehavior` — the fix has to travel with the page, not the app.
 class CatalogueEntryPage extends StatefulWidget {
   /// Creates the detail page for [entry].
   const CatalogueEntryPage({required this.entry, super.key});
@@ -213,40 +201,30 @@ class CatalogueEntryPageState extends State<CatalogueEntryPage> {
             child: Stack(
               children: [
                 Positioned.fill(
-                  // A local override, not a reliance on `main.dart`'s
-                  // app-wide one — see the doc comment on
-                  // `CatalogueEntryPage` for why a `CustomScrollView` with
-                  // glass inside it needs this regardless of what any
-                  // ancestor's `MaterialApp` set.
-                  child: ScrollConfiguration(
-                    behavior: ScrollConfiguration.of(
-                      context,
-                    ).copyWith(overscroll: false),
-                    child: CustomScrollView(
-                      slivers: [
-                        SliverPadding(
-                          padding: EdgeInsets.only(top: barHeight),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: EdgeInsets.only(top: barHeight),
+                      ),
+                      SliverToBoxAdapter(child: _Specimen(entry: _entry)),
+                      SliverToBoxAdapter(child: _Header(entry: _entry)),
+                      SliverToBoxAdapter(
+                        child: _KnobRow(
+                          entry: _entry,
+                          onKnobChanged: setKnob,
                         ),
-                        SliverToBoxAdapter(child: _Specimen(entry: _entry)),
-                        SliverToBoxAdapter(child: _Header(entry: _entry)),
-                        SliverToBoxAdapter(
-                          child: _KnobRow(
-                            entry: _entry,
-                            onKnobChanged: setKnob,
-                          ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                        sliver: SliverToBoxAdapter(
+                          child: SnippetView(entry: _entry),
                         ),
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                          sliver: SliverToBoxAdapter(
-                            child: SnippetView(entry: _entry),
-                          ),
-                        ),
-                        SliverToBoxAdapter(child: _SeeAlso(entry: _entry)),
-                        const SliverPadding(
-                          padding: EdgeInsets.only(bottom: 24),
-                        ),
-                      ],
-                    ),
+                      ),
+                      SliverToBoxAdapter(child: _SeeAlso(entry: _entry)),
+                      const SliverPadding(
+                        padding: EdgeInsets.only(bottom: 24),
+                      ),
+                    ],
                   ),
                 ),
                 Positioned(
