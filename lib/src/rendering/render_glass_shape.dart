@@ -29,25 +29,21 @@ class RenderGlassShape extends RenderProxyBox {
   RenderGlassLayer? _layer;
 
   /// The transform-to-layer [_syncGeometryIfTransformChanged] last observed
-  /// at paint time.
+  /// at paint time, and the only transform this shape has ever really read.
   ///
-  /// Deliberately not the same value [performLayout]'s own [_syncGeometry]
-  /// registers: layout can call it mid-layout, before an ancestor like
-  /// `Padding`, `Align` or `Positioned` has assigned this frame's offset for
-  /// its child (most of them assign it only *after* laying that child out,
-  /// i.e. after this shape's own `performLayout` already ran), so comparing
-  /// straight against that value here would treat routine settling as a
-  /// real move. [_justSyncedFromLayout] is what tells paint to adopt
-  /// whatever layout registered as this baseline, once, without re-deriving
-  /// or re-registering it.
+  /// Paint is the one phase where [getTransformTo] both *may* be called and
+  /// *answers correctly* — see [_syncGeometry] for why layout is neither —
+  /// so this doubles as the baseline a later paint compares against and as
+  /// the placeholder [_syncGeometry] re-registers while it waits for one.
   Matrix4? _lastSyncedTransform;
 
-  /// Whether [performLayout] registered this shape's geometry since the
+  /// Whether [_syncGeometry] registered a placeholder transform since the
   /// last paint.
   ///
-  /// True for exactly one paint after every `performLayout` — the one where
-  /// [_syncGeometryIfTransformChanged] should trust that registration as-is
-  /// (see [_lastSyncedTransform]) rather than compare against it.
+  /// True for exactly one paint after every [_syncGeometry] — the one where
+  /// [_syncGeometryIfTransformChanged] must register whatever it reads even
+  /// if that equals [_lastSyncedTransform], because what the layer is
+  /// holding right now is the placeholder, not that baseline.
   bool _justSyncedFromLayout = false;
 
   /// Whether a post-frame callback to repaint [_layer] is already queued.
@@ -225,15 +221,82 @@ class RenderGlassShape extends RenderProxyBox {
     return null;
   }
 
+  /// Tells the layer this shape exists, with what it will render as — and
+  /// deliberately **without** reading where it is.
+  ///
+  /// Everything here that the layer acts on before it paints is settled by
+  /// now: which shapes exist, each one's material, each one's blend group,
+  /// and what drives its presence. `RenderGlassLayer.paint` decides which
+  /// passes to push from exactly those, before a single child paints, which
+  /// is why this has to run from [performLayout], [attach] and the setters
+  /// rather than wait for paint. A shape that only announced itself at
+  /// paint time would be a frame late into its own pass.
+  ///
+  /// Where it is, though, is not knowable here. Every caller of this can run
+  /// inside a layout pass — [performLayout] by definition, [attach] and the
+  /// setters whenever a lazy sliver builds its children from inside its own
+  /// `performLayout` — and `getTransformTo` walks this shape's ancestors
+  /// calling `applyPaintTransform` on each, which mid-layout is both illegal
+  /// and wrong:
+  ///
+  ///  * **Illegal.** `RenderBox.size` asserts `hasSize` against an ancestor
+  ///    that has not been laid out yet — a `Transform` (Material's stretch
+  ///    overscroll indicator is one), a `FittedBox` — and asserts
+  ///    `sizeAccessAllowed` against one that *has* a size but is not in its
+  ///    own layout scope, which is every ancestor above a relayout boundary
+  ///    during a scroll. `RenderSliverMultiBoxAdaptor` meanwhile reads the
+  ///    child's `layoutOffset`, which it assigns only *after* laying that
+  ///    child out, and null-checks it. Three exception shapes, one cause.
+  ///  * **Wrong.** Even where it does not throw it answers with the previous
+  ///    frame's offsets: `Padding`, `Align`, `Positioned` and `Column` all
+  ///    assign a child's offset after laying that child out, so a walk from
+  ///    inside this shape's own `performLayout` cannot see this frame's.
+  ///
+  /// So the transform is read in exactly one place — [paint], the only phase
+  /// where the walk is both permitted and correct. What goes in here is a
+  /// placeholder: the last transform paint read, or [_nowhereYet] for a
+  /// shape that has never painted. [_justSyncedFromLayout] then makes the
+  /// next paint register what it reads unconditionally, even if it matches
+  /// [_lastSyncedTransform], because the layer is holding the placeholder.
+  ///
+  /// In the ordinary case no placeholder is ever rendered from.
+  /// `RenderObject.layout` ends with `markNeedsPaint`, so a shape that laid
+  /// out paints in the same frame; the layer bakes its mattes only *after*
+  /// its subtree paints (see `RenderGlassLayer._pushBackdropPasses`); and
+  /// nothing between those two points reads a shape's transform. Where a
+  /// repaint boundary means the layer itself does not paint, it bakes
+  /// nothing that frame either, and [_scheduleLayerRepaint] brings it along.
+  ///
+  /// The case that does render from one is a shape that lays out and then is
+  /// never painted — a lazy list's rows in the cache region, which are built
+  /// and laid out ahead of the viewport and skipped by
+  /// `RenderSliverMultiBoxAdaptor.paint`. Re-registering the last transform
+  /// is right for those: it is where the shape was when it last painted, and
+  /// holding still is what it does. A shape that has *never* painted has no
+  /// such answer and must not invent one — registering the identity puts it
+  /// at the layer's own origin, which is a phantom refraction in the corner
+  /// of the screen, seen in exactly this case while writing this fix. Hence
+  /// [_nowhereYet].
   void _syncGeometry() {
     final target = _layer;
     if (target == null || !hasSize || !attached) {
       return;
     }
-    _registerGeometry(target, getTransformTo(target));
+    _registerGeometry(target, _lastSyncedTransform ?? _nowhereYet);
     _justSyncedFromLayout = true;
     target.markNeedsPaint();
   }
+
+  /// The placeholder transform for a shape that has never painted.
+  ///
+  /// Deliberately singular: zero in the linear part, so `ShapeGeometry`
+  /// resolves an empty basis and the shader's coverage term collapses — the
+  /// shape registers, taking its place in the layer's pass assignment
+  /// alongside its material and blend group, and draws nothing until its
+  /// first paint says where it is. `Matrix4.zero` on its own will not do:
+  /// `MatrixUtils.transformPoint` divides by the w row, so a fully zero
+  /// matrix resolves an origin of NaN rather than of nothing.
+  static final Matrix4 _nowhereYet = Matrix4.zero()..setEntry(3, 3, 1);
 
   void _registerGeometry(RenderGlassLayer target, Matrix4 transform) {
     target.registerShape(
@@ -271,26 +334,23 @@ class RenderGlassShape extends RenderProxyBox {
   /// comparing [getTransformTo] against [_lastSyncedTransform] here is what
   /// actually catches it.
   ///
-  /// Always registers the freshly-read transform here, never the stale one
-  /// [performLayout] saw — `getTransformTo` read from *inside* a shape's own
-  /// `performLayout` can be missing an ancestor's contribution entirely: for
-  /// a `Positioned` child, `RenderStack.performLayout` lays the child out
-  /// *before* assigning `childParentData.offset` for this pass, so the
-  /// shape's own `performLayout` runs while that offset still holds its
-  /// previous value (`Offset.zero` on the very first layout). Silently
-  /// keeping that stale value as authoritative — which an earlier version of
-  /// this method did, treating the first post-layout paint as "just a
-  /// baseline" — left a shape's registered geometry permanently wrong
-  /// whenever nothing moved it a second time to trigger a correction.
+  /// This is also the *only* place the transform is read at all: [paint] is
+  /// the one phase where walking ancestors is both permitted and correct,
+  /// for the reasons set out on [_syncGeometry]. So a paint that follows a
+  /// [_syncGeometry] has to register what it reads even when that equals
+  /// [_lastSyncedTransform], because what the layer holds at that moment is
+  /// the placeholder that call left, not this baseline —
+  /// [_justSyncedFromLayout] is what says so. Silently keeping a stale value
+  /// as authoritative — which an earlier version of this method did,
+  /// treating the first post-layout paint as "just a baseline" — left a
+  /// shape's registered geometry permanently wrong whenever nothing moved it
+  /// a second time to trigger a correction.
   ///
-  /// [_justSyncedFromLayout] still matters, but only for whether this
-  /// schedules an extra repaint (see [_scheduleLayerRepaint]'s doc), not for
-  /// whether it registers: forcing an extra frame unconditionally on every
-  /// first post-layout paint is what broke a retained-clip-chain test that
-  /// pumps exactly once and reads pixels straight off it. Registering the
-  /// correct geometry costs nothing extra there — `_refreshMatte` was always
-  /// going to read whatever the scene holds by the time it next runs, this
-  /// just makes sure that is the right value instead of the wrong one.
+  /// [_justSyncedFromLayout] does not, however, force an extra repaint:
+  /// forcing an extra frame unconditionally on every first post-layout paint
+  /// is what broke a retained-clip-chain test that pumps exactly once and
+  /// reads pixels straight off it. It does not need to — [_syncGeometry]
+  /// marked the layer for paint itself, so the layer is already coming.
   ///
   /// `RenderObject.markNeedsPaint` asserts it is never called while the
   /// pipeline owner is already painting, which is exactly the phase this
@@ -313,10 +373,10 @@ class RenderGlassShape extends RenderProxyBox {
       return;
     }
     final transform = getTransformTo(target);
-    final needsExtraRepaint =
-        !_justSyncedFromLayout && !target.isPaintingSubtree;
+    final wasPlaceholder = _justSyncedFromLayout;
+    final needsExtraRepaint = !wasPlaceholder && !target.isPaintingSubtree;
     _justSyncedFromLayout = false;
-    if (_lastSyncedTransform == transform) {
+    if (_lastSyncedTransform == transform && !wasPlaceholder) {
       return;
     }
     _lastSyncedTransform = transform;
