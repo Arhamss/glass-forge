@@ -197,6 +197,22 @@ and C3, see above.
 
 ## Known problems, struck through as they are fixed
 
+- **A `Glass` in a scrolled lazy list keeps stale geometry.** Found while
+  fixing the paint-time transform walk (`62bb1d6`), and **not caused by it** —
+  the same probe gives the same numbers with that fix reverted. The
+  exceptions it removed were hiding this.
+
+  `ListView` wraps each row in a `RepaintBoundary`, and scrolling re-lays out
+  nothing, so a scrolled row neither paints nor lays out. It therefore never
+  re-registers its transform. Measured after a fling: rows that should sit at
+  y = 2.6, 102.6 and 202.6 register at **467.5, 518.8 and 567.5** — the
+  positions they held when they were last painted.
+
+  What a user sees is refraction sampling the wrong part of the backdrop for
+  any glass row that has been scrolled without repainting. It wants its own
+  task; the fix is presumably to re-register on scroll, or to make the layer
+  re-read transforms it has not seen painted this frame.
+
 - **The `FittedBox` bug has two exception shapes, and the guards only know
   one.** Instrumenting the index test caught **14** errors: **9** are
   `_AssertionError … 'hasSize'` with no sliver frame, and **5** are
