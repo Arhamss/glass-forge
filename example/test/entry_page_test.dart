@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_example/src/catalogue/catalogue_entry.dart';
 import 'package:glass_forge_example/src/catalogue/entry_page.dart';
+import 'package:glass_forge_example/src/catalogue/index_page.dart';
 
 void main() {
   final entry = CatalogueEntry(
@@ -62,10 +63,9 @@ void main() {
   group('the handoff, as pure curves', () {
     // These drive `incomingCataloguePresence`/`outgoingCataloguePresence`
     // with a bare `AnimationController`, which pins the *shape* of the two
-    // ramps cheaply -- but proves nothing about whether `catalogueEntryRoute`
-    // (and, so far as a real index can be pumped without tripping a
-    // separate bug -- see `_CoveredStandIn` below -- `CatalogueIndexPage`)
-    // actually wire the right animation into each function. A mutation
+    // ramps cheaply -- but proves nothing about whether
+    // `catalogueEntryRoute` and `CatalogueIndexPage` actually wire the
+    // right animation into each function. A mutation
     // that swaps `animation` for `secondaryAnimation` at either wiring
     // point leaves every test in this group green while breaking the
     // on-screen handoff outright, which is what the widget test below
@@ -148,29 +148,49 @@ void main() {
       // actually mounted in the tree, rather than recomputing anything
       // itself.
       //
-      // The outgoing side is `_CoveredStandIn` below, not the real
-      // `CatalogueIndexPage` -- see its doc comment for why, and for what
-      // that trade-off costs this test.
+      // The outgoing side is the real `CatalogueIndexPage`, so a mutation
+      // inside its own copy of the `ModalRoute.secondaryAnimation` line is
+      // caught here too. It used to be a stand-in, because the real page
+      // tripped `RenderGlassShape`'s layout-time transform walk; that walk
+      // reads at paint now.
       await tester.pumpWidget(
-        const MaterialApp(home: _CoveredStandIn()),
+        const MaterialApp(home: CatalogueIndexPage()),
       );
       await tester.pumpAndSettle();
 
-      // `_CoveredStandIn` wraps its own content in `GlassPresence` (a
-      // descendant), but `catalogueEntryRoute` wraps `CatalogueEntryPage`
-      // *in* a `GlassPresence` from its `transitionsBuilder` -- an
-      // ancestor, not a descendant -- so the two sides need opposite
-      // `find` directions.
+      // The page really rendered, rather than merely failing to throw.
+      // Both catalogue pages once drew as a bare photograph with a single
+      // 44x44 square of glass on it while every test in this repo stayed
+      // green, because no test asserted anything was on the index.
+      // The title, the first group's header as it is actually drawn
+      // (`_GroupHeader` upper-cases it), and two API names off the rows
+      // under it. Both are real `glass_forge` symbols, spelled out here
+      // rather than read back out of `entriesIn('Surfaces')`, which would
+      // agree with the page however wrong the page was.
+      expect(find.text('Catalogue'), findsOneWidget);
+      expect(find.text('SURFACES'), findsOneWidget);
+      expect(find.text('Glass'), findsOneWidget);
+      expect(find.text('GlassLayer'), findsOneWidget);
+
+      // `CatalogueIndexPage` wraps its scroll view in `GlassPresence` (an
+      // ancestor of that scroll view and nothing else), while
+      // `catalogueEntryRoute` wraps `CatalogueEntryPage` in one from its
+      // `transitionsBuilder`. Naming the index's scroll view rather than
+      // the page keeps this off the `GlassPresence`es that some row
+      // thumbnails are themselves specimens of.
       //
-      // `skipOffstage: false` on both: once the push fully settles, the
-      // opaque incoming route wraps everything below it (`_CoveredStandIn`)
-      // in an `Offstage`, and every `find.byType`/`find.descendant` skips
-      // offstage widgets by default -- which would otherwise make the very
-      // check for "settled at 0" unable to find the thing it is checking.
-      final outgoingFinder = find.descendant(
-        of: find.byType(_CoveredStandIn, skipOffstage: false),
+      // `skipOffstage: false` throughout: once the push fully settles, the
+      // opaque incoming route wraps everything below it in an `Offstage`,
+      // and every `find.byType`/`find.descendant` skips offstage widgets by
+      // default -- which would otherwise make the very check for "settled
+      // at 0" unable to find the thing it is checking.
+      final outgoingFinder = find.ancestor(
+        of: find.descendant(
+          of: find.byType(CatalogueIndexPage, skipOffstage: false),
+          matching: find.byType(CustomScrollView, skipOffstage: false),
+          skipOffstage: false,
+        ),
         matching: find.byType(GlassPresence, skipOffstage: false),
-        skipOffstage: false,
       );
       final incomingFinder = find.ancestor(
         of: find.byType(CatalogueEntryPage, skipOffstage: false),
@@ -228,43 +248,4 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
-}
-
-/// A minimal stand-in for the covered ("outgoing") side of the handoff.
-///
-/// Not `CatalogueIndexPage` itself, and deliberately: a real, populated
-/// index (Tasks 5-10, landing concurrently with this fix) trips a
-/// separate, pre-existing bug the moment it is pumped -- `_EntryRow`'s
-/// `FittedBox`, present since Task 3, has not been laid out yet on the
-/// frame a fresh `Glass` specimen beneath it first registers its
-/// geometry, and `RenderGlassShape._syncGeometry`'s `getTransformTo` walk
-/// throws reading its size. Reproduced directly (a throwaway `pumpWidget
-/// (CatalogueIndexPage())` in a scratch test) and it is genuinely
-/// unstable from one run to the next -- one exception that self-corrects,
-/// or several across many frames, depending on how many rows a given run
-/// happens to have. That is `_EntryRow`'s bug to fix, not this test's,
-/// and not stable enough to build an assertion on top of.
-///
-/// This carries only the one line under test -- reading
-/// `ModalRoute.secondaryAnimation` and feeding it to
-/// `outgoingCataloguePresence` -- with no rows, no real entries, nothing
-/// that can trip the `FittedBox` issue. The trade-off: this test cannot
-/// catch a mutation made directly inside `CatalogueIndexPage.build`'s own
-/// copy of that line, only inside `outgoingCataloguePresence` and
-/// `catalogueEntryRoute` itself. Worth pointing this test at the real
-/// page once `_EntryRow` is fixed.
-class _CoveredStandIn extends StatelessWidget {
-  const _CoveredStandIn();
-
-  @override
-  Widget build(BuildContext context) {
-    final covering = ModalRoute.of(context);
-    final covered = covering?.secondaryAnimation ?? kAlwaysDismissedAnimation;
-    return GlassLayer(
-      child: GlassPresence(
-        presence: outgoingCataloguePresence(covered),
-        child: const ColoredBox(color: Color(0xFF07080A)),
-      ),
-    );
-  }
 }
