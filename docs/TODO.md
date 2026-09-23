@@ -359,46 +359,48 @@ and C3, see above.
   bug and is no longer needed for it, though it is harmless and the mirror
   may want it for other reasons.
 
-- **A `sizeAccessAllowed` assertion fires when one catalogue entry page
-  replaces another in place — culprit unidentified.** Recorded because it
-  reproduces, not because it is understood. Latent, not live: no route in the
-  example replaces an entry page without a key, and it has only ever been
-  seen under `flutter test`, never on a device.
+- **~~A `sizeAccessAllowed` assertion fires when one catalogue entry page
+  replaces another in place~~ — cause found and fixed 2026-09-23.** The
+  culprit was `InteractiveGlass`: its `build` wrapped the child in a
+  `GestureDetector` only when `drag.enabled || onTap != null`, so its
+  subtree had a different *number of elements* depending on its own
+  parameters. Replacing one Motion entry page with another in the same
+  slot, unkeyed, left Flutter updating an element against a widget of a
+  different type. Its own entry above has the fix — the `GestureDetector`
+  is now unconditional — and the reasoning for why that costs nothing.
 
-  Verbatim:
+  The entry's warning about the message was right and worth keeping:
+  `RenderGlassMotion` is the *victim*, the box whose `size` was read, and
+  the trailing `.performLayout` is template text from `box.dart:2274`.
+  Nobody should chase `RenderGlassMotion` itself over this message.
 
-  ```
-  'package:flutter/src/rendering/box.dart': Failed assertion: line 2268
-  pos 11: 'sizeAccessAllowed': RenderBox.size accessed beyond the scope of
-  resize, layout, or permitted parent access. ... If you hit this assert
-  trying to access a child's size, pass "parentUsesSize: true" to that
-  child's layout() in RenderGlassMotion.performLayout.
-  ```
+  **How it was confirmed**, since the recorded reproduction did more than
+  the entry realised. A throwaway test pumped
+  `MaterialApp(home: GlassLayer(child: CatalogueEntryPage(entry: entry)))`
+  for every entry with a knob, unkeyed, `pumpAndSettle()` between, and —
+  unlike the original — cleared and re-read `FlutterError.onError` after
+  *each* pump instead of stopping at the first, so one error could not hide
+  the rest. Run in a throwaway `git worktree` pinned to a commit, because
+  the main checkout had another agent's uncommitted work in
+  `lib/src/rendering/render_glass_shape.dart` and that silently made an
+  earlier attempt read clean on both sides.
 
-  **`RenderGlassMotion` is the victim, not the culprit, and the trailing
-  `.performLayout` is template text.** `box.dart:2274` builds that sentence
-  with `objectRuntimeType(this, 'RenderBox')`, where `this` is the box whose
-  `size` getter was *read*. So the message names `RenderGlassMotion` because
-  `RenderGlassMotion.size` was accessed, and then phrases the remedy as
-  though the reader were the victim's parent. `RenderGlassMotion` has no
-  `performLayout` override at all — it is a `RenderProxyBox`, and
-  `RenderProxyBoxMixin.performLayout` already passes `parentUsesSize: true`.
-  Anyone chasing this must ignore the class name in the message and find what
-  `RenderObject.debugActiveLayout` actually was.
+  At `472dc44^`, five transitions reported something: **four**
+  `sizeAccessAllowed`, all inside the Motion group — `InteractiveGlass →
+  GlassJiggle`, `GlassJiggle → GlassPressStretch`, `GlassPressStretch →
+  GlassOverdrag`, and the `GlassMotion → GlassReduceMotion` one this entry
+  named. At `472dc44` all four are gone. So this was never one transition;
+  it was every adjacent pair of Motion entries whose `InteractiveGlass`
+  drag configuration differed.
 
-  **Reproduction.** A throwaway widget test looping every catalogue entry
-  that has an option knob, pumping `MaterialApp(home: GlassLayer(child:
-  CatalogueEntryPage(entry: entry)))` then `pumpAndSettle()`, **with no key**,
-  so elements are reused between pumps. It fires on the pump replacing the
-  `GlassMotion` page with the `GlassReduceMotion` one. Pumped alone,
-  `GlassReduceMotion` is clean; wrapping each page in a `KeyedSubtree` reaches
-  the same transition and is also clean. So it needs element reuse across
-  that specific transition.
-
-  **What is missing is the stack.** The only capture so far used
-  `tester.takeException()` and kept the message alone. To locate it, install
-  `FlutterError.onError` and read `details.stack` — which will name the object
-  actually laying out.
+  **One report at that repro survives, and it is a different bug.**
+  `Shapes | GlassBlendGroup → Motion | InteractiveGlass` still raises
+  `RenderGlassLayer#… and RenderGlassShape#… are not in the same render
+  tree`. Different message, different assertion, unrelated to tree shape —
+  recorded here so nobody reads the surviving failure as this one coming
+  back. It did not reproduce against the main checkout's working tree,
+  which suggests the `render_glass_shape.dart` work in flight on
+  2026-09-23 addresses it; worth re-checking once that lands.
 
 - **~~`GlassDetentSheet` notifies its controller from inside its own
   build~~ — fixed 2026-09-23.** The chain the entry recorded was exact:
