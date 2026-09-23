@@ -1559,6 +1559,98 @@ void main() {
     );
 
     testWidgets(
+      'every sheet snippet prints the geometry and backdrop its own '
+      'specimen is built with',
+      (tester) async {
+        // The four arguments that decide what the reader sees and that a
+        // sheet does not take from the frame: three insets and radii, and
+        // the measured colour that turns adaptation on. Each is read off
+        // the `GlassDetentSheet` the entry actually mounted, never off
+        // the constants the entry file declares — an expected value taken
+        // from the thing under test would agree with any snippet at all.
+        //
+        // Nothing here is worth printing unless it differs from what a
+        // caller gets for free, and `flushRadius` is the one that bites:
+        // its default is a display's radius on a 208-point frame.
+        final bare = GlassDetentSheet(
+          detents: const <GlassDetent>[
+            GlassDetent.fraction(0.5),
+            GlassDetent.fraction(1),
+          ],
+          child: const SizedBox.shrink(),
+        );
+
+        for (final api in const <String>[
+          'GlassDetentSheet',
+          'GlassDetentSheetController',
+          'GlassSheetScrollPhysics',
+        ]) {
+          final entry = entryNamed(api);
+          await mountSheet(tester, entry);
+          final sheet = tester.widget<GlassDetentSheet>(
+            find.byType(GlassDetentSheet),
+          );
+          final snippet = renderSnippet(entry);
+
+          expect(
+            <Object?>[
+              sheet.gap,
+              sheet.floatingRadius,
+              sheet.flushRadius,
+              sheet.backdrop,
+            ],
+            isNot(<Object?>[
+              bare.gap,
+              bare.floatingRadius,
+              bare.flushRadius,
+              bare.backdrop,
+            ]),
+            reason:
+                '$api: sanity — a specimen at the package defaults would '
+                'make every assertion below true of a snippet that '
+                'printed nothing',
+          );
+
+          expect(
+            snippet,
+            contains('gap: ${sheet.gap}'),
+            reason: '$api drops the side inset its specimen is drawn at',
+          );
+          expect(
+            snippet,
+            contains('floatingRadius: ${sheet.floatingRadius}'),
+            reason: '$api drops the floating radius',
+          );
+          expect(
+            snippet,
+            contains('flushRadius: ${sheet.flushRadius}'),
+            reason:
+                '$api drops flushRadius, whose default is '
+                '${bare.flushRadius} — a reader pasting this into the '
+                'frame _frameNote describes gets corners rounded nearly '
+                'to circles',
+          );
+          final backdrop = sheet.backdrop;
+          expect(backdrop, isNotNull, reason: '$api: sanity');
+          final hex = backdrop!
+              .toARGB32()
+              .toRadixString(16)
+              .toUpperCase()
+              .padLeft(8, '0');
+          expect(
+            snippet,
+            contains('backdrop: const Color(0x$hex)'),
+            reason:
+                '$api drops backdrop — the argument BackdropInfo and the '
+                'README both call the thing that turns adaptation on, and '
+                'the one every Design system and Adaptation snippet '
+                'prints',
+          );
+        }
+      },
+    );
+
+    testWidgets(
       'GlassDetent — moving available rescales the fraction, clamps the '
       'fixed height and leaves the content one where it was',
       (tester) async {

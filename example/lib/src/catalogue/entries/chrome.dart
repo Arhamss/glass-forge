@@ -118,6 +118,28 @@ class _Frame extends StatelessWidget {
   }
 }
 
+/// A colour as the Dart literal a snippet would quote.
+///
+/// Derived from the value rather than typed beside it, exactly as the
+/// Adaptation and Design system groups derive theirs: every colour in this
+/// file comes out of [backdrops], and a hand-written hex is one edit away
+/// from describing a photograph nobody is looking at.
+String _hex(Color color) =>
+    '0x${color.toARGB32().toRadixString(16).toUpperCase().padLeft(8, '0')}';
+
+/// What `GlassDetentSheet.flushRadius` is when a caller leaves it alone.
+///
+/// Read off a sheet rather than typed as 55: [_frameNote] tells the reader
+/// there is a default and what it is for, and a number typed into that
+/// sentence would go on saying 55 after the package moved.
+final double _packageFlushRadius = GlassDetentSheet(
+  detents: const <GlassDetent>[
+    GlassDetent.fraction(0.5),
+    GlassDetent.fraction(1),
+  ],
+  child: const SizedBox.shrink(),
+).flushRadius;
+
 /// The line every snippet built around a [_Frame] opens with.
 ///
 /// The frame is the one thing on these three pages that is not the reader's
@@ -125,13 +147,22 @@ class _Frame extends StatelessWidget {
 /// fraction here is a fraction of [_frameHeight], and a gap here is a gap
 /// in a box that size. Left in a doc comment, a reader would copy the
 /// arithmetic and apply it to a screen it was never done against.
+///
+/// The corner radii are the sharper half of the same problem. Every sheet
+/// below states its own [_flushRadius] because the package's default is a
+/// display's radius and this frame is not a display — so the note says the
+/// default is there and what it is for, rather than leaving a reader to
+/// wonder why the snippet names a number their own sheet would not need.
 final String _frameNote =
     '// This specimen stands in a ${_frameHeight.toStringAsFixed(0)}-point '
     'tall frame with the\n'
-    '// window insets already off it, so every fraction and gap below\n'
-    '// is sized to that rather than to a screen. A real sheet\n'
-    '// resolves its detents against the height it is given, less\n'
-    '// MediaQuery.paddingOf(context).top.\n';
+    '// window insets already off it, so every fraction, gap and\n'
+    '// radius below is sized to that rather than to a screen. A\n'
+    '// real sheet resolves its detents against the height it is\n'
+    '// given, less MediaQuery.paddingOf(context).top, and leaves\n'
+    '// flushRadius at its default '
+    '${_packageFlushRadius.toStringAsFixed(0)} — the corner radius of\n'
+    '// a modern display, which this frame is not.\n';
 
 // ---------------------------------------------------------------------------
 // What the sheets carry
@@ -496,7 +527,11 @@ final CatalogueEntry _glassDetentSheet = CatalogueEntry(
         '        GlassDetent.fraction(1),\n'
         '      ],\n'
         '      controller: controller,\n'
+        '      gap: $_sideGap,\n'
         '      bottomGap: $_bottomGap,\n'
+        '      floatingRadius: $_floatingRadius,\n'
+        '      flushRadius: $_flushRadius,\n'
+        '      backdrop: const Color(${_hex(_backdrop.panelBackdrop)}),\n'
         "      semanticLabel: 'Nearby places',\n"
         '      child: ListView(children: places),\n'
         '    ),\n'
@@ -777,6 +812,10 @@ final CatalogueEntry _glassDetentSheetController = CatalogueEntry(
         '  // its own LayoutBuilder, so animateToDetent before that\n'
         '  // first frame is a documented no-op.\n'
         '  initialDetent: $index,\n'
+        '  gap: $_sideGap,\n'
+        '  floatingRadius: $_floatingRadius,\n'
+        '  flushRadius: $_flushRadius,\n'
+        '  backdrop: const Color(${_hex(_backdrop.panelBackdrop)}),\n'
         "  semanticLabel: 'Nearby places',\n"
         '  child: ListView(children: places),\n'
         ');\n'
@@ -858,6 +897,10 @@ final CatalogueEntry _glassSheetScrollPhysics = CatalogueEntry(
         '    GlassDetent.fraction(0.45),\n'
         '    GlassDetent.fraction(1),\n'
         '  ],\n'
+        '  gap: $_sideGap,\n'
+        '  floatingRadius: $_floatingRadius,\n'
+        '  flushRadius: $_flushRadius,\n'
+        '  backdrop: const Color(${_hex(_backdrop.panelBackdrop)}),\n'
         "  semanticLabel: 'Nearby places',\n"
         '  // The sheet installs GlassSheetScrollPhysics on every\n'
         '  // scrollable inside it, through a ScrollConfiguration.\n'
