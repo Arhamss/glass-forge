@@ -814,6 +814,85 @@ void main() {
         );
       },
     );
+
+    testWidgets(
+      'GlassReduceMotion — the snippet describes the swap the knob '
+      'previews and never claims a platform reading',
+      (tester) async {
+        final entry = entryNamed('GlassReduceMotion');
+
+        // Any sentence the snippet could write *about the value*, in the
+        // shapes one would be written in.
+        final claim = RegExp(
+          r'GlassReduceMotion\.instance\.value\s+'
+          r'(?:is|was|reads|returns)\s+(true|false)',
+        );
+
+        // The real signal, driven from the platform side — the only side
+        // that can drive it. `GlassReduceMotion.value` is
+        // `_readFromPlatform()`, so the knob is not an input to it and
+        // never was: the failing case this guards is the ordinary device,
+        // setting off, knob turned On.
+        for (final setting in const <bool>[false, true]) {
+          tester.platformDispatcher.accessibilityFeaturesTestValue =
+              FakeAccessibilityFeatures(reduceMotion: setting);
+          addTearDown(
+            tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+          );
+          expect(
+            GlassReduceMotion.instance.value,
+            setting,
+            reason: 'sanity: the platform side is what moves the value',
+          );
+
+          for (final position in const <String>['Off', 'On']) {
+            final snippet = renderSnippet(entry.withKnob(0, position));
+            for (final match in claim.allMatches(snippet)) {
+              expect(
+                match[1],
+                '$setting',
+                reason:
+                    'with the knob at $position and the real setting '
+                    '$setting, the snippet tells the reader the value is '
+                    '${match[1]} — a claim about a value this app reads '
+                    'and never writes, and here a false one',
+              );
+            }
+
+            // Not satisfiable by deleting the sentence: the entry exists
+            // to say where the value comes from, and the snippet is the
+            // only place on the detail page that can say it past
+            // `purpose`.
+            expect(
+              snippet,
+              contains('read off the'),
+              reason:
+                  'at $position, nothing says where the value comes '
+                  'from',
+            );
+            expect(snippet, contains('never written'));
+            expect(
+              snippet,
+              contains('previews'),
+              reason: 'at $position, nothing says the knob is a preview',
+            );
+          }
+        }
+
+        // And each position names its own side of the swap, so the
+        // sentence cannot collapse into one that describes neither.
+        expect(
+          renderSnippet(entry.withKnob(0, 'On')),
+          contains('a true reading resolves pressStretch to none.'),
+        );
+        expect(
+          renderSnippet(entry.withKnob(0, 'Off')),
+          contains(
+            'a false reading leaves the declared pressStretch alone.',
+          ),
+        );
+      },
+    );
   });
 
   group('compositionEntries', () {

@@ -380,12 +380,22 @@ final CatalogueEntry _glassReduceMotion = CatalogueEntry(
               '    squash: 0.4,\n'
               '    travel: 0.18,\n'
               '  )';
-    return '// GlassReduceMotion.instance.value is $reduced here — read\n'
-        '// off the platform, never written, so the knob above\n'
-        '// previews this swap rather than making it. jiggle is left\n'
-        '// alone on purpose: under the real setting every spring\n'
-        '// settles at once, so the velocity jiggle reads never\n'
-        '// leaves zero and the squash goes with it.\n'
+    // The comment says which side of the swap is printed below, never
+    // what the platform answered. `GlassReduceMotion.value` is
+    // `_readFromPlatform()`, and this app neither sets it nor is asked
+    // about it — a snippet claiming a reading would be claiming something
+    // it cannot know, and would be wrong outright on the ordinary device
+    // that has the setting off while the knob says On.
+    final reading = reduced
+        ? 'a true reading resolves pressStretch to none.'
+        : 'a false reading leaves the declared pressStretch alone.';
+    return '// GlassReduceMotion.instance.value is read off the\n'
+        '// platform, never written, so the knob above previews\n'
+        '// this swap rather than making it:\n'
+        '// $reading\n'
+        '// jiggle is left alone on purpose: under the real setting\n'
+        '// every spring settles at once, so the velocity jiggle\n'
+        '// reads never leaves zero and the squash goes with it.\n'
         'InteractiveGlass(\n'
         '  pressStretch: $pressStretch,\n'
         '  child: const Glass(\n'
