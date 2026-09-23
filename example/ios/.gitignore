@@ -27,6 +27,13 @@ Flutter/flutter_export_environment.sh
 ServiceDefinitions.json
 Runner/GeneratedPluginRegistrant.*
 
+# CocoaPods fallback artifacts. The example builds through Swift Package
+# Manager, the Flutter stable default. A machine that has opted out of SPM
+# globally falls back to CocoaPods, and the tool writes these two files on
+# its way through. Nothing in the repository reads them.
+Podfile
+Podfile.lock
+
 # Exceptions to above rules.
 !default.mode1v3
 !default.mode2v3

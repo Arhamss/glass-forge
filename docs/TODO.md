@@ -5,10 +5,10 @@ Resume file. Updated at the end of a working session; read it first.
 ## State
 
 Branch `main`, **not pushed** (`origin` is a local `.bundle`, and there is
-no GitHub repository yet). Six iOS files are dirty in the working tree and
-are deliberately uncommitted — see "The example cannot build for iOS" below;
-they are a workaround, not a preference, and what to do about them is
-Arham's call.
+no GitHub repository yet). The six dirty iOS files that used to sit here
+uncommitted are gone. The clean-checkout iOS build is fixed at source, so
+the CocoaPods integration that had been standing in for it was discarded
+rather than committed — see "The iOS build" under Verified.
 
 **Sub-project A (foundations) shipped**, and the example app has been rebuilt
 as a **catalogue of 33 named entries across 7 groups** — index → detail, each
@@ -49,9 +49,23 @@ re-run by a second agent, which got the same numbers:
   after `48aded3`. It was **already failing** on
   `test/src/composition/glow_gating_test.dart` before this session's last
   task touched anything — a `dart_style` splitting rule, not line length.
-- **The example does NOT build for iOS from a clean checkout.** See below.
-  A simulator run was only achieved with a throwaway shim. The old note that
-  it "runs on the iPhone 17e simulator and renders correctly" is withdrawn.
+- **The iOS build — fixed on 2026-09-23.** `cd example && flutter build ios
+  --simulator` and `flutter run -d <iPhone 17e>` both succeed from a clean
+  checkout, verified in a throwaway `git worktree` before the fix went on
+  `main` and again on `main` afterwards. The app launches and serves
+  DevTools. No shim, no manual step.
+
+  The cause was two stray `PBXFileReference` wrappers in the pbxproj's
+  Flutter group — `glass_forge` at `../../ios/glass_forge` and
+  `FlutterFramework` at `Flutter/ephemeral/Packages/.packages/`. Neither
+  carried a build role; they were navigator entries. Xcode still resolved
+  the first as a local Swift package, and its manifest asks for a sibling
+  `../FlutterFramework` that only exists next to the *symlinked* copy under
+  `Flutter/ephemeral/Packages/.packages/`, never next to the real source
+  directory. Deleting the four lines fixes it under both dependency
+  managers. **A consumer cloning the repo does nothing:** Swift Package
+  Manager is `enabledByDefault: true` on Flutter stable, so the default path
+  needs no CocoaPods at all and builds in about 18s.
 - The example's web build (CI's SkSL gate) — *not re-verified this session.*
   Carried over from the `a522eb4` checkout and possibly stale.
 
@@ -227,30 +241,42 @@ and C3, see above.
   with no semantic risk, but big enough to want its own commit — and worth
   confirming the number with Arham first, since the documented rule is 80.
 
-- **The example does not build for iOS from a clean checkout.** Found during
-  Task 12's simulator run, and verified at source afterwards — this is not
-  the 60-second cold-resolution timeout that looks similar.
+- **An iOS run still dirties four tracked files on this machine.** The build
+  itself is fixed; this is what is left of it, and it needs one decision
+  from Arham.
 
-  `example/ios/Runner.xcodeproj/project.pbxproj:58` holds a folder reference
-  with `path = ../../ios/glass_forge`. Xcode resolves that as a local Swift
-  package, and its manifest — `ios/glass_forge/Package.swift:15` — declares
-  `.package(name: "FlutterFramework", path: "../FlutterFramework")`. That
-  sibling directory only exists when Swift Package Manager generates it, and
-  `flutter config` has `enable-swift-package-manager: false`. So `xcodebuild`
-  fails resolving `<repo>/ios/FlutterFramework`, which does not and will not
-  exist.
+  `~/.config/flutter/settings` here carries
+  `"enable-swift-package-manager": false` — a global, per-user opt-out, set
+  at some point on this machine. Swift Package Manager is on by default on
+  Flutter stable, so every consumer takes the SPM path and generates
+  nothing. This machine takes the CocoaPods fallback instead, and `pod
+  install` writes the Pods include into `Flutter/Debug.xcconfig` and
+  `Flutter/Release.xcconfig`, a `Pods.xcodeproj` reference into
+  `Runner.xcworkspace`, and about 110 lines of Pods integration into the
+  pbxproj. `Podfile` and `Podfile.lock` are now gitignored, so they stay
+  quiet, but those four tracked files reappear as modified. Two of them —
+  the xcconfigs — come back on a bare `flutter pub get` in `example/`, not
+  just on a build, so `flutter analyze` there is enough to dirty the tree.
 
-  **This is why the example flipped to CocoaPods**, and it explains the
-  untracked `example/ios/Podfile` and modified xcconfigs that reappear after
-  every iOS run. Those files are not a stylistic question about whether to
-  track CocoaPods artifacts — they are the workaround keeping an otherwise
-  unbuildable iOS target alive.
+  Flutter itself says not to live this way. On an SPM-enabled build against
+  the CocoaPods-integrated project it prints: *"All plugins found for ios
+  are Swift Packages, but your project still has CocoaPods integration …
+  Removing CocoaPods integration will improve the project's build time."*
+  That is why the CocoaPods artifacts were discarded rather than committed
+  — committing them would force the CocoaPods gem on every consumer and
+  pin a `Podfile.lock` that fails the `[CP] Check Pods Manifest.lock` phase
+  on the next Flutter bump.
 
-  Task 12 got a simulator run only by creating a throwaway `ios/FlutterFramework`
-  shim and deleting it afterwards. **The clean-checkout build is still
-  broken.** Two coherent fixes: enable SPM and let it generate the sibling, or
-  drop the local-package folder reference from the pbxproj and let CocoaPods
-  own the plugin properly, tracking the `Podfile` that follows from it.
+  **The one-line fix, which needs Arham's nod because it is outside the
+  brief's allowed paths:** a `config: enable-swift-package-manager: true`
+  entry under `flutter:` in `example/pubspec.yaml`. Project-level config
+  outranks both the global setting and the `FLUTTER_SWIFT_PACKAGE_MANAGER`
+  environment variable, so it pins every machine to the same path the
+  default consumer already takes. Measured in a worktree: build drops from
+  ~45s to ~18s, no `pod install`, and the tree is clean after a run.
+  Alternatively, `flutter config --enable-swift-package-manager` on this
+  machine has the same effect without a repository change — but only here,
+  which is why the pubspec entry is the better of the two.
 
 - **A hard-edged grey smear on the first `GlassSurface.control` of an entry
   page.** Seen on the simulator across three different entries, roughly
