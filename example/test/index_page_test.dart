@@ -58,21 +58,16 @@ void main() {
       // the bundled fonts travel with it, and exactly one tap on screen
       // reaches it. Until this test, that tap was untested.
       //
-      // `_EntryRow`'s known first-frame geometry bug (docs/TODO.md) fires
-      // here, once per row that registers geometry before its `FittedBox`
-      // has been laid out. Every error is collected and matched against
-      // that one signature rather than swallowed by a `takeException()`,
-      // which would discard whichever of them it happened to return — and
-      // would pass just as happily on a real regression.
+      // Every error raised while the app boots and the tap lands is
+      // collected, rather than read back through a `takeException()` that
+      // would discard whichever of them it happened to return — and would
+      // pass just as happily on a real regression.
       //
-      // Matched on the stack rather than on the message, unlike
-      // `catalogue_test.dart`'s copy. The same `getTransformTo` walk
-      // raises two different exceptions depending on what it walks
-      // through: a `hasSize` assertion against a box that has not been
-      // laid out, and a null check inside
-      // `RenderSliverMultiBoxAdaptor.childMainAxisPosition` when the
-      // unlaid ancestor is one of the index's own slivers. The walk is
-      // the bug; the message is which host it happened to reach.
+      // Nothing is tolerated. `_EntryRow`'s rows used to raise a
+      // first-frame `getTransformTo` exception apiece, because
+      // `RenderGlassShape` read a shape's transform during layout, through
+      // ancestors the index had not laid out yet; the walk happens at
+      // paint now, so booting this app is expected to be silent.
       final caught = <FlutterErrorDetails>[];
       final originalOnError = FlutterError.onError;
       FlutterError.onError = caught.add;
@@ -92,20 +87,13 @@ void main() {
         FlutterError.onError = originalOnError;
       }
 
-      for (final details in caught) {
-        final stack = details.stack.toString();
-        final isKnownFirstFrameBug =
-            stack.contains('RenderGlassShape._syncGeometry') &&
-            stack.contains('RenderObject.getTransformTo');
-        expect(
-          isKnownFirstFrameBug,
-          isTrue,
-          reason:
-              'booting the app and tapping through to the licences threw '
-              'something other than the known, tolerated first-frame '
-              'geometry exception: ${details.exception}',
-        );
-      }
+      expect(
+        caught.map((details) => details.exception).toList(),
+        isEmpty,
+        reason:
+            'booting the app and tapping through to the licences is '
+            'expected to raise nothing at all',
+      );
 
       // Flutter's own page, reached — not a second licence screen this
       // example drew.

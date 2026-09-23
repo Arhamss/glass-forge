@@ -645,13 +645,13 @@ void main() {
       'every entry mounts and paints under a real GlassLayer, at default '
       'knobs',
       (tester) async {
-        // Each iteration is keyed by the entry's own api: two entries in
-        // this group build structurally different `InteractiveGlass`
-        // trees (drag on versus off adds a `GestureDetector`), and without
-        // a key Flutter's element diffing updates the previous iteration's
-        // render tree in place instead of replacing it — which is not
-        // what the real app does, since one catalogue page never turns
-        // into another without a route push between them.
+        // Each iteration is keyed by the entry's own api, for the one
+        // reason the groups below repeat: without a key Flutter's element
+        // diffing updates the previous iteration's render tree in place
+        // instead of replacing it, so every entry after the first would
+        // be checked down an update path the real app never takes — one
+        // catalogue page never turns into another without a route push
+        // between them, and mounting is what this test claims to check.
         for (final entry in motionEntries) {
           await tester.pumpWidget(
             MaterialApp(
@@ -972,10 +972,12 @@ void main() {
       'every entry mounts and paints under a real GlassLayer, at default '
       'knobs',
       (tester) async {
-        // Keyed by api, same as motionEntries' equivalent test: GlassGlow
-        // mounts two `InteractiveGlass`es, and a mismatched tree shape
-        // between two entries sharing a slot is exactly what this repo's
-        // InteractiveGlass tree-shape bug (docs/TODO.md) reaches.
+        // Keyed by api, same as motionEntries' equivalent test and for
+        // the same one reason: without a key Flutter would update one
+        // entry's tree in place into the next entry's, which is not what
+        // the real app does — one catalogue page never turns into another
+        // without a route push between them, and a mount is what this
+        // test claims to check.
         for (final entry in compositionEntries) {
           await tester.pumpWidget(
             MaterialApp(
@@ -1011,21 +1013,17 @@ void main() {
         // lays out at all (docs/TODO.md, "the FittedBox also imposes
         // unbounded width") — found in Cross-pass overlap.
         //
-        // A single `tester.takeException()` right after `pumpWidget`
-        // cannot guard this: both the known, tolerated first-frame
-        // `getTransformTo` exception (docs/TODO.md bug #1 — every entry
-        // here has a `Glass`, so every entry hits it) *and* the Stack
-        // regression this test exists to catch fire during that same
-        // `pumpWidget` call, and calling `takeException()` once
-        // discards whichever it returns without telling them apart —
-        // confirmed by reverting the fix with this test left as
-        // originally written and watching it still report "All tests
-        // passed!". So every individual `FlutterErrorDetails` raised
-        // during that call is captured here instead, and each one is
-        // checked against the known bug's own exact signature —
-        // `RenderGlassShape._syncGeometry` calling `getTransformTo`
-        // into a not-yet-laid-out ancestor — rather than merely
-        // counting or discarding them.
+        // Every `FlutterErrorDetails` raised during that `pumpWidget` is
+        // collected here rather than read back through a single
+        // `tester.takeException()`, which folds several errors from one
+        // pump into a synthetic "Multiple exceptions" string and throws
+        // the originals away — a count, not a report, and one that would
+        // pass just as happily on a real regression.
+        //
+        // Nothing is tolerated. A first-frame `getTransformTo` exception
+        // used to be, because `RenderGlassShape` read a shape's transform
+        // during layout; it reads it at paint now, so this slot is silent
+        // and anything in `caught` is the regression.
         for (final entry in compositionEntries) {
           final caught = <FlutterErrorDetails>[];
           final originalOnError = FlutterError.onError;
@@ -1057,23 +1055,11 @@ void main() {
             FlutterError.onError = originalOnError;
           }
 
-          for (final details in caught) {
-            final isKnownFirstFrameBug =
-                details.exception.toString().contains(
-                  "Failed assertion: line 2251 pos 12: 'hasSize'",
-                ) &&
-                details.stack.toString().contains(
-                  'RenderGlassShape._syncGeometry',
-                );
-            expect(
-              isKnownFirstFrameBug,
-              isTrue,
-              reason:
-                  '${entry.api} threw under an unbounded-width FittedBox '
-                  'with something other than the known, tolerated '
-                  'first-frame geometry exception: ${details.exception}',
-            );
-          }
+          expect(
+            caught.map((details) => details.exception).toList(),
+            isEmpty,
+            reason: '${entry.api} threw under an unbounded-width FittedBox',
+          );
 
           await tester.pumpAndSettle();
           expect(
@@ -1081,7 +1067,7 @@ void main() {
             isNull,
             reason:
                 '${entry.api} kept throwing under an unbounded-width '
-                'FittedBox past the first, known frame',
+                'FittedBox past its first frame',
           );
         }
       },
@@ -1949,15 +1935,11 @@ void main() {
         // `constraints.biggest` never lays out. Every root in this group
         // is a doubly-tight `SizedBox`, and this is what says so.
         //
-        // Every individual `FlutterErrorDetails` is captured and matched
-        // against the known first-frame bug's own signature, rather than
-        // one `tester.takeException()` discarding whichever of them it
-        // returns. That shortcut cannot fail: the binding collapses
-        // several errors from one `pumpWidget` into a synthetic
-        // "Multiple exceptions" string and throws the originals away, and
-        // every entry here has a `Glass`, so the known bug fires at least
-        // once before any regression exists to be seen. Same collector and
-        // same signature as compositionEntries — see the long note there.
+        // Every `FlutterErrorDetails` is captured rather than read back
+        // through one `tester.takeException()`, which collapses several
+        // errors from a single `pumpWidget` into a synthetic "Multiple
+        // exceptions" string and throws the originals away. Nothing is
+        // tolerated — see the note in compositionEntries.
         for (final entry in designSystemEntries) {
           final caught = <FlutterErrorDetails>[];
           final originalOnError = FlutterError.onError;
@@ -1989,23 +1971,11 @@ void main() {
             FlutterError.onError = originalOnError;
           }
 
-          for (final details in caught) {
-            final isKnownFirstFrameBug =
-                details.exception.toString().contains(
-                  "Failed assertion: line 2251 pos 12: 'hasSize'",
-                ) &&
-                details.stack.toString().contains(
-                  'RenderGlassShape._syncGeometry',
-                );
-            expect(
-              isKnownFirstFrameBug,
-              isTrue,
-              reason:
-                  '${entry.api} threw under an unbounded-width FittedBox '
-                  'with something other than the known, tolerated '
-                  'first-frame geometry exception: ${details.exception}',
-            );
-          }
+          expect(
+            caught.map((details) => details.exception).toList(),
+            isEmpty,
+            reason: '${entry.api} threw under an unbounded-width FittedBox',
+          );
 
           await tester.pumpAndSettle();
           expect(
@@ -2013,7 +1983,7 @@ void main() {
             isNull,
             reason:
                 '${entry.api} kept throwing under an unbounded-width '
-                'FittedBox past the first, known frame',
+                'FittedBox past its first frame',
           );
         }
       },
@@ -2497,15 +2467,11 @@ void main() {
         // bug, and it lays out only because the `SizedBox` above it is
         // tight in both axes.
         //
-        // Every individual `FlutterErrorDetails` is captured and matched
-        // against the known first-frame bug's own signature, rather than
-        // one `tester.takeException()` discarding whichever of them it
-        // returns. That shortcut cannot fail: the binding collapses
-        // several errors from one `pumpWidget` into a synthetic
-        // "Multiple exceptions" string and throws the originals away, and
-        // every entry here has a `Glass`, so the known bug fires at least
-        // once before any regression exists to be seen. Same collector and
-        // same signature as compositionEntries — see the long note there.
+        // Every `FlutterErrorDetails` is captured rather than read back
+        // through one `tester.takeException()`, which collapses several
+        // errors from a single `pumpWidget` into a synthetic "Multiple
+        // exceptions" string and throws the originals away. Nothing is
+        // tolerated — see the note in compositionEntries.
         for (final entry in adaptationEntries) {
           final caught = <FlutterErrorDetails>[];
           final originalOnError = FlutterError.onError;
@@ -2537,23 +2503,11 @@ void main() {
             FlutterError.onError = originalOnError;
           }
 
-          for (final details in caught) {
-            final isKnownFirstFrameBug =
-                details.exception.toString().contains(
-                  "Failed assertion: line 2251 pos 12: 'hasSize'",
-                ) &&
-                details.stack.toString().contains(
-                  'RenderGlassShape._syncGeometry',
-                );
-            expect(
-              isKnownFirstFrameBug,
-              isTrue,
-              reason:
-                  '${entry.api} threw under an unbounded-width FittedBox '
-                  'with something other than the known, tolerated '
-                  'first-frame geometry exception: ${details.exception}',
-            );
-          }
+          expect(
+            caught.map((details) => details.exception).toList(),
+            isEmpty,
+            reason: '${entry.api} threw under an unbounded-width FittedBox',
+          );
 
           await tester.pumpAndSettle();
           expect(
@@ -2561,7 +2515,7 @@ void main() {
             isNull,
             reason:
                 '${entry.api} kept throwing under an unbounded-width '
-                'FittedBox past the first, known frame',
+                'FittedBox past its first frame',
           );
         }
       },

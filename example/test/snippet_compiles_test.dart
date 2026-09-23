@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_example/src/catalogue/catalogue.dart';
@@ -681,12 +680,6 @@ void main() {
   });
 
   testWidgets('Adaptation | GlassTierEngine', (tester) async {
-    // This is the one snippet that starts an engine, and starting one asks
-    // the host for its thermal and accessibility readings. A widget test has
-    // no host, so the two event channels are answered here — the device the
-    // snippet is written for, stood in for like any other caller-side thing.
-    _answerPlatformChannels();
-
     final engine = GlassTierEngine(
       requested: _knob(null),
       capabilities: const RenderCapabilities(
@@ -808,25 +801,6 @@ void main() {
 Future<void> _pumpGlass(WidgetTester tester, Widget child) async {
   await tester.pumpWidget(MaterialApp(home: GlassLayer(child: child)));
   expect(tester.takeException(), isNull);
-}
-
-/// Answers the plugin's two event channels with nothing, for the length of
-/// the calling test.
-///
-/// Without this, `GlassTierEngine.start` reaches a host that is not there
-/// and the `MissingPluginException` it raises is what the test would be
-/// reading instead of the snippet.
-void _answerPlatformChannels() {
-  final messenger =
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-  for (final name in const <String>[
-    'glass_forge/thermal',
-    'glass_forge/reduce_transparency',
-  ]) {
-    final channel = MethodChannel(name);
-    messenger.setMockMethodCallHandler(channel, (call) async => null);
-    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
-  }
 }
 
 /// A value the entry page's controls supply.
