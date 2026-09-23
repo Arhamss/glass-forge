@@ -267,30 +267,18 @@ and C3, see above.
   task; the fix is presumably to re-register on scroll, or to make the layer
   re-read transforms it has not seen painted this frame.
 
-- **The `FittedBox` bug has two exception shapes, and the guards only know
-  one.** Instrumenting the index test caught **14** errors: **9** are
-  `_AssertionError … 'hasSize'` with no sliver frame, and **5** are
-  `_TypeError: Null check operator used on a null value` with
-  `RenderSliverMultiBoxAdaptor` in the stack and no `hasSize` in the message.
+- ~~**The `FittedBox` bug has two exception shapes, and the guards only know**~~ 
 
-  The three per-group guards in `example/test/catalogue_test.dart`
-  (`:1063`, `:1995`, `:2543`) match on the literal string
-  `"Failed assertion: line 2251 pos 12: 'hasSize'"`. So they would
-  **mis-classify the sliver form as a regression** — the one thing those
-  guards exist to distinguish. They also pin a Flutter SDK line number, which
-  will drift on any SDK bump. The newer index test matches the stack
-  (`_syncGeometry` + `getTransformTo`) instead, which is the better shape.
+  Resolved: `62bb1d6` fixed the underlying walk, so the guards had
+  nothing left to tolerate. `cfe5195` deleted them rather than rewriting
+  the match — which also drops the pinned Flutter SDK line number and the
+  mis-classification of the other two shapes. Verified by removing the
+  tolerance first and confirming nothing throws.
 
-  Two follow-ups: widen the three guards to the stack-based match, and record
-  the null-check form alongside the `hasSize` one in this file's description
-  of the bug above.
+- ~~**`_hex` is written out three times verbatim** — `entries/adaptation.dart:107`,**~~ 
 
-- **`_hex` is written out three times verbatim** — `entries/adaptation.dart:107`,
-  `entries/chrome.dart:127`, `entries/design_system.dart:40`. Its home is
-  `example/lib/src/backdrop_info.dart`, which already owns `BackdropInfo` and
-  `backdrops` and is the sole source of every colour in the example. Recorded
-  here rather than left in a review report, because the fourth copy is what
-  happens otherwise.
+  Resolved by `b7f18f4`: moved to `example/lib/src/backdrop_info.dart`,
+  which already owns `BackdropInfo` and `backdrops`.
 
 - **The line-length rule is 80, not 79, and nothing enforces it.**
   `docs/superpowers/specs/2026-09-14-glass-widgets-design.md:50` is the only
@@ -311,42 +299,14 @@ and C3, see above.
   with no semantic risk, but big enough to want its own commit — and worth
   confirming the number with Arham first, since the documented rule is 80.
 
-- **An iOS run still dirties four tracked files on this machine.** The build
-  itself is fixed; this is what is left of it, and it needs one decision
-  from Arham.
+- ~~**An iOS run still dirties four tracked files on this machine.** The build**~~ 
 
-  `~/.config/flutter/settings` here carries
-  `"enable-swift-package-manager": false` — a global, per-user opt-out, set
-  at some point on this machine. Swift Package Manager is on by default on
-  Flutter stable, so every consumer takes the SPM path and generates
-  nothing. This machine takes the CocoaPods fallback instead, and `pod
-  install` writes the Pods include into `Flutter/Debug.xcconfig` and
-  `Flutter/Release.xcconfig`, a `Pods.xcodeproj` reference into
-  `Runner.xcworkspace`, and about 110 lines of Pods integration into the
-  pbxproj. `Podfile` and `Podfile.lock` are now gitignored, so they stay
-  quiet, but those four tracked files reappear as modified. Two of them —
-  the xcconfigs — come back on a bare `flutter pub get` in `example/`, not
-  just on a build, so `flutter analyze` there is enough to dirty the tree.
-
-  Flutter itself says not to live this way. On an SPM-enabled build against
-  the CocoaPods-integrated project it prints: *"All plugins found for ios
-  are Swift Packages, but your project still has CocoaPods integration …
-  Removing CocoaPods integration will improve the project's build time."*
-  That is why the CocoaPods artifacts were discarded rather than committed
-  — committing them would force the CocoaPods gem on every consumer and
-  pin a `Podfile.lock` that fails the `[CP] Check Pods Manifest.lock` phase
-  on the next Flutter bump.
-
-  **The one-line fix, which needs Arham's nod because it is outside the
-  brief's allowed paths:** a `config: enable-swift-package-manager: true`
-  entry under `flutter:` in `example/pubspec.yaml`. Project-level config
-  outranks both the global setting and the `FLUTTER_SWIFT_PACKAGE_MANAGER`
-  environment variable, so it pins every machine to the same path the
-  default consumer already takes. Measured in a worktree: build drops from
-  ~45s to ~18s, no `pod install`, and the tree is clean after a run.
-  Alternatively, `flutter config --enable-swift-package-manager` on this
-  machine has the same effect without a repository change — but only here,
-  which is why the pubspec entry is the better of the two.
+  Resolved. The leftover `Podfile` was the trigger and had become
+  gitignored, so it was invisible in `git status` while still forcing the
+  CocoaPods path; removing it plus pinning SPM per-project in
+  `example/pubspec.yaml` (`d9c19de`) and committing the integration refs
+  (`63857f7`) leaves the tree clean. Verified idempotent: two consecutive
+  `flutter build ios --simulator` runs change nothing.
 
 - ~~**A hard-edged grey smear on the first `GlassSurface.control` of an
   entry page.**~~ **Not a defect — it is the photograph.** Investigated on a
