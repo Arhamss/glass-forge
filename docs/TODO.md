@@ -1,19 +1,26 @@
-# Where glass_forge stands — 2026-09-18
+# Where glass_forge stands — 2026-09-23
 
 Resume file. Updated at the end of a working session; read it first.
 
 ## State
 
-Branch `main`, clean, **not pushed** (`origin` is a local `.bundle`, and
-there is no GitHub repository yet). Last five commits:
+Branch `main`, **not pushed** (`origin` is a local `.bundle`, and there is
+no GitHub repository yet). Six iOS files are dirty in the working tree and
+are deliberately uncommitted — see "The example cannot build for iOS" below;
+they are a workaround, not a preference, and what to do about them is
+Arham's call.
 
-| Commit | What |
-|---|---|
-| `040d769` | The glass widgets design spec, awaiting sign-off |
-| `a522eb4` | Package moved to the repository root, countrify-style |
-| `b2398c0` | Workbench deleted (573 files) |
-| `9feb819` | pub.dev publishing blockers cleared |
-| `cd25945` | The example app pub.dev will show |
+**Sub-project A (foundations) shipped**, and the example app has been rebuilt
+as a **catalogue of 33 named entries across 7 groups** — index → detail, each
+entry a live specimen with knobs and a copyable snippet. Spec at
+`docs/superpowers/specs/2026-09-20-example-catalogue-design.md`, plan at
+`docs/superpowers/plans/2026-09-20-example-catalogue.md`. All 12 plan tasks
+are complete; the execution ledger, with every ruling made along the way,
+is at `.superpowers/sdd/2026-09-20-example-catalogue/progress.md`
+(gitignored).
+
+Entry counts, which `example/test/index_page_test.dart` now pins: Surfaces 6,
+Shapes 4, Motion 7, Composition 4, Chrome 4, Design system 5, Adaptation 3.
 
 The repository is now one package at its root: `lib/ shaders/ test/
 benchmark/ hook/ android/ ios/ macos/ example/ docs/` with `pubspec.yaml`,
@@ -23,22 +30,36 @@ benchmark/ hook/ android/ ios/ macos/ example/ docs/` with `pubspec.yaml`,
 
 ## Verified
 
-The `a522eb4` checkout this section originally described is now 31 commits
-behind `main`. `flutter analyze` and both `flutter test` runs below were
-re-run against current `main` on 2026-09-19; the web build and simulator
-checks were not re-verified this session and may also be stale — re-run
-them before trusting those two.
+All re-run on 2026-09-23 against current `main`, and independently
+re-run by a second agent, which got the same numbers:
 
-- `flutter analyze` — clean.
-- `flutter test` — **527 passed, 24 skipped, 0 failed**.
+- `flutter analyze` — clean, at the root and in `example/`.
+- `flutter test` — **600 passed, 24 skipped, 0 failed**. The old 527 figure
+  predates the catalogue; +73 is the catalogue's own tests, and nothing
+  regressed.
 - `flutter test --tags impeller --run-skipped --enable-impeller` —
-  **81 passed, 2 skipped, 1 failed** (see below).
-- The example's web build (CI's SkSL gate) succeeds. *(Carried over from
-  the `a522eb4` checkout, not re-verified this session.)*
-- The example runs on the iPhone 17e simulator and renders correctly.
-  *(Carried over, not re-verified this session.)* Simulator UUIDs are
-  regenerated per machine, so resolve the current one at run time instead
-  of pinning it here: `xcrun simctl list devices | grep '17e'`.
+  **82 passed, 2 skipped, 1 failed**: the pre-existing `GpuGeometryProducer`
+  fail-soft in `test/src/rendering/render_glass_layer_test.dart`. Any other
+  failure is new.
+- `cd example && flutter test` — **150 passed, 0 skipped**. Note
+  `example/test/snippet_compiles_test.dart` alone takes about six minutes: it
+  mounts a real mirror of all 33 snippets, and the heavy entries pump a real
+  backdrop pass at roughly 17s each. **Tell CI.**
+- `dart format --set-exit-if-changed --output=none .` — exit 0, but only
+  after `48aded3`. It was **already failing** on
+  `test/src/composition/glow_gating_test.dart` before this session's last
+  task touched anything — a `dart_style` splitting rule, not line length.
+- **The example does NOT build for iOS from a clean checkout.** See below.
+  A simulator run was only achieved with a throwaway shim. The old note that
+  it "runs on the iPhone 17e simulator and renders correctly" is withdrawn.
+- The example's web build (CI's SkSL gate) — *not re-verified this session.*
+  Carried over from the `a522eb4` checkout and possibly stale.
+
+**Ten tests written during this work read as correct while asserting
+nothing**, across five distinct causes. The lesson is recorded in full in the
+ledger; the short version is that the best single tell is **an expected value
+sourced from the thing under test**, and that a guard's ability to fail is
+established by breaking the code it guards, never by reading it.
 
 ## The four decisions — answered 2026-09-18
 
