@@ -39,6 +39,10 @@ abstract final class Tone {
 /// flips its scheme — which is the behaviour the design system exists to
 /// provide, and the easiest one to throw away by writing `Colors.white`.
 extension SurfaceInk on BuildContext {
+  /// The opacity [inkFill] applies, named so a catalogue snippet showing a
+  /// control paint its own fill can quote the number rather than repeat it.
+  static const double fillAlpha = 0.26;
+
   /// The colour this surface says its labels must be drawn in.
   Color get ink => DefaultTextStyle.of(this).style.color ?? Tone.overPhoto;
 
@@ -59,7 +63,7 @@ extension SurfaceInk on BuildContext {
   /// Well clear of [inkTrack] rather than a step above it: the fill has to
   /// read as a *level* at a glance, and a fill only slightly stronger than
   /// its track reads as a smudge.
-  Color get inkFill => ink.withValues(alpha: 0.26);
+  Color get inkFill => ink.withValues(alpha: fillAlpha);
 }
 
 /// The type scale.

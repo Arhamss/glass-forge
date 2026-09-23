@@ -156,11 +156,20 @@ final CatalogueEntry _glassHostScope = CatalogueEntry(
     // Both placements below run this exact ternary at their own position
     // — the same control, not two — so the snippet repeats it rather
     // than hiding the second copy behind a comment.
+    // `context.inkFill` is this example's own extension, not package API,
+    // so the snippet spells out what it resolves to: the colour the
+    // surface put in the `DefaultTextStyle` for its own labels, at the
+    // fill step. Read rather than named, so the chip inverts with a
+    // surface that flipped its scheme — and paste-able by a reader who
+    // has no `SurfaceInk`.
     final chip =
         'GlassHostScope.isOnGlass(context)\n'
         '        ? SizedBox.square(\n'
         '            dimension: 96,\n'
-        '            child: ColoredBox(color: context.inkFill),\n'
+        '            child: ColoredBox(\n'
+        '              color: DefaultTextStyle.of(context).style.color!\n'
+        '                  .withValues(alpha: ${SurfaceInk.fillAlpha}),\n'
+        '            ),\n'
         '          )\n'
         '        : SizedBox.square(\n'
         '            dimension: 96,\n'

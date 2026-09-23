@@ -2869,4 +2869,48 @@ void main() {
       },
     );
   });
+
+  test(
+    "no snippet quotes one of the example's own extensions, which a "
+    'reader pasting it does not have',
+    () {
+      // `context.inkFill` is `SurfaceInk` in example/lib, and the type
+      // scale is `AppText` beside it. Neither is package API, so a reader
+      // who copies a line naming one gets an undefined getter. The compile
+      // mirror cannot see this: its tie-back check matches capitalised
+      // identifiers only, and every one of these is lower-case.
+      const exampleOnly = <String>[
+        'context.ink',
+        'context.display',
+        'context.title',
+        'context.body',
+        'context.label',
+        'context.caption',
+        'context.code',
+        'context.mono',
+      ];
+      for (final entries in <List<CatalogueEntry>>[
+        surfacesEntries,
+        shapesEntries,
+        motionEntries,
+        compositionEntries,
+        chromeEntries,
+        designSystemEntries,
+        adaptationEntries,
+      ]) {
+        for (final entry in entries) {
+          final snippet = renderSnippet(entry);
+          for (final name in exampleOnly) {
+            expect(
+              snippet,
+              isNot(contains(name)),
+              reason:
+                  '${entry.api} hands the reader $name, which is an '
+                  'extension in example/lib rather than package API',
+            );
+          }
+        }
+      }
+    },
+  );
 }

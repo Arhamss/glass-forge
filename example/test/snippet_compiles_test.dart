@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_example/src/catalogue/catalogue.dart';
 import 'package:glass_forge_example/src/catalogue/snippet.dart';
-import 'package:glass_forge_example/src/theme.dart';
 
 /// Every snippet the catalogue prints, compiled.
 ///
@@ -349,7 +348,11 @@ void main() {
     Widget control(BuildContext context) => GlassHostScope.isOnGlass(context)
         ? SizedBox.square(
             dimension: 96,
-            child: ColoredBox(color: context.inkFill),
+            child: ColoredBox(
+              color: DefaultTextStyle.of(
+                context,
+              ).style.color!.withValues(alpha: 0.26),
+            ),
           )
         : SizedBox.square(
             dimension: 96,
