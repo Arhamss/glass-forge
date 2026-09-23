@@ -197,6 +197,24 @@ and C3, see above.
 
 ## Known problems, struck through as they are fixed
 
+- ~~**Swapping a `GlassBlendGroup` for an `InteractiveGlass` in one slot
+  threw "are not in the same render tree".**~~ Fixed by `62bb1d6`, and
+  recorded here only because it was never written down as a bug before it
+  was fixed — it was found while confirming a different one, and without
+  this note the fix's value is invisible.
+
+  Verified as a **package** bug rather than a catalogue symptom, with a bare
+  repro carrying no catalogue code: one `GlassLayer`, a `GlassBlendGroup` of
+  two ovals swapped in place for an `InteractiveGlass`, no key. At `472dc44`
+  it raised `RenderGlassLayer#… NEEDS-PAINT and RenderGlassShape#… are not
+  in the same render tree.`; at `0afb36f` it is clean, and `62bb1d6` is the
+  only non-docs commit between those runs. So any consumer swapping a blend
+  group for an interactive surface in one slot could hit it.
+
+  It was **one-directional**: the reverse swap was clean even at `472dc44`.
+  Worth knowing, because a symmetric-looking API with an asymmetric failure
+  is the kind of thing a test written in one direction will miss.
+
 - **A `Glass` in a scrolled lazy list keeps stale geometry.** Found while
   fixing the paint-time transform walk (`62bb1d6`), and **not caused by it** —
   the same probe gives the same numbers with that fix reverted. The
