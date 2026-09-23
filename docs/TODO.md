@@ -162,6 +162,44 @@ and C3, see above.
 
 ## Known problems, none of them fixed
 
+- **The example does not build for iOS from a clean checkout.** Found during
+  Task 12's simulator run, and verified at source afterwards — this is not
+  the 60-second cold-resolution timeout that looks similar.
+
+  `example/ios/Runner.xcodeproj/project.pbxproj:58` holds a folder reference
+  with `path = ../../ios/glass_forge`. Xcode resolves that as a local Swift
+  package, and its manifest — `ios/glass_forge/Package.swift:15` — declares
+  `.package(name: "FlutterFramework", path: "../FlutterFramework")`. That
+  sibling directory only exists when Swift Package Manager generates it, and
+  `flutter config` has `enable-swift-package-manager: false`. So `xcodebuild`
+  fails resolving `<repo>/ios/FlutterFramework`, which does not and will not
+  exist.
+
+  **This is why the example flipped to CocoaPods**, and it explains the
+  untracked `example/ios/Podfile` and modified xcconfigs that reappear after
+  every iOS run. Those files are not a stylistic question about whether to
+  track CocoaPods artifacts — they are the workaround keeping an otherwise
+  unbuildable iOS target alive.
+
+  Task 12 got a simulator run only by creating a throwaway `ios/FlutterFramework`
+  shim and deleting it afterwards. **The clean-checkout build is still
+  broken.** Two coherent fixes: enable SPM and let it generate the sibling, or
+  drop the local-package folder reference from the pbxproj and let CocoaPods
+  own the plugin properly, tracking the `Podfile` that follows from it.
+
+- **A hard-edged grey smear on the first `GlassSurface.control` of an entry
+  page.** Seen on the simulator across three different entries, roughly
+  150x40pt, always the **first** control and never the second, present before
+  any knob is touched.
+
+  It reads as a stale backdrop region, which makes flutter#187820 — stacked
+  backdrop filters sampling the previous frame's backdrop, already recorded
+  below — the obvious suspect. **It is not confirmed as that**, and the
+  first-but-never-second pattern is a detail that issue does not obviously
+  predict, so it is recorded as an observation rather than filed under the
+  known one. Whoever picks it up should establish which it is before fixing
+  anything.
+
 - **`_events`'s `handleError` cannot catch what it documents, and its doc
   comment says the opposite.** `lib/src/platform/glass_forge_method_channel.dart:102`
   explains the choice of `handleError` over a `try` by saying "the failure
