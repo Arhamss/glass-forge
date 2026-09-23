@@ -34,14 +34,14 @@ All re-run on 2026-09-23 against current `main`, and independently
 re-run by a second agent, which got the same numbers:
 
 - `flutter analyze` — clean, at the root and in `example/`.
-- `flutter test` — **600 passed, 24 skipped, 0 failed**. The old 527 figure
+- `flutter test` — **613 passed, 24 skipped, 0 failed**. The old 527 figure
   predates the catalogue; +73 is the catalogue's own tests, and nothing
   regressed.
 - `flutter test --tags impeller --run-skipped --enable-impeller` —
   **82 passed, 2 skipped, 1 failed**: the pre-existing `GpuGeometryProducer`
   fail-soft in `test/src/rendering/render_glass_layer_test.dart`. Any other
   failure is new.
-- `cd example && flutter test` — **150 passed, 0 skipped**. Note
+- `cd example && flutter test` — **157 passed, 0 skipped**, about 6m30s. Note
   `example/test/snippet_compiles_test.dart` alone takes about six minutes: it
   mounts a real mirror of all 33 snippets, and the heavy entries pump a real
   backdrop pass at roughly 17s each. **Tell CI.**
@@ -197,6 +197,42 @@ and C3, see above.
 
 ## Known problems, struck through as they are fixed
 
+- **Overscrolling the catalogue index emits 14 glass-over-glass overlap
+  warnings.** Found when the overscroll workarounds were removed (`fca850e`).
+  They are absent without the stretch, and the pairs named sit in *different*
+  backdrop passes even though the rows declare no material of their own —
+  which is not what the warning is supposed to fire on. Either the warning is
+  over-reporting under a stretch transform, or the stretch is genuinely
+  putting two passes over the same pixels. Nobody has established which.
+
+- ~~**The retained clip chain was collected from one arbitrary shape, and
+  cropped whole pages.**~~ Fixed by `f85863c`; `collect` now takes every
+  shape in the pass and keeps only clips they all sit under.
+
+  Worth keeping because of how it was found and what it says about the tests.
+  The catalogue index rendered as the bare photograph plus a single 44x44
+  glass square — no bar, no rows, no text — while **all 613 package tests and
+  154 example tests passed.** Every existing test of that mechanism asserts on
+  the mechanism (chain length, an entry's rrect, where one square landed);
+  none asserted that anything *else* on screen survived. **The missing class
+  is negative space: "this clip did not eat the rest of the frame."** The new
+  test closes it for the multi-shape case, not in general.
+
+  `62bb1d6` **exposed** this rather than introducing it: before it, the
+  layout-time walk threw against the unsized `FittedBox`, so rows never
+  registered and the chain was empty *because the shapes were missing*, not
+  because it was right. For an index-shaped tree, `472dc44` gives 13 framework
+  errors, 10 shapes, 0 retained clips; `63857f7` gives 0 errors, 14 shapes, 2.
+
+  **Two residuals, documented rather than quietly fixed.** A clip that every
+  shape *does* sit under is still re-pushed around the subtree, so non-glass
+  siblings under the same `GlassLayer` can still be cropped — the subtree
+  needs no retained clip at all, but moving it also moves the layer's bounds
+  clip, which is a behaviour change with its own test surface. And a clip
+  private to one shape is now dropped rather than honoured, so that shape's
+  backdrop can bleed past its box — strictly better than cropping the page,
+  and the real answer is the per-pass clipping `_pushBackdropPasses` flags.
+
 - ~~**Swapping a `GlassBlendGroup` for an `InteractiveGlass` in one slot
   threw "are not in the same render tree".**~~ Fixed by `62bb1d6`, and
   recorded here only because it was never written down as a bug before it
@@ -312,37 +348,26 @@ and C3, see above.
   machine has the same effect without a repository change — but only here,
   which is why the pubspec entry is the better of the two.
 
-- **A hard-edged grey smear on the first `GlassSurface.control` of an entry
-  page.** Seen on the simulator across three different entries, roughly
-  150x40pt, always the **first** control and never the second, present before
-  any knob is touched.
+- ~~**A hard-edged grey smear on the first `GlassSurface.control` of an
+  entry page.**~~ **Not a defect — it is the photograph.** Investigated on a
+  booted simulator with `xcrun simctl io` screenshots and pixel reads, not
+  from source.
 
-  It reads as a stale backdrop region, which makes flutter#187820 — stacked
-  backdrop filters sampling the previous frame's backdrop, already recorded
-  below — the obvious suspect. **It is not confirmed as that.** Evidence both
-  ways, gathered during Task 12's review and checked at source here:
+  The catalogue backdrop has a dark rocky shoreline crossing exactly the band
+  of screen the first control occupies on every entry page; the second control
+  sits 50pt lower over the bright aurora, which is why it "never" showed it.
+  The hard edge is the opaque painted pill abutting it. Decisive evidence: a
+  scan-line comparison of the photograph alone against the same rows seen
+  through a control — the control's luminance minimum falls on exactly the
+  photograph's minimum, with no displacement. Falsified twice over: remove the
+  pill and the region is soft-edged on both sides; declare the *lower* control
+  first, making it `firstShapeOwner`, and the band stays on the upper one.
 
-  *For.* **The precondition is present, and the README's own rule does not
-  prevent it.** `_pushBackdropPasses` (`lib/src/rendering/render_glass_layer.dart:932-946`)
-  pushes one `BackdropFilterLayer` **per material pass**, as siblings over the
-  whole layer rect. An entry page has at least two materials — the specimen
-  and its `GlassSurface.control` — so two backdrop filters really are stacked
-  over the same region *even though no two shapes overlap*. The README's rule
-  about overlap governs **shapes**, not **passes**. Worth stating plainly,
-  because the invariant everyone has been reasoning from does not cover this.
-
-  *Against.* The smear is hard-edged, static, and present from the first
-  frame. flutter#187820 is a progressive white wash that builds over
-  successive frames.
-
-  *The pattern is positional, not control-type.* The obvious benign
-  explanation was falsified: `GlassDetentSheet`'s first knob is a `double`
-  slider while `GlassMaterial`'s and `GlassTierEngine`'s are segmented
-  controls, and the smear lands on the first either way. That points instead
-  at `_clipChain.collect(firstShape, this)`
-  (`render_glass_layer.dart:737-741`), where the **entire pass's retained clip
-  chain is collected from `scene.firstShapeOwner` alone**. Look there before
-  filing this under #187820.
+  flutter#187820 was ruled out directly — eight synthetic arrangements over a
+  striped backdrop (1/2/3 passes, with and without viewport clip, with and
+  without a painted fill) were all clean, and a debug shader painting red on
+  out-of-range backdrop samples showed none on the real page. **This file
+  previously called that issue "the obvious suspect". It was not.**
 
 - **~~`_events`'s `handleError` cannot catch what it documents~~ — fixed
   2026-09-23.** The mechanism the entry recorded was right, and confirmed
@@ -508,7 +533,7 @@ and C3, see above.
   the example's call, not the package's.
 
 
-- **A `Glass` under a transform-bearing ancestor that has not been laid out
+- ~~*A `Glass` under a transform-bearing ancestor that has not been laid out
   yet throws on first layout.** Two symptoms found so far, one cause.** Found while building the catalogue example. It is a
   package bug, not an example one, and it hits the headline use case — glass
   chrome over scrolling content.
@@ -544,7 +569,19 @@ and C3, see above.
   );
   ```
 
-  **Not fixed.** The catalogue example works around it with
+  **Fixed by `62bb1d6`** — the walk moved to paint, which is the one phase
+  where it is both permitted and correct. The approach it rules out is
+  worth recording: tolerate-and-skip cannot be written release-safely,
+  because a third exception shape, `sizeAccessAllowed`, has only debug-only
+  predicates (`debugDoingThisLayout`, `debugActiveLayout`), so such a walk
+  would register different geometry in debug than in release.
+
+  All three example workarounds are gone (`fca850e`), each proved dead
+  first: the override removed, the stretch actually engaged, errors read
+  through `FlutterError.onError`, zero in all three. **This entry said
+  "Not fixed" for some hours after it was fixed, and on that basis I told
+  an agent to keep workarounds it should have removed.** The old text
+  described the example working around it with
   `ScrollConfiguration(...copyWith(overscroll: false))` around its scroll
   views, and the same default app-wide in `main.dart`. That is the right move
   for the example and the wrong thing to ask of a consumer: anyone putting
