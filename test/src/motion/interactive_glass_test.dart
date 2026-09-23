@@ -121,8 +121,77 @@ Future<void> _settle(WidgetTester tester, RenderGlassMotion motion) async {
   }
 }
 
+/// Every `FlutterErrorDetails` reported while [body] runs.
+///
+/// Deliberately not `tester.takeException()`: that collapses however many
+/// errors one `pumpWidget` produced into a single synthetic string and
+/// throws the originals away, so a test built on it can neither say how
+/// many errors there were nor which one it caught. This installs its own
+/// handler and keeps every report whole.
+Future<List<FlutterErrorDetails>> _errorsDuring(
+  Future<void> Function() body,
+) async {
+  final reports = <FlutterErrorDetails>[];
+  final previous = FlutterError.onError;
+  FlutterError.onError = reports.add;
+  try {
+    await body();
+  } finally {
+    FlutterError.onError = previous;
+  }
+  return reports;
+}
+
+/// What [_errorsDuring] caught, as strings, for a readable failure.
+Iterable<String> _messages(List<FlutterErrorDetails> reports) =>
+    reports.map((report) => report.exceptionAsString());
+
+/// One `InteractiveGlass` in a fixed slot, keyless on purpose.
+///
+/// Keyless is the whole point: Flutter matches the old element to the new
+/// widget by runtime type and updates it in place, which is what a tree
+/// whose shape depends on [drag] cannot survive.
+Widget _slot(GlassDrag drag) => Directionality(
+  textDirection: TextDirection.ltr,
+  child: GlassLayer(
+    tier: GeometryTier.none,
+    material: _inert,
+    child: Center(
+      child: SizedBox(
+        width: 100,
+        height: 100,
+        child: InteractiveGlass(
+          drag: drag,
+          pressStretch: const GlassPressStretch.none(),
+          child: const Glass(
+            shape: GlassRoundedRectangle(
+              radius: BorderRadius.all(Radius.circular(16)),
+            ),
+          ),
+        ),
+      ),
+    ),
+  ),
+);
+
+/// A surface with no drag and no [InteractiveGlass.onTap]: nothing for it
+/// to handle, which is the configuration the hit-testing tests below pin.
+const Widget _plainSurface = SizedBox(
+  width: 100,
+  height: 100,
+  child: InteractiveGlass(
+    pressStretch: GlassPressStretch.none(),
+    child: Glass(
+      shape: GlassRoundedRectangle(
+        radius: BorderRadius.all(Radius.circular(16)),
+      ),
+    ),
+  ),
+);
+
 void main() {
   _retuneTests();
+  _treeShapeTests();
   setUp(() => _BuildCounterState.builds = 0);
 
   testWidgets('a press reaches the surface on pointer down', (tester) async {
@@ -458,5 +527,147 @@ void _retuneTests() {
     );
 
     expect(tester.takeException(), isNull);
+  });
+}
+
+void _treeShapeTests() {
+  // Regression: `build` used to wrap the child in a `GestureDetector` only
+  // when `drag.enabled || onTap != null`, so two `InteractiveGlass`es that
+  // differed only in that produced differently-shaped subtrees. Swapping
+  // one for the other in the same slot left Flutter updating an element
+  // against a widget of a different type, and the mismatch surfaced as a
+  // layout-time crash rather than as anything the API hints at.
+  testWidgets('swapping a still surface for a draggable one does not throw', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_slot(const GlassDrag.none()));
+    final before = tester.state<State<InteractiveGlass>>(
+      find.byType(InteractiveGlass),
+    );
+
+    final reports = await _errorsDuring(
+      () => tester.pumpWidget(_slot(const GlassDrag())),
+    );
+
+    expect(_messages(reports), isEmpty);
+    expect(
+      tester.state<State<InteractiveGlass>>(find.byType(InteractiveGlass)),
+      same(before),
+      reason:
+          'the swap inflated a fresh element, so it never exercised '
+          'the in-place update this is about',
+    );
+    await _settle(tester, _motionOf(tester));
+  });
+
+  testWidgets('swapping a draggable surface for a still one does not throw', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_slot(const GlassDrag()));
+    final before = tester.state<State<InteractiveGlass>>(
+      find.byType(InteractiveGlass),
+    );
+
+    final reports = await _errorsDuring(
+      () => tester.pumpWidget(_slot(const GlassDrag.none())),
+    );
+
+    expect(_messages(reports), isEmpty);
+    expect(
+      tester.state<State<InteractiveGlass>>(find.byType(InteractiveGlass)),
+      same(before),
+      reason:
+          'the swap inflated a fresh element, so it never exercised '
+          'the in-place update this is about',
+    );
+    await _settle(tester, _motionOf(tester));
+  });
+
+  // The two below are the regression the fix above risks: keeping the tree
+  // shape stable means a `GestureDetector` is now present on surfaces that
+  // handle no gesture at all, and that must not change what such a surface
+  // does to a pointer.
+  testWidgets('a surface with no drag and no onTap is still opaque', (
+    tester,
+  ) async {
+    var behind = 0;
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: GlassLayer(
+          tier: GeometryTier.none,
+          material: _inert,
+          child: Stack(
+            children: <Widget>[
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => behind++,
+                ),
+              ),
+              const Center(child: _plainSurface),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    // The control: the widget behind is reachable everywhere the surface
+    // is not, so a zero below means the surface swallowed the tap rather
+    // than that nothing was listening.
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pump();
+    expect(behind, 1, reason: 'the widget behind never received a tap');
+
+    await tester.tapAt(const Offset(400, 300));
+    await tester.pump();
+    expect(
+      behind,
+      1,
+      reason: 'a tap passed through the surface to the widget behind it',
+    );
+    await _settle(tester, _motionOf(tester));
+  });
+
+  // A parent *pan* is the gesture a spurious child recognizer would
+  // actually take. A parent vertical or horizontal drag proves nothing
+  // here: it declares victory at `kTouchSlop` while a pan is still waiting
+  // for `kPanSlop`, so it beats a child pan either way — a scrollable
+  // ancestor is never at risk. Pan against pan is decided by which
+  // recognizer accepts first, and the child's is added to the arena and
+  // routed its events first, so the child takes it.
+  testWidgets('a surface with no drag leaves a parent pan to the parent', (
+    tester,
+  ) async {
+    var starts = 0;
+    var cancels = 0;
+    var travel = Offset.zero;
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: GlassLayer(
+          tier: GeometryTier.none,
+          material: _inert,
+          child: GestureDetector(
+            onPanStart: (_) => starts++,
+            onPanUpdate: (details) => travel += details.delta,
+            onPanCancel: () => cancels++,
+            child: const Center(child: _plainSurface),
+          ),
+        ),
+      ),
+    );
+
+    await tester.drag(find.byType(InteractiveGlass), const Offset(0, -150));
+    await tester.pump();
+
+    expect(starts, 1, reason: 'the surface took the parent pan');
+    expect(cancels, 0, reason: 'the arena cancelled the parent pan');
+    expect(
+      travel.dy,
+      lessThan(-100),
+      reason: 'the parent pan won but never tracked the finger',
+    );
+    await _settle(tester, _motionOf(tester));
   });
 }

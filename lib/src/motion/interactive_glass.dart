@@ -505,19 +505,34 @@ class _InteractiveGlassState extends State<InteractiveGlass>
 
   @override
   Widget build(BuildContext context) {
-    var result = widget.child;
-
-    if (widget.drag.enabled || widget.onTap != null) {
-      result = GestureDetector(
-        behavior: widget.behavior,
-        onTap: widget.onTap,
-        onPanStart: widget.drag.enabled ? _onPanStart : null,
-        onPanUpdate: widget.drag.enabled ? _onPanUpdate : null,
-        onPanEnd: widget.drag.enabled ? _onPanEnd : null,
-        onPanCancel: widget.drag.enabled ? _onPanCancel : null,
-        child: result,
-      );
-    }
+    // **Unconditional on purpose.** This used to be wrapped in
+    // `if (widget.drag.enabled || widget.onTap != null)`, which made the
+    // shape of this subtree depend on the parameters the widget was given:
+    // swapping a `GlassDrag.none()` surface for a `GlassDrag(...)` one in
+    // the same slot changed the number of elements under `Listener`, and
+    // Flutter's in-place element update then crashed in
+    // `RenderGlassMotion.performLayout` on `sizeAccessAllowed`. Nothing in
+    // the API hinted at that, and it was reachable by any consumer who
+    // makes a surface draggable in response to state.
+    //
+    // The gate bought nothing, and costs nothing to drop. Every callback
+    // below is already individually nulled when there is nothing to
+    // handle, and `GestureDetector` registers a recognizer only when at
+    // least one callback of that family is non-null — so a surface with no
+    // drag and no [onTap] puts nothing in the gesture arena and cannot
+    // claim a gesture an ancestor would otherwise win. Hit testing is
+    // unchanged too: the `Listener` below already applies [behavior] to
+    // this very box unconditionally, so these extra proxies repeat a
+    // decision that was already made and only lengthen the hit-test path.
+    Widget result = GestureDetector(
+      behavior: widget.behavior,
+      onTap: widget.onTap,
+      onPanStart: widget.drag.enabled ? _onPanStart : null,
+      onPanUpdate: widget.drag.enabled ? _onPanUpdate : null,
+      onPanEnd: widget.drag.enabled ? _onPanEnd : null,
+      onPanCancel: widget.drag.enabled ? _onPanCancel : null,
+      child: widget.child,
+    );
 
     // Outside the detector and outside the arena: a press has to show the
     // instant the finger lands, not once a recognizer has won. Waiting for

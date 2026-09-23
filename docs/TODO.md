@@ -415,37 +415,61 @@ and C3, see above.
   catalogue's example-side workaround in
   `example/lib/src/catalogue/entries/chrome.dart` is redundant and can go.
 
-- **`InteractiveGlass` changes its widget-tree *shape* with its parameters,
-  so swapping one for another in the same slot can crash.** Found while
-  writing the catalogue's Motion entries.
+- **~~`InteractiveGlass` changes its widget-tree *shape* with its
+  parameters~~ — fixed 2026-09-23.** The entry's diagnosis held exactly:
+  `build` wrapped its child in a `GestureDetector` only when
+  `widget.drag.enabled || widget.onTap != null`, so two `InteractiveGlass`es
+  differing only in that produced differently-shaped subtrees, and an
+  in-place element update across the two failed
+  `RenderGlassMotion.performLayout`'s `sizeAccessAllowed` assertion.
 
-  `build` wraps its child in a `GestureDetector` only when
-  `widget.drag.enabled || widget.onTap != null`:
+  The `GestureDetector` is now unconditional, with the per-callback nulling
+  it already had left alone. The alternative — keeping the gate and reaching
+  for a key — only moves the sharp edge to the consumer, who has no way to
+  know it is there.
 
-  ```dart
-  if (widget.drag.enabled || widget.onTap != null) {
-    result = GestureDetector(
-      onPanStart: widget.drag.enabled ? _onPanStart : null,
-      ...
-    );
-  }
-  ```
+  **The cost of always emitting it was checked, not assumed.** It is
+  nothing on either axis the gate might have been buying:
 
-  Two `InteractiveGlass`es that differ only in whether drag is enabled
-  therefore produce differently-shaped subtrees. Flutter's element diffing
-  tries to update the old element in place, and the mismatch surfaces as
-  `RenderGlassMotion.performLayout` failing `sizeAccessAllowed`.
+  - *The arena.* `GestureDetector.build` registers a recognizer only when at
+    least one callback of that family is non-null, so a surface with no drag
+    and no `onTap` builds an empty `gestures` map,
+    `RawGestureDetectorState._handlePointerDown` iterates nothing, and no
+    member is added to the arena. It cannot take a gesture an ancestor would
+    otherwise win.
+  - *Hit testing.* The `Listener` that carries the press was already
+    unconditional and already applied `behavior` to this very box, so the
+    surface was opaque (or translucent, or deferring) in every configuration
+    before this change. The extra proxies repeat a decision already made:
+    `RenderProxyBoxWithHitTestBehavior.hitTest` returns whatever its child
+    returned for `deferToChild` and `translucent`, and the same `true` for
+    `opaque`, so nesting two of identical behaviour and size lengthens the
+    hit-test path and changes no outcome.
 
-  **The outer `if` buys nothing** — every callback inside is already
-  individually nulled when drag is off, so always building the
-  `GestureDetector` is behaviourally identical and keeps the tree shape
-  stable. That is the fix.
+  Four tests in `test/src/motion/interactive_glass_test.dart`, under
+  `_treeShapeTests`: both swap directions in one keyless slot, each
+  asserting that no `FlutterErrorDetails` was reported *and* that the
+  `State` instance survived (a swap that inflated a fresh element would
+  never have exercised the in-place update); plus the two hit-testing
+  guards the fix risks — that a plain surface still swallows a tap a
+  full-bleed widget behind it would otherwise get, and that a parent
+  `onPanStart` still wins over it. Both swap tests fail on the old code with
+  the recorded `sizeAccessAllowed` assertion; both guards were shown to bite
+  by mutation (unconditional pan callbacks, and a translucent `Listener`).
 
-  Reachable by any consumer who swaps a draggable surface for a
-  non-draggable one at the same position. The catalogue does not hit it,
-  because entries are reached through a `Navigator` push rather than a
-  direct widget swap, and the task that found it worked around it test-side
-  with a `KeyedSubtree`.
+  A parent *vertical* or *horizontal* drag was tried first as the arena
+  guard and proved nothing: it declares victory at `kTouchSlop` while a pan
+  is still waiting for `kPanSlop`, so it beats a child pan either way. A
+  scrollable ancestor was never at risk; a parent pan is.
+
+  The catalogue's workaround is test-side, not in the entries: the
+  `KeyedSubtree` wrappers in `example/test/catalogue_test.dart`'s two
+  "every entry mounts and paints" loops (motion and composition). The crash
+  those keys were guarding against is gone. Their comments give a second,
+  independent reason to keep them — one catalogue page never turns into
+  another without a route push, so an unkeyed in-place swap is not what the
+  real app does — so they are no longer load-bearing, but whether they go is
+  the example's call, not the package's.
 
 
 - **A `Glass` under a transform-bearing ancestor that has not been laid out
