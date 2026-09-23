@@ -1,7 +1,7 @@
 name: glass_forge_example
 description: >-
-  Five scenes over five photographs, showing what glass_forge renders and
-  how it is written.
+  A catalogue of 33 named entries, index to detail, showing what glass_forge
+  renders and how it is written.
 publish_to: none
 version: 1.0.0+1
 
@@ -32,7 +32,7 @@ flutter:
   # Geist and Geist Mono, under the SIL Open Font License 1.1. Bundling a font
   # is a redistribution and the OFL asks for the licence to travel with it, so
   # assets/licenses/ ships too and main() registers it with LicenseRegistry —
-  # which is what puts it behind the Licences button in the System scene.
+  # which is what puts it behind the Licences button in the index's top bar.
   fonts:
     - family: Geist
       fonts:
