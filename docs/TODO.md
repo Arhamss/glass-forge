@@ -183,6 +183,50 @@ and C3, see above.
 
 ## Known problems, none of them fixed
 
+- **The `FittedBox` bug has two exception shapes, and the guards only know
+  one.** Instrumenting the index test caught **14** errors: **9** are
+  `_AssertionError … 'hasSize'` with no sliver frame, and **5** are
+  `_TypeError: Null check operator used on a null value` with
+  `RenderSliverMultiBoxAdaptor` in the stack and no `hasSize` in the message.
+
+  The three per-group guards in `example/test/catalogue_test.dart`
+  (`:1063`, `:1995`, `:2543`) match on the literal string
+  `"Failed assertion: line 2251 pos 12: 'hasSize'"`. So they would
+  **mis-classify the sliver form as a regression** — the one thing those
+  guards exist to distinguish. They also pin a Flutter SDK line number, which
+  will drift on any SDK bump. The newer index test matches the stack
+  (`_syncGeometry` + `getTransformTo`) instead, which is the better shape.
+
+  Two follow-ups: widen the three guards to the stack-based match, and record
+  the null-check form alongside the `hasSize` one in this file's description
+  of the bug above.
+
+- **`_hex` is written out three times verbatim** — `entries/adaptation.dart:107`,
+  `entries/chrome.dart:127`, `entries/design_system.dart:40`. Its home is
+  `example/lib/src/backdrop_info.dart`, which already owns `BackdropInfo` and
+  `backdrops` and is the sole source of every colour in the example. Recorded
+  here rather than left in a review report, because the fourth copy is what
+  happens otherwise.
+
+- **The line-length rule is 80, not 79, and nothing enforces it.**
+  `docs/superpowers/specs/2026-09-14-glass-widgets-design.md:50` is the only
+  statement of it: "`very_good_analysis`, 80-character lines, no `// ignore:`".
+  **79 appears nowhere in any spec or plan — it was my own error, propagated
+  through every dispatch this session.** The practical damage is small, since
+  79 is stricter than 80 and all the work is compliant either way, but commit
+  `610d14b` reflowed five lines that were exactly 80 characters and therefore
+  already correct.
+
+  `dart format`'s default width is 80, so `analyze` and `format` both pass
+  lines at 80 and neither catches 81+. **37 lines of exactly 80 characters
+  live under root `lib/` and `test/`** — all legal under the real rule.
+  If the intent is to make the limit enforced rather than aspirational, the
+  change is `formatter: page_width: <n>` in `analysis_options.yaml`; applied
+  at 79 in a throwaway worktree it reformats **24 files, +245/−161**, all
+  under root `lib/`/`test/` and none under `example/`. Mechanical re-splitting
+  with no semantic risk, but big enough to want its own commit — and worth
+  confirming the number with Arham first, since the documented rule is 80.
+
 - **The example does not build for iOS from a clean checkout.** Found during
   Task 12's simulator run, and verified at source afterwards — this is not
   the 60-second cold-resolution timeout that looks similar.
