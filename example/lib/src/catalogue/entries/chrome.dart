@@ -161,8 +161,8 @@ final String _frameNote =
     '// real sheet resolves its detents against the height it is\n'
     '// given, less MediaQuery.paddingOf(context).top, and leaves\n'
     '// flushRadius at its default '
-    '${_packageFlushRadius.toStringAsFixed(0)} — the corner radius of\n'
-    '// a modern display, which this frame is not.\n';
+    '${_packageFlushRadius.toStringAsFixed(0)}, the corner radius of a\n'
+    '// modern display. This frame is not one.\n';
 
 // ---------------------------------------------------------------------------
 // What the sheets carry
