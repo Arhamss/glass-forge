@@ -13,6 +13,33 @@ import 'package:glass_forge_example/src/catalogue/entries/shapes.dart';
 import 'package:glass_forge_example/src/catalogue/entries/surfaces.dart';
 import 'package:glass_forge_example/src/catalogue/snippet.dart';
 
+/// The constructor call that makes [material].
+///
+/// A second, independent naming, and it has to be: both Adaptation
+/// snippets now *derive* the material they print from the one their
+/// specimen is built with, and an expectation reached out of that same
+/// derivation would agree with it whatever it said — the failure mode this
+/// whole file is written against. This table is written here, by hand,
+/// against `GlassMaterial`'s own constructors.
+String materialCodeFor(GlassMaterial material) {
+  final named = <GlassMaterial, String>{
+    const GlassMaterial(): 'const GlassMaterial()',
+    GlassMaterial.dome(): 'GlassMaterial.dome()',
+    GlassMaterial.clear(): 'GlassMaterial.clear()',
+    GlassMaterial.regular(brightness: Brightness.dark):
+        'GlassMaterial.regular(brightness: Brightness.dark)',
+    GlassMaterial.regular(brightness: Brightness.light):
+        'GlassMaterial.regular(brightness: Brightness.light)',
+  };
+  final code = named[material];
+  expect(
+    code,
+    isNotNull,
+    reason: 'no GlassMaterial constructor call names $material',
+  );
+  return code!;
+}
+
 void main() {
   CatalogueEntry entryWithFrost(double frost) {
     return CatalogueEntry(
@@ -2665,6 +2692,26 @@ void main() {
         );
         expect(find.text('tier reduced'), findsOneWidget);
         expect(renderSnippet(moved), contains('GlassTier.reduced'));
+
+        // The material line is derived from the specimen, not written
+        // beside it. Two assertions, because there are two ways to break
+        // it: the specimen could stop rendering with the colour-measured
+        // material, or the snippet could go back to a literal and drift
+        // the next time the first one moves.
+        expect(
+          asked,
+          backdropFor(catalogueBackdropPhoto).material,
+          reason:
+              "the specimen renders with the catalogue photograph's own "
+              'measured material, not one typed into the entry',
+        );
+        expect(
+          renderSnippet(moved),
+          contains('material: ${materialCodeFor(asked)}'),
+          reason:
+              'the snippet quotes the material this shape is drawn with; '
+              'a literal here says dome forever',
+        );
         expect(
           renderSnippet(entry),
           contains('the four signals decide'),
@@ -2788,6 +2835,24 @@ void main() {
           reason: 'and the strip says which of the two cases it is in',
         );
         expect(renderSnippet(moved), contains('tier: GeometryTier.none'));
+
+        // Same pair as GlassTierScope above, for the same reason: this
+        // snippet's `material:` line is derived from the layer the entry
+        // mounted, and a literal would drift the moment the backdrop's
+        // measured material moved.
+        final layerMaterial = pinnedLayer(tester).material;
+        expect(
+          layerMaterial,
+          backdropFor(catalogueBackdropPhoto).material,
+          reason:
+              "the layer renders with the catalogue photograph's own "
+              'measured material, not one typed into the entry',
+        );
+        expect(
+          renderSnippet(moved),
+          contains('material: ${materialCodeFor(layerMaterial)}'),
+          reason: 'the snippet quotes the material the layer captures with',
+        );
 
         final portable = entry.withKnob(0, GeometryTier.portable);
         await pump(tester, portable);

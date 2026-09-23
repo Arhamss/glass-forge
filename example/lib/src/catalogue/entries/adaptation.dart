@@ -107,6 +107,38 @@ const RenderCapabilities _fullCapabilities = RenderCapabilities(
 String _hex(Color color) =>
     '0x${color.toARGB32().toRadixString(16).toUpperCase().padLeft(8, '0')}';
 
+/// [material] as the Dart literal a snippet would quote.
+///
+/// Matched against the calls `GlassMaterial` exposes rather than typed
+/// beside the value, for the reason [_hex] gives one line up: every
+/// specimen in this file is built with `_backdrop.material`, and a literal
+/// `GlassMaterial.dome()` written into a snippet goes on saying dome long
+/// after the material it claims to describe has moved.
+///
+/// Throws rather than guessing. A material this cannot name is one no
+/// snippet here can quote truthfully, and the group's own "every entry's
+/// code is non-empty" test is where that shows up — in a test run, rather
+/// than in front of a reader.
+String _materialCode(GlassMaterial material) {
+  final named = <GlassMaterial, String>{
+    const GlassMaterial(): 'const GlassMaterial()',
+    GlassMaterial.dome(): 'GlassMaterial.dome()',
+    GlassMaterial.clear(): 'GlassMaterial.clear()',
+    GlassMaterial.regular(brightness: Brightness.dark):
+        'GlassMaterial.regular(brightness: Brightness.dark)',
+    GlassMaterial.regular(brightness: Brightness.light):
+        'GlassMaterial.regular(brightness: Brightness.light)',
+  };
+  final code = named[material];
+  if (code == null) {
+    throw UnsupportedError(
+      'no GlassMaterial call names $material — add it here before a '
+      'backdrop is measured with it, or no snippet can quote it',
+    );
+  }
+  return code;
+}
+
 /// [capabilities] as the Dart literal a snippet would quote, with every
 /// line after the first carrying [indent].
 String _capabilitiesCode(RenderCapabilities capabilities, String indent) {
@@ -419,7 +451,7 @@ final CatalogueEntry _glassTierScope = CatalogueEntry(
         'GlassTierScope(\n'
         '  engine: engine,\n'
         '  child: Glass(\n'
-        '    material: GlassMaterial.dome(),\n'
+        '    material: ${_materialCode(_backdrop.material)},\n'
         '    shape: const GlassSuperellipse(\n'
         '      radius: BorderRadius.all(Radius.circular($_scopeRadius)),\n'
         '    ),\n'
@@ -842,7 +874,7 @@ final CatalogueEntry _geometryTier = CatalogueEntry(
         '  // Null adopts the enclosing GlassTierScope answer, or\n'
         '  // GeometryTier.accelerated where there is no scope.\n'
         '  tier: GeometryTier.${tier.name},\n'
-        '  material: GlassMaterial.dome(),\n'
+        '  material: ${_materialCode(_backdrop.material)},\n'
         '  child: Stack(\n'
         '    fit: StackFit.expand,\n'
         '    children: [\n'
