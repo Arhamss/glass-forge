@@ -157,4 +157,46 @@ class ShapeGeometry {
           c * localPoint.dx + d * localPoint.dy,
         );
   }
+
+  /// This shape's box in layer-local physical pixels, axis-aligned.
+  ///
+  /// **Not** [origin] plus [halfExtent]. Those two are in different spaces:
+  /// [origin] is where the shape sits in the layer, while [halfExtent] is
+  /// half the shape's own box in its *own* frame, which is what the SDF
+  /// wants (`abs(local) - halfExtent`, see `common/sdf.glsl`) and what
+  /// [toLocal] maps into. Between them sits the basis, and any scale in it
+  /// separates the two: a 200x200 specimen fitted into a 44x44 thumbnail
+  /// carries a [halfExtent] of 100 logical pixels and covers 22. Adding
+  /// [halfExtent] to [origin] answers 200x200 at the thumbnail's centre,
+  /// which is how two thumbnails a row apart came to look like overlapping
+  /// glass to the cross-pass overlap warning.
+  ///
+  /// The four corners are transformed rather than the extent scaled, which
+  /// is what makes this right under rotation and skew as well, and it is a
+  /// bounding box rather than the silhouette: an oval's box is its ellipse's
+  /// box, not the ellipse.
+  ///
+  /// Empty, at [origin], for a shape whose basis is degenerate — a shape
+  /// that has never painted (see `RenderGlassShape`) or one squashed flat.
+  /// Such a shape draws nothing, and an empty rect overlaps nothing, which
+  /// is the answer callers want.
+  Rect get layerBounds {
+    final corners = <Offset>[
+      toLayerSpace(Offset(-halfExtent.width, -halfExtent.height)),
+      toLayerSpace(Offset(halfExtent.width, -halfExtent.height)),
+      toLayerSpace(Offset(-halfExtent.width, halfExtent.height)),
+      toLayerSpace(Offset(halfExtent.width, halfExtent.height)),
+    ];
+    var left = corners.first.dx;
+    var top = corners.first.dy;
+    var right = left;
+    var bottom = top;
+    for (final corner in corners.skip(1)) {
+      left = math.min(left, corner.dx);
+      top = math.min(top, corner.dy);
+      right = math.max(right, corner.dx);
+      bottom = math.max(bottom, corner.dy);
+    }
+    return Rect.fromLTRB(left, top, right, bottom);
+  }
 }

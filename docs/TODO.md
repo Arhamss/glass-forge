@@ -197,13 +197,75 @@ and C3, see above.
 
 ## Known problems, struck through as they are fixed
 
-- **Overscrolling the catalogue index emits 14 glass-over-glass overlap
-  warnings.** Found when the overscroll workarounds were removed (`fca850e`).
-  They are absent without the stretch, and the pairs named sit in *different*
-  backdrop passes even though the rows declare no material of their own —
-  which is not what the warning is supposed to fire on. Either the warning is
-  over-reporting under a stretch transform, or the stretch is genuinely
-  putting two passes over the same pixels. Nobody has established which.
+- ~~**Overscrolling the catalogue index emits 14 glass-over-glass overlap
+  warnings.**~~ **The warning was over-reporting**, and the stretch had
+  nothing to do with it. Fixed by giving the check
+  `ShapeGeometry.layerBounds` instead of a rect built from `origin` and
+  `halfExtent`.
+
+  Established by instrumenting the check to print both records rather than
+  just their rects. All fourteen name the **same pair**, they differ only in
+  material, and one of them fires before any gesture at all — so "absent
+  without the stretch" was wrong too; the stretch only adds frames, and each
+  frame that overlaps prints once. The pair is two rows' thumbnails, 44x44
+  and 120 logical pixels apart on screen, which cannot touch.
+
+  The cause is a **space mismatch**, not a transform. `origin` is where the
+  shape sits in the layer; `halfExtent` is half the shape's box in its *own*
+  frame, which is what the SDF evaluates against and what the basis sits
+  between. Every index thumbnail fits a 200x200 specimen into 44x44, so the
+  check read each one as 200x200 at the thumbnail's centre — 4.5x too wide
+  in each direction — and neighbours a row apart collided. Any scale at all
+  between a shape and its layer produced this; a rotation was the only case
+  the old comment admitted to, and it was the least of them. A never-painted
+  shape was a second false source: its degenerate basis resolves an origin
+  of (0, 0), so it claimed a full-size box at the layer's corner. Both are
+  gone — `layerBounds` maps the four corners through the basis, and answers
+  an empty rect for a degenerate one.
+
+  `GlassScene.bounds` had already been doing it correctly, by hand, since
+  before the warning existed. That routine is now `ShapeGeometry.layerBounds`
+  and both callers share it.
+
+  **It is a debug-only cost.** The check runs inside an `assert`, so the
+  four `toLayerSpace` calls per shape it now costs are compiled out of
+  profile and release entirely. `GlassScene.bounds` does exactly what it
+  always did.
+
+- **The index does have real cross-pass overlaps, and the false ones were
+  hiding them.** Found immediately above, and the reason that entry is not
+  simply closed. The check prints **one pair per paint** and returns, so
+  whichever pair `_records` reaches first is the only one anybody ever
+  hears about — which for the whole life of that bug was the bogus
+  thumbnail-against-thumbnail pair. With it gone, the same probe on the
+  same page reports a row's thumbnail against the **pinned top bar**:
+  `Rect.fromLTRB(0, 0, 2400, 168)` is `_TopBar`'s `GlassSurface.navigationBar`
+  in physical pixels, 800x56 logical, and a row scrolled under it is
+  genuinely two backdrop passes over the same pixels. That is what the
+  warning exists to say, and it is flutter#187820's own minimal repro —
+  its title is a glass bar stacked above other glass.
+
+  It is an **example-app composition question, not a package defect**: the
+  bar takes its own measured backdrop material (`_backdrop.barBackdrop`) and
+  every row thumbnail is a live specimen with whatever material that
+  specimen demonstrates, so they can never share a pass. Content scrolling
+  under a translucent bar is also the arrangement the comp asks for. The
+  three ways out the message itself names — one material, one blend group,
+  or `GlassPresence` — none fit a catalogue whose whole point is showing
+  different materials at once. The real answer is the per-pass clipping
+  `_pushBackdropPasses` flags: clip each pass to its own shapes' bounds,
+  inflated by displacement and blur, so two passes only ever stack where
+  their shapes really meet. Wants a physical device, like everything else
+  about #187820.
+
+  A second real pair turns up too, between two glass surfaces **inside one
+  specimen** — a specimen that composes two materials is overlapping by
+  construction. Worth a look when the entries are next reviewed.
+
+  Consider also making the check report every pair rather than the first.
+  It is one pair per paint to avoid spamming a frame, and that is exactly
+  what let one false positive mask everything behind it for as long as it
+  lasted.
 
 - ~~**The retained clip chain was collected from one arbitrary shape, and
   cropped whole pages.**~~ Fixed by `f85863c`; `collect` now takes every
@@ -232,6 +294,23 @@ and C3, see above.
   private to one shape is now dropped rather than honoured, so that shape's
   backdrop can bleed past its box — strictly better than cropping the page,
   and the real answer is the per-pass clipping `_pushBackdropPasses` flags.
+
+  **Still open on 2026-09-24, deliberately.** Both were looked at again
+  alongside the two fixes above and left alone. The first is a restructure
+  of `_pushGlassLayers`: the subtree would stop painting inside the last
+  backdrop pass and paint as a sibling after the whole retained chain, which
+  moves three things at once — the retained clips off the subtree (the
+  point), the layer's own bounds clip off the subtree (a separate behaviour
+  change, and arguably a correction, since a `RenderProxyBox` does not
+  normally clip its child), and the single-material arrangement that
+  `_pushBackdropPasses` currently keeps byte-for-byte identical to what it
+  was before passes existed. `retained_clip_chain_test.dart` pins content
+  positions through that arrangement, so it needs its own task and its own
+  tests rather than a ride along with something else. It also does not bite
+  the catalogue: every index thumbnail has its *own* `ClipRRect`, so no clip
+  there is shared by all shapes, which is the second residual's case, not
+  the first's. The second still wants a physical device — it cannot be
+  separated from #187820, which the simulator does not reproduce.
 
 - ~~**Swapping a `GlassBlendGroup` for an `InteractiveGlass` in one slot
   threw "are not in the same render tree".**~~ Fixed by `62bb1d6`, and

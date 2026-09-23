@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/rendering.dart';
 import 'package:glass_forge/src/scene/scene_revision.dart';
 import 'package:glass_forge/src/shapes/shape_geometry.dart';
@@ -66,9 +64,9 @@ class GlassScene {
     if (_shapes.isEmpty) {
       return Rect.zero;
     }
-    var result = _boundsOf(shapes.first);
+    var result = shapes.first.layerBounds;
     for (final shape in shapes.skip(1)) {
-      result = result.expandToInclude(_boundsOf(shape));
+      result = result.expandToInclude(shape.layerBounds);
     }
     return result.inflate(padding);
   }
@@ -98,36 +96,6 @@ class GlassScene {
       }
     }
     return delta;
-  }
-
-  static Rect _boundsOf(ShapeGeometry shape) {
-    // The shape's own extent, mapped through its basis. Taking the extremes of
-    // the four transformed corners covers rotation and skew.
-    final corners = <Offset>[
-      shape.toLayerSpace(
-        Offset(-shape.halfExtent.width, -shape.halfExtent.height),
-      ),
-      shape.toLayerSpace(
-        Offset(shape.halfExtent.width, -shape.halfExtent.height),
-      ),
-      shape.toLayerSpace(
-        Offset(-shape.halfExtent.width, shape.halfExtent.height),
-      ),
-      shape.toLayerSpace(
-        Offset(shape.halfExtent.width, shape.halfExtent.height),
-      ),
-    ];
-    var left = corners.first.dx;
-    var top = corners.first.dy;
-    var right = left;
-    var bottom = top;
-    for (final c in corners.skip(1)) {
-      left = math.min(left, c.dx);
-      top = math.min(top, c.dy);
-      right = math.max(right, c.dx);
-      bottom = math.max(bottom, c.dy);
-    }
-    return Rect.fromLTRB(left, top, right, bottom);
   }
 
   static bool _sameGeometry(ShapeGeometry a, ShapeGeometry b) {

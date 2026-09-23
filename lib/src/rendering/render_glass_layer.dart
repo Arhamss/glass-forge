@@ -592,11 +592,19 @@ class RenderGlassLayer extends RenderProxyBox {
   /// fine: they share a matte and fold into one surface via smooth-min,
   /// which is the supported way to overlap.
   ///
-  /// Each shape's bounds are built from [ShapeGeometry.origin] and
-  /// [ShapeGeometry.halfExtent] as an axis-aligned rect. That is exact for
-  /// an unrotated shape and only approximate -- an over-estimate -- once a
-  /// rotated basis is involved, which is good enough for a debug
-  /// diagnostic.
+  /// Each shape's box comes from [ShapeGeometry.layerBounds], which puts
+  /// the shape's own extent through its own basis. Building it from
+  /// [ShapeGeometry.origin] and [ShapeGeometry.halfExtent] directly --
+  /// which this did until the catalogue index reported fourteen overlaps
+  /// between thumbnails a row apart that never touch -- mixes two spaces:
+  /// the origin is in the layer's, the half-extent in the shape's own. Any
+  /// scale between them is then missing, and a shrinking one over-reports:
+  /// the index fits a 200x200 specimen into a 44x44 thumbnail, so every
+  /// thumbnail claimed four and a half times its width in each direction
+  /// and collided with its neighbours. It is still a bounding box rather
+  /// than a silhouette, so two ovals that share a corner of their boxes and
+  /// nothing else still report -- an over-estimate a debug diagnostic can
+  /// live with, unlike one that scales with the caller's layout.
   ///
   /// Called from two places in [paint], both *after* the subtree has
   /// painted -- never from the top of [paint] itself, where every shape's
@@ -626,11 +634,7 @@ class RenderGlassLayer extends RenderProxyBox {
         if (!GlassComposition.willRender(assignedA.material, a.presence)) {
           continue;
         }
-        final boundsA = Rect.fromCenter(
-          center: a.geometry.origin,
-          width: a.geometry.halfExtent.width * 2,
-          height: a.geometry.halfExtent.height * 2,
-        );
+        final boundsA = a.geometry.layerBounds;
         for (var j = i + 1; j < entries.length; j++) {
           final b = entries[j];
           final assignedB = b.assigned;
@@ -640,11 +644,7 @@ class RenderGlassLayer extends RenderProxyBox {
           if (!GlassComposition.willRender(assignedB.material, b.presence)) {
             continue;
           }
-          final boundsB = Rect.fromCenter(
-            center: b.geometry.origin,
-            width: b.geometry.halfExtent.width * 2,
-            height: b.geometry.halfExtent.height * 2,
-          );
+          final boundsB = b.geometry.layerBounds;
           if (!boundsA.overlaps(boundsB)) {
             continue;
           }
