@@ -15,10 +15,17 @@ import 'package:glass_forge_example/src/theme.dart';
 /// these sit on a glass bar, and a second piece of glass on top of the
 /// first is the one composition this renderer cannot draw.
 ///
-/// The fill is [SurfaceInk.inkTrack] over the enclosing surface's own label
-/// colour, which is the same pair the selected half of a
-/// [SegmentedControl] uses — so a pill inverts with its bar instead of
-/// staying white on a bar that flipped to the light scheme.
+/// The fill is [SurfaceInk.inkFill] over the enclosing surface's own label
+/// colour — the step a [SegmentedControl] puts behind its *selected*
+/// segment and a [ValueSlider] behind the portion it has filled, not the
+/// [SurfaceInk.inkTrack] those two use for the part that is merely
+/// available. The reason is the one `inkFill`'s own doc gives: a fill only
+/// slightly above the track reads as a smudge rather than as a state, and
+/// this is the only control in the app that promises a destination.
+///
+/// Reading the colour off the surface rather than naming one is what lets a
+/// pill invert with a bar that flipped to the light scheme instead of
+/// staying white on white.
 class PillButton extends StatelessWidget {
   /// Creates a pill reading [label] that calls [onTap].
   const PillButton({required this.label, required this.onTap, super.key});
@@ -37,7 +44,7 @@ class PillButton extends StatelessWidget {
       onTap: onTap,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: context.inkTrack,
+          color: context.inkFill,
           borderRadius: const BorderRadius.all(Radius.circular(999)),
         ),
         child: Padding(

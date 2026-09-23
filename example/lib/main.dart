@@ -16,7 +16,13 @@ void main() {
   runApp(const GlassForgeExample());
 }
 
-/// A 33-entry catalogue, index to detail, over five photographs.
+/// A 33-entry catalogue, index to detail, over one photograph.
+///
+/// One, not the five the example ships: the index and every entry page
+/// share `catalogueBackdropPhoto`, so paging between them never swaps the
+/// picture out from under the glass. The other four still have their
+/// backdrop colours measured in `backdrop_info.dart`, unpainted since the
+/// catalogue replaced the scenes.
 ///
 /// Everything on screen is this package's own API. There is no wrapper
 /// layer between the reader and `GlassLayer`, `Glass`, `GlassMaterial`,

@@ -501,6 +501,18 @@ class _SeeAlso extends StatelessWidget {
 /// resolve off the enclosing surface, so the distinction survives a bar
 /// that flipped its scheme.
 ///
+/// **A pill says "there is an entry", not "this is a class".** Two entries
+/// are named for a subject rather than a symbol — `Material knobs` and
+/// `Cross-pass overlap` — because no single class names the eight fields
+/// that shape a `GlassMaterial`, or an illegal composition. `Material
+/// knobs` is a see-also target, and it gets a pill like any other, because
+/// the one thing the pill promises is a page, and there is one. A third
+/// treatment for concept entries would split the row along an axis the
+/// reader is not asking about and blunt the only distinction it does make.
+/// Nor does a pill imply a symbol typographically: every chip is set in
+/// [AppText.label], the app's sans, where an actual API name is set in
+/// [AppText.mono].
+///
 /// Painted either way, never glass — a row of chips this small would each
 /// cost their own backdrop pass for no visual gain, since none of them need
 /// to refract anything.
