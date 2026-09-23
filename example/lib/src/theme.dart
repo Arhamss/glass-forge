@@ -73,17 +73,23 @@ extension SurfaceInk on BuildContext {
 /// `DefaultTextStyle`, so leaving colour unset is what lets a surface's own
 /// label colour through; a caller that wants a step down the hierarchy asks
 /// [SurfaceInk] for it.
-extension AppText on BuildContext {
-  TextStyle _sans(double size, double height, FontWeight weight, double track) {
-    return TextStyle(
-      fontFamily: 'Geist',
-      fontSize: size,
-      height: height / size,
-      fontWeight: weight,
-      letterSpacing: track,
-    );
-  }
+/// One step of the sans scale, stated the way a type specimen states it:
+/// size over leading, in points, with its own weight and tracking.
+///
+/// A plain function rather than a member of [AppText] because it reads
+/// nothing off a context — every step below is a pure function of these four
+/// numbers.
+TextStyle _sans(double size, double height, FontWeight weight, double track) {
+  return TextStyle(
+    fontFamily: 'Geist',
+    fontSize: size,
+    height: height / size,
+    fontWeight: weight,
+    letterSpacing: track,
+  );
+}
 
+extension AppText on BuildContext {
   /// A scene's name.
   TextStyle get display => _sans(32, 36, FontWeight.w600, -0.9);
 

@@ -127,7 +127,7 @@ void main() {
       expect(outgoing.value, 1.0);
     });
 
-    test('the incoming page reaches full presence once the push completes', () {
+    test('the incoming page is at full presence once the push completes', () {
       final incoming = incomingCataloguePresence(route);
       route.value = 1;
       expect(incoming.value, 1.0);
@@ -258,8 +258,8 @@ class _CoveredStandIn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final covered =
-        ModalRoute.of(context)?.secondaryAnimation ?? kAlwaysDismissedAnimation;
+    final covering = ModalRoute.of(context);
+    final covered = covering?.secondaryAnimation ?? kAlwaysDismissedAnimation;
     return GlassLayer(
       child: GlassPresence(
         presence: outgoingCataloguePresence(covered),

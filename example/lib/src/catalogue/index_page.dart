@@ -54,8 +54,8 @@ class CatalogueIndexPage extends StatelessWidget {
     // `ModalRoute` says something now sits on top of it. See
     // `outgoingCataloguePresence` for why this ramp and the entry page's
     // incoming one never overlap.
-    final covered =
-        ModalRoute.of(context)?.secondaryAnimation ?? kAlwaysDismissedAnimation;
+    final covering = ModalRoute.of(context);
+    final covered = covering?.secondaryAnimation ?? kAlwaysDismissedAnimation;
 
     // A Scaffold, for one reason: `MaterialApp` marks any text that is not
     // inside a `Material` with a debug underline, and every label on this

@@ -51,7 +51,9 @@ class _CatalogueEntryRoute extends PageRoute<void>
   final CatalogueEntry entry;
 
   @override
-  Widget buildContent(BuildContext context) => CatalogueEntryPage(entry: entry);
+  Widget buildContent(BuildContext context) {
+    return CatalogueEntryPage(entry: entry);
+  }
 
   @override
   bool get maintainState => true;
