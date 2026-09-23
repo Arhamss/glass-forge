@@ -586,13 +586,33 @@ and C3, see above.
   an API with a sharp edge, and this is the third distinct way the same
   missing tolerance has drawn blood.
 
-- **Not publish-clean.** On a fresh checkout `flutter pub publish --dry-run`
-  reports one warning: `pubspec.yaml` declares
-  `build/shaderbundles/geometry.shaderbundle` as an asset, but `build/` is
-  gitignored, so the file only exists after something has built. Fixing it
-  touches `hook/build.dart` and `lib/`, so it was left alone. It also means
-  CI must build before it analyzes — `shaders.yaml` is ordered that way
-  deliberately.
+- **Not publish-clean.** Confirmed still true on 2026-09-24, and confirmed
+  the *right* way: a `flutter pub publish --dry-run` in the working tree
+  reports **0 warnings**, because `build/` exists here from earlier builds. In
+  a throwaway worktree with no `build/`, it reports **1 warning**:
+
+  ```
+  warning - pubspec.yaml:55:7 - The asset file
+  'build/shaderbundles/geometry.shaderbundle' doesn't exist.
+  ```
+
+  `hook/build.dart` generates that bundle into `build/`, which is gitignored,
+  and `pubspec.yaml` declares it under `assets:` so a consuming app bundles it
+  as `packages/glass_forge/build/shaderbundles/geometry.shaderbundle` —
+  the key `gpu_geometry_producer_io.dart` tries first.
+
+  **Partially investigated, deliberately not fixed.** Removing the `assets:`
+  entry in a worktree left the Impeller lane with exactly its one pre-existing
+  failure (the `GpuGeometryProducer` fail-soft) and nothing new — so the
+  declaration is not load-bearing for *this package's own tests*. That does
+  not answer the question that matters, which is whether a **consuming app**
+  still finds the bundle without it, and `pub get` failed in that worktree so
+  the dry-run's own warning count was not comparable. Do not act on the
+  half-result above without settling the consumer case first.
+
+  Low urgency: the package is not published, has no repository URL, and pub
+  treats this as a warning rather than an error.
+
 - **`repository` and `issue_tracker` are unset** in `pubspec.yaml`, because
   pub.dev checks that the URLs resolve and no public repo exists yet.
   `publish_to: none` is still set.
