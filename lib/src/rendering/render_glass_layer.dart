@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -966,20 +967,30 @@ class RenderGlassLayer extends RenderProxyBox {
   /// correctly and reproduces nothing. The issue is closed, but by a bot for
   /// lack of a reply, not by a fix.
   ///
-  /// So the arrangement below is exposed wherever two passes overlap. A pass
-  /// writes transparent black outside its own shapes' coverage and composites
-  /// srcOver, so where the earlier passes drew nothing the later one reads
-  /// the untouched original — but each pass currently covers the whole layer
-  /// clip, not its own shapes, so two materials in one layer stack across the
-  /// entire layer whether or not their shapes meet.
+  /// So the arrangement below is exposed wherever two passes overlap — and,
+  /// since this change, only there. A pass writes transparent black outside
+  /// its own shapes' coverage and composites srcOver, so where the earlier
+  /// passes drew nothing the later one reads the untouched original. What
+  /// used to spoil that was the clip: every pass covered the whole layer
+  /// rect rather than its own shapes, so two materials in one layer stacked
+  /// across the entire layer whether or not their shapes went anywhere near
+  /// each other. Each pass now carries its own clip — see [_passClip] — so
+  /// two of them reach the same pixels only where their shapes, plus
+  /// everything their filters legitimately read around them, really meet.
   ///
-  /// Clipping each pass to its own shapes' bounds would remove that for
-  /// non-overlapping materials, and make every pass cheaper. It is not as
-  /// simple as clipping to the coverage: the shader samples the backdrop up
-  /// to the full displacement away from each shape, and a composed frost
-  /// blur reaches further again, so the clip has to be inflated by both or
-  /// every rim picks up mirrored-edge artefacts. That wants a physical device
-  /// to verify, which is also the only way to confirm #187820 here at all.
+  /// That is also why the subtree moves out from under the passes as soon as
+  /// there is more than one of them. It used to paint inside the last pass,
+  /// and a pass clipped to its own shapes would crop the whole subtree to
+  /// them — the same failure the retained clip chain had. With a single
+  /// pass, which is the common case and one that stacks over nothing,
+  /// nothing changes at all: no clip of its own, and the subtree still
+  /// paints inside it, byte for byte the arrangement this had before there
+  /// were passes.
+  ///
+  /// None of this makes #187820 itself verifiable here. It removes the
+  /// precondition for it wherever two materials' shapes are apart; whether
+  /// the symptom is gone where they are apart still wants a physical
+  /// device, which is the only place the symptom exists at all.
   ///
   /// Where two materials' shapes genuinely overlap, the later one samples the
   /// earlier one's glass — glass sampling glass, which Apple's own guidance
@@ -993,18 +1004,45 @@ class RenderGlassLayer extends RenderProxyBox {
     List<_GlassPass> dormant,
   ) {
     final pushed = <BackdropFilterLayer>[];
+    final clips = <ClipRectLayer>[];
+    final stacks = passes.length > 1;
+    // The layer's own clip, which is what wraps all of this anyway. Used as
+    // each pass's provisional clip because the real one cannot be known yet
+    // -- see the narrowing below -- and because it is the behaviour this had
+    // before there were per-pass clips, so a pass that somehow never gets
+    // narrowed is no worse off than it used to be.
+    final layerClip = expandToPixelBuckets(Offset.zero & size);
     for (var i = 0; i < passes.length; i++) {
       GlassRenderCounters.instance.recordBackdropPush();
       final backdrop = BackdropFilterLayer();
       pushed.add(backdrop);
-      context.pushLayer(
-        backdrop,
-        // The subtree paints once, above every pass. Putting it in the last
-        // one keeps a single-material layer byte-for-byte the arrangement it
-        // had before there were passes at all.
-        i == passes.length - 1 ? _paintSubtree : _paintNothing,
-        offset,
-      );
+      if (!stacks) {
+        // One pass stacks over nothing, so it keeps the arrangement it has
+        // always had: no clip of its own, and the subtree painted inside it.
+        context.pushLayer(backdrop, _paintSubtree, offset);
+        continue;
+      }
+      final clip = context.pushClipRect(needsCompositing, offset, layerClip, (
+        clippedContext,
+        clippedOffset,
+      ) {
+        clippedContext.pushLayer(backdrop, _paintNothing, clippedOffset);
+      });
+      // Non-null because `needsCompositing` is, and this layer's is a
+      // constant true -- `pushClipRect` only answers null when it clips on
+      // the canvas instead, which would not contain a pushed layer at all.
+      clips.add(clip!);
+    }
+    if (stacks) {
+      // Every pass above was pushed empty, so the subtree paints here
+      // instead: a sibling over all of them rather than a child of the last,
+      // which would put it inside that pass's clip and crop it to that
+      // pass's shapes. An empty `BackdropFilterLayer` takes its bounds from
+      // the enclosing cull rect rather than from children it does not have,
+      // which is what the clip pushed around each one is setting — see
+      // `glass_material_pass_test.dart`, which renders one and reads the
+      // pixels back.
+      _paintSubtree(context, offset);
     }
 
     // The subtree has painted, so every shape has registered the transform
@@ -1012,6 +1050,19 @@ class RenderGlassLayer extends RenderProxyBox {
     final mapping = _coordinateMapping(layerOffset);
     for (var i = 0; i < passes.length; i++) {
       pushed[i].filter = _buildFilter(passes[i], mapping);
+    }
+
+    // And only now can a pass be narrowed to its own shapes, for exactly
+    // the reason the filters are built here rather than above: before the
+    // subtree paints, a shape that has not painted yet carries a degenerate
+    // basis and an empty box (see [ShapeGeometry.layerBounds]), so every
+    // pass on a fresh mount would have clipped to nothing and the layer
+    // would have rendered blank for that frame. Assigning afterwards is
+    // legal for the same reason assigning `filter` is: a layer tree is not
+    // handed to the compositor until the end of the frame, and the setter
+    // calls `markNeedsAddToScene` itself.
+    for (var i = 0; i < clips.length; i++) {
+      clips[i].clipRect = _passClip(passes[i]).shift(offset);
     }
 
     // Checked here, not earlier in `paint`, for the same reason the filters
@@ -1031,6 +1082,106 @@ class RenderGlassLayer extends RenderProxyBox {
   }
 
   static void _paintNothing(PaintingContext context, Offset offset) {}
+
+  /// How far outside its own shapes one pass's filter reads, in physical
+  /// pixels.
+  ///
+  /// Derived from the two things in that filter that sample away from the
+  /// pixel being written, not guessed. Under-inflate either and the rim
+  /// reads the mirrored edge of a backdrop that stopped too early, which is
+  /// a hard line along the clip — the one real risk in clipping a pass at
+  /// all.
+  ///
+  /// * **Refraction.** `final_render.frag` reads the backdrop at
+  ///   `frag + displacement`, and the magnitude it decodes there is at most
+  ///   `uOptical.x`, which [GlassComposition] writes as
+  ///   [GlassMaterial.maxDisplacement] in physical pixels. Chromatic
+  ///   aberration takes its red and blue taps at
+  ///   `displacement * (1 ± chromaticAberration / 2)`, so the furthest of
+  ///   the three sits that fraction further out again.
+  /// * **Frost.** The shader reads the *blurred* backdrop, never the raw
+  ///   one: [GlassComposition] composes `blur(sigma: frost * ratio)` inside
+  ///   it. A Gaussian at sigma draws on its input out to about three sigma
+  ///   — beyond that under 0.3% of the weight is left, which is the
+  ///   truncation raster libraries use — so the blurred value the shader
+  ///   samples needs the raw backdrop that far around the sample point.
+  ///
+  /// Both are measured from a pixel the pass *writes*, and a pass writes a
+  /// little outside its shapes' boxes: up to half a physical pixel for
+  /// `final_render.frag`'s coverage ramp, and one texel further for the
+  /// bilinear backdrop tap a dome takes. [_coverageSlack] covers both.
+  ///
+  /// Presence is deliberately left out, though it scales both the
+  /// displacement and the frost. A clip that shrank as a surface faded would
+  /// resize that pass's offscreen render target on every frame of the fade,
+  /// and a clip wider than it needs to be costs a little fill rate and never
+  /// an artefact.
+  static double _filterReach(GlassMaterial material, double ratio) {
+    final aberration = 1 + material.chromaticAberration.abs() / 2;
+    return material.maxDisplacement * ratio * aberration +
+        _blurSigmasSampled * material.frost * ratio +
+        _coverageSlack;
+  }
+
+  /// How many sigmas of a Gaussian blur are worth treating as real.
+  static const double _blurSigmasSampled = 3;
+
+  /// Physical pixels a pass writes, or taps, outside its shapes' boxes.
+  static const double _coverageSlack = 2;
+
+  /// Where one backdrop pass may paint and sample, in this layer's own
+  /// local logical space.
+  ///
+  /// Its shapes' boxes unioned, inflated by [_filterReach], and grown onto a
+  /// pixel bucket exactly as the layer's own clip is: a clip that changed
+  /// size on every animating frame would reallocate that pass's offscreen
+  /// render target on every one of them.
+  ///
+  /// A shape whose box is empty is skipped rather than unioned in.
+  /// [ShapeGeometry.layerBounds] answers an empty rect at the shape's origin
+  /// for a degenerate basis — a shape that has never painted, or one
+  /// squashed flat — and two of those at different origins would union into
+  /// a real rectangle spanning the gap between them, so a pass that draws
+  /// nothing would clip to something. A pass whose shapes are all degenerate
+  /// clips to nothing, which is what it draws.
+  Rect _passClip(_GlassPass pass) {
+    final drawn = _drawnBounds(pass.scene);
+    if (drawn.isEmpty) {
+      return Rect.zero;
+    }
+    final ratio = math.max(_devicePixelRatio, 1e-3);
+    final reach = _filterReach(pass.material, ratio);
+    final inflated = drawn.inflate(reach);
+    if (!inflated.isFinite) {
+      // A shape whose transform went non-finite. `expandToPixelBuckets`
+      // would throw on it, so fall back to the clip this layer pushes
+      // around all of its passes anyway -- no worse than before there were
+      // per-pass clips, and it is the enclosing clip regardless.
+      return expandToPixelBuckets(Offset.zero & size);
+    }
+    return expandToPixelBuckets(
+      Rect.fromLTRB(
+        inflated.left / ratio,
+        inflated.top / ratio,
+        inflated.right / ratio,
+        inflated.bottom / ratio,
+      ),
+    );
+  }
+
+  /// The union of [scene]'s shapes that actually cover pixels, in
+  /// layer-local physical pixels; empty when none of them does.
+  static Rect _drawnBounds(GlassScene scene) {
+    Rect? union;
+    for (final shape in scene.shapes) {
+      final box = shape.layerBounds;
+      if (box.isEmpty) {
+        continue;
+      }
+      union = union == null ? box : union.expandToInclude(box);
+    }
+    return union ?? Rect.zero;
+  }
 
   ui.ImageFilter _buildFilter(_GlassPass pass, Float32List mapping) {
     _refreshMatte(pass);

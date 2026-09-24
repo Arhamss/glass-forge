@@ -30,6 +30,18 @@ benchmark/ hook/ android/ ios/ macos/ example/ docs/` with `pubspec.yaml`,
 
 ## Verified
 
+**2026-09-24, after per-pass backdrop clipping:** `flutter test` at the root
+is **622 passed, 24 skipped, 0 failed** — the 616 this section's successor
+figures grew to, plus six new tests in
+`test/src/rendering/backdrop_pass_clip_test.dart`. The Impeller lane and the
+example suite are unchanged at **82 passed, 2 skipped, 1 failed** (the
+known `GpuGeometryProducer` fail-soft) and **157 passed, 0 skipped**.
+`flutter analyze` clean at the root and in `example/`, `dart format` exit 0.
+One run of the Impeller lane failed `final_pass_shading_test.dart`'s
+`setUpAll`; it passed alone and on both re-runs, and the same lane with the
+change stashed gave the baseline exactly — flaky, not a regression, but
+worth watching.
+
 All re-run on 2026-09-23 against current `main`, and independently
 re-run by a second agent, which got the same numbers:
 
@@ -252,11 +264,34 @@ and C3, see above.
   under a translucent bar is also the arrangement the comp asks for. The
   three ways out the message itself names — one material, one blend group,
   or `GlassPresence` — none fit a catalogue whose whole point is showing
-  different materials at once. The real answer is the per-pass clipping
-  `_pushBackdropPasses` flags: clip each pass to its own shapes' bounds,
-  inflated by displacement and blur, so two passes only ever stack where
-  their shapes really meet. Wants a physical device, like everything else
-  about #187820.
+  different materials at once.
+
+  **Per-pass clipping landed on 2026-09-24.** A layer with more than one
+  pass now clips each of them to its own shapes' boxes, inflated by how far
+  that pass's filter actually reads outside them, so two passes reach the
+  same pixels only where their shapes plus that reach really meet. The
+  arithmetic is in `RenderGlassLayer._filterReach`: the full displacement
+  (`maxDisplacement`, times `1 + chromaticAberration / 2` for the furthest
+  aberration tap), plus three sigmas of the composed frost blur, plus two
+  pixels for the coverage ramp and the dome's bilinear tap. Read it before
+  changing either — under-inflating puts a hard line along the clip, which
+  is worse than the stacking it removes.
+
+  **It does not close this entry for the index**, and nobody should read it
+  as having done so. The reach is large: an Apple regular material at a
+  ratio of 3 inflates by about 50 logical pixels a side (28.8 of
+  displacement, 21 of blur), so `_TopBar`'s 800x56 becomes roughly 900x156
+  and a row's 44x44 thumbnail becomes 144x144. A row **scrolled under** the
+  pinned bar still genuinely overlaps it, and still stacks, because it
+  really is two backdrop passes over the same pixels. What the clip removes
+  is every row that is *not* under the bar, which used to stack with it
+  across the entire layer. Rows and bar meeting at the top of a scroll is
+  the arrangement the comp asks for and there is no clip that fixes it;
+  same material, same blend group or `GlassPresence` remain the only ways
+  out, and none of them fits. Whether the symptom is gone where the shapes
+  are apart still wants a physical device — the clipping geometry is
+  tested headlessly and the white-wash is not testable anywhere but a real
+  iPhone.
 
   A second real pair turns up too, between two glass surfaces **inside one
   specimen** — a specimen that composes two materials is overlapping by
@@ -293,12 +328,24 @@ and C3, see above.
   clip, which is a behaviour change with its own test surface. And a clip
   private to one shape is now dropped rather than honoured, so that shape's
   backdrop can bleed past its box — strictly better than cropping the page,
-  and the real answer is the per-pass clipping `_pushBackdropPasses` flags.
+  and the real answer is the per-pass clipping, which landed on 2026-09-24
+  for layers with more than one pass and is deliberately not applied to a
+  single-pass layer (see the cross-pass overlap entry above). A
+  single-material layer is exactly the case this residual is about, so it
+  is unchanged.
 
-  **Still open on 2026-09-24, deliberately.** Both were looked at again
-  alongside the two fixes above and left alone. The first is a restructure
-  of `_pushGlassLayers`: the subtree would stop painting inside the last
-  backdrop pass and paint as a sibling after the whole retained chain, which
+  **Still open on 2026-09-24, deliberately — and half of the first one has
+  since happened by another route.** Per-pass clipping moves the subtree out
+  from under the passes whenever there is more than one of them: it paints
+  as a sibling over all of them, inside the layer's own clip and the
+  retained chain, because a pass clipped to its own shapes would otherwise
+  crop the whole subtree to them. That is only the multi-pass case, and it
+  does not move the subtree out of the *retained chain* or out of the
+  layer's bounds clip, which is what this residual is really about. The
+  paragraph below still describes it accurately for a single-pass layer. The
+  first is a restructure of `_pushGlassLayers`: the subtree would stop
+  painting inside the last backdrop pass and paint as a sibling after the
+  whole retained chain, which
   moves three things at once — the retained clips off the subtree (the
   point), the layer's own bounds clip off the subtree (a separate behaviour
   change, and arguably a correction, since a `RenderProxyBox` does not
@@ -381,8 +428,10 @@ and C3, see above.
   and has since scrolled into the cache region now registers its real
   off-screen position, so the matte's bounds grow by up to the cache extent
   (250 logical pixels) at each end of a scrolling list. Clamping a pass's
-  matte to what the layer can actually show would recover that, and belongs
-  with the per-pass clipping `_pushBackdropPasses` already flags.
+  matte to what the layer can actually show would recover that. Per-pass
+  clipping landed on 2026-09-24 and does **not** do it: it clips where a
+  pass composites, not what its matte is baked over, so an off-screen row's
+  bounds still grow the matte exactly as described here. Still open.
 
 - ~~**The `FittedBox` bug has two exception shapes, and the guards only know**~~ 
 
