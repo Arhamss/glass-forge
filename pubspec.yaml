@@ -2,6 +2,8 @@ name: glass_forge
 description: Performance-tiered liquid glass rendering for Flutter — real refraction where the GPU allows, graceful degradation everywhere else.
 version: 0.1.0
 homepage: https://gocodeable.com
+repository: https://github.com/Arhamss/glass-forge
+issue_tracker: https://github.com/Arhamss/glass-forge/issues
 
 topics:
   - liquid-glass
