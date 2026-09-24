@@ -703,32 +703,40 @@ and C3, see above.
   an API with a sharp edge, and this is the third distinct way the same
   missing tolerance has drawn blood.
 
-- **Not publish-clean.** Confirmed still true on 2026-09-24, and confirmed
-  the *right* way: a `flutter pub publish --dry-run` in the working tree
-  reports **0 warnings**, because `build/` exists here from earlier builds. In
-  a throwaway worktree with no `build/`, it reports **1 warning**:
+- **Publishing as-is would ship an asset declaration for a file that is not
+  in the archive.** Investigation finished on 2026-09-24; this is no longer
+  a cosmetic warning and it blocks a real publish.
 
-  ```
-  warning - pubspec.yaml:55:7 - The asset file
-  'build/shaderbundles/geometry.shaderbundle' doesn't exist.
-  ```
+  `pubspec.yaml:55` declares `build/shaderbundles/geometry.shaderbundle` under
+  `assets:`. `hook/build.dart` generates that file, and `.gitignore:37` ignores
+  `build/`, so **`pub publish` excludes it** — the archive carries only the
+  manifest, `shaders/gpu/geometry.shaderbundle.json`. Confirmed by grepping
+  the dry-run's own file listing.
 
-  `hook/build.dart` generates that bundle into `build/`, which is gitignored,
-  and `pubspec.yaml` declares it under `assets:` so a consuming app bundles it
-  as `packages/glass_forge/build/shaderbundles/geometry.shaderbundle` —
-  the key `gpu_geometry_producer_io.dart` tries first.
+  **The declaration is load-bearing, so it cannot simply be deleted.** Checked
+  against the real consumer rather than reasoned about: `example/` depends on
+  the package by path, and its built app contains
+  `packages/glass_forge/build/shaderbundles/geometry.shaderbundle` — exactly
+  the key `gpu_geometry_producer_io.dart` tries first — with the same entry in
+  its `AssetManifest`. Removing the declaration would take the Flutter GPU
+  producer away from consumers, not just silence a warning. (An earlier probe
+  that removed it left the Impeller lane at its one pre-existing failure, which
+  is why this looked safe; that probe only proved the *package's own tests* do
+  not need it.)
 
-  **Partially investigated, deliberately not fixed.** Removing the `assets:`
-  entry in a worktree left the Impeller lane with exactly its one pre-existing
-  failure (the `GpuGeometryProducer` fail-soft) and nothing new — so the
-  declaration is not load-bearing for *this package's own tests*. That does
-  not answer the question that matters, which is whether a **consuming app**
-  still finds the bundle without it, and `pub get` failed in that worktree so
-  the dry-run's own warning count was not comparable. Do not act on the
-  half-result above without settling the consumer case first.
+  So a path dependency works and a pub.dev install would not. The fix is a
+  real choice, not a tidy-up, and wants a decision:
+  - **Ship the compiled bundle** — un-ignore that one file and commit it.
+    Costs a binary in the repo and a staleness risk against the shaders.
+  - **Stop declaring it as an asset** and load it through whatever the build
+    hook produces for consumers, which is what the native-assets API is for.
+    Cleanest, and the largest change.
+  - **Publish without the GPU path**, letting `GpuGeometryProducer` fail-soft
+    to the runtime producer as it already does when the bundle is absent.
+    Honest, and costs the accelerated path for everyone who installs.
 
-  Low urgency: the package is not published, has no repository URL, and pub
-  treats this as a warning rather than an error.
+  Not urgent while the package is unpublished — but it is a publish blocker,
+  not a warning to wave through.
 
 - **`repository` and `issue_tracker` are unset** in `pubspec.yaml`, because
   pub.dev checks that the URLs resolve and no public repo exists yet.
