@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -146,10 +147,17 @@ Matrix4 glassSurfaceTransform({
   // `!(x > 0)` rather than `x <= 0`, so a NaN extent is degenerate too.
   final hasArea = !(!(halfWidth > 0) || !(halfHeight > 0));
   final anchor = hasArea ? state.pressAnchor * state.press : Offset.zero;
+  // How far the finger reaches, as a fraction of the surface's extent in
+  // that direction — 1 at the edge, and never more — and which way. The
+  // two are taken separately on purpose. The fraction is measured per axis
+  // so a small button and a large one reach alike; the *direction* is the
+  // finger's own. Taking the direction off the per-axis fraction instead
+  // turns a finger at the corner of a wide card into a 45-degree reach, and
+  // stretching a wide surface along a diagonal it does not have is a shear.
   final reach = pressStretch.isActive && anchor != Offset.zero
       ? Offset(anchor.dx / halfWidth, anchor.dy / halfHeight)
       : Offset.zero;
-  final reachDistance = reach.distance;
+  final reachDistance = math.min(reach.distance, 1);
 
   final double m00;
   final double m01;
@@ -166,8 +174,9 @@ Matrix4 glassSurfaceTransform({
     final pressAlong = 1 + pressStretch.intensity * reachDistance;
     final pressAcross =
         1 / (1 + pressStretch.intensity * reachDistance * pressStretch.squash);
-    final cos = reach.dx / reachDistance;
-    final sin = reach.dy / reachDistance;
+    final toward = anchor.distance;
+    final cos = anchor.dx / toward;
+    final sin = anchor.dy / toward;
     final a00 = pressAlong * cos * cos + pressAcross * sin * sin;
     final a01 = (pressAlong - pressAcross) * cos * sin;
     final a11 = pressAlong * sin * sin + pressAcross * cos * cos;

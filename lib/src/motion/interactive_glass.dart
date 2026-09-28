@@ -163,6 +163,13 @@ class _InteractiveGlassState extends State<InteractiveGlass>
 
   final Set<int> _pointersDown = <int>{};
 
+  /// Where the surface had travelled to when the current press began.
+  Offset _translationAtDown = Offset.zero;
+
+  /// The finger's last position, in the coordinate space of the press's
+  /// pointer-down. Null between presses.
+  Offset? _pointerAtDown;
+
   /// This surface's own connection to the layer's shared glow channel.
   ///
   /// Looked up in [didChangeDependencies], not cached for the widget's
@@ -195,19 +202,23 @@ class _InteractiveGlassState extends State<InteractiveGlass>
   /// that ramps from zero is unsafe given how the shader floors its
   /// falloff distance.
   ///
-  /// Measured, not guessed. Apple describes the glow as spreading "onto any
-  /// Liquid Glass elements nearby", and the point of putting it in the
-  /// shader rather than painting it per shape was to reach a neighbour at
-  /// all. At the 140 this started as, it did not: measured against two
-  /// adjacent controls in the example, a neighbour 96 logical pixels away
-  /// gained about 7/255 at its near edge and nothing at all across the rest
-  /// of it — at or under the noise floor. The falloff is
-  /// `(1 - smoothstep(0, radius, distance))^2`, so at 320 that same
-  /// neighbour gains roughly 86/255 at its near edge, 23/255 through its
-  /// middle, and is dark again by its far edge. That reads as light
-  /// arriving from somewhere and falling off, which is the effect; much
-  /// beyond 320 and the whole row lifts evenly, which is not.
-  static const double _glowRadius = 320;
+  /// The glow's radius for a surface of [size]: its own longest side,
+  /// within [_glowMinRadius] and [_glowMaxRadius].
+  ///
+  /// The glow is one light per layer, shared by every surface in it, so its
+  /// reach is everyone's problem. It started as a fixed 140, which reached
+  /// no neighbour at all, then went to a fixed 320 so light would arrive on
+  /// the glass nearby, as Apple describes. On a screen of 64 pt tiles that
+  /// 320 washed every tile white for a press on any one of them. Sized to
+  /// the surface, the falloff `(1 - smoothstep(0, radius, distance))^2`
+  /// puts about a quarter of the light at the pressed surface's own edge
+  /// and none one radius out: the surface lights up, a neighbour a gap away
+  /// catches the fringe, and the rest of the screen stays put.
+  static double _glowRadiusFor(Size size) =>
+      size.longestSide.clamp(_glowMinRadius, _glowMaxRadius);
+
+  static const double _glowMinRadius = 48;
+  static const double _glowMaxRadius = 320;
 
   /// How strongly the glow brightens at its centre at full press, 0 to 1.
   static const double _glowMaxStrength = 0.55;
@@ -215,7 +226,7 @@ class _InteractiveGlassState extends State<InteractiveGlass>
   @override
   void initState() {
     super.initState();
-    _controller = _createController()..addListener(_publishGlow);
+    _controller = _createController()..addListener(_onMotionChanged);
   }
 
   @override
@@ -256,9 +267,9 @@ class _InteractiveGlassState extends State<InteractiveGlass>
       // exists.
       _releaseGlow();
       _controller
-        ..removeListener(_publishGlow)
+        ..removeListener(_onMotionChanged)
         ..dispose();
-      _controller = _createController()..addListener(_publishGlow);
+      _controller = _createController()..addListener(_onMotionChanged);
       _rawDrag = Offset.zero;
     }
   }
@@ -266,7 +277,7 @@ class _InteractiveGlassState extends State<InteractiveGlass>
   @override
   void dispose() {
     _releaseGlow();
-    _controller.removeListener(_publishGlow);
+    _controller.removeListener(_onMotionChanged);
     _controller.dispose();
     super.dispose();
   }
@@ -293,13 +304,46 @@ class _InteractiveGlassState extends State<InteractiveGlass>
     // synchronously (Reduce Motion settles instantly), and the glow this
     // triggers needs a position to convert the moment that happens.
     _globalPointerPosition = event.position;
+    _translationAtDown = _controller.value.translation;
+    _pointerAtDown = event.localPosition;
     _controller.setPressed(pressed: true);
     _controller.setPressAnchor(_anchorFor(event.localPosition));
   }
 
   void _onPointerMove(PointerMoveEvent event) {
     _globalPointerPosition = event.position;
-    _controller.setPressAnchor(_anchorFor(event.localPosition));
+    // Every event after the down is delivered in the coordinate space hit
+    // testing recorded *at* the down, so its local position is measured
+    // from where the surface was then. Subtracting how far the surface has
+    // travelled since puts the finger back relative to the surface as it is
+    // now — without this, a drag reads as the finger getting further and
+    // further away, and the press-stretch pulls the glass into a needle.
+    _pointerAtDown = event.localPosition;
+    _trackAnchor();
+  }
+
+  /// The anchor, from the finger's last position and where the surface is
+  /// *now*.
+  ///
+  /// Run on every pointer move and on every frame of motion. The surface
+  /// follows the finger on a spring, so it is still travelling after the
+  /// finger stops; an anchor computed only on pointer moves would freeze the
+  /// lag of the last move into a permanent stretch.
+  void _trackAnchor() {
+    final pointer = _pointerAtDown;
+    if (pointer == null || _pointersDown.isEmpty) {
+      return;
+    }
+    _controller.setPressAnchor(
+      _anchorFor(
+        pointer - (_controller.value.translation - _translationAtDown),
+      ),
+    );
+  }
+
+  void _onMotionChanged() {
+    _trackAnchor();
+    _publishGlow();
   }
 
   void _onPointerUp(int pointer) {
@@ -309,6 +353,7 @@ class _InteractiveGlassState extends State<InteractiveGlass>
       // surface should not un-press it when it lifts again. The glow rides
       // this same spring down to nothing — see `_publishGlow` — rather
       // than being zeroed here directly, so it decays instead of vanishing.
+      _pointerAtDown = null;
       _controller
         ..setPressed(pressed: false)
         ..setPressAnchor(Offset.zero);
@@ -323,9 +368,19 @@ class _InteractiveGlassState extends State<InteractiveGlass>
   /// that is the whole point of the inverse transform it hit-tests through
   /// — so this is stable through a drag or a press, not relative to wherever
   /// the surface currently is on screen.
+  ///
+  /// Clamped to the surface's own extent. A finger past the edge — a
+  /// rubber-banded surface lagging its drag, or a press that slid off —
+  /// reaches as far as a finger *at* the edge and no further, because the
+  /// press-stretch grows with the anchor and has no ceiling of its own.
   Offset _anchorFor(Offset localPosition) {
     final size = context.size ?? Size.zero;
-    return localPosition - Offset(size.width / 2, size.height / 2);
+    final halfWidth = size.width / 2;
+    final halfHeight = size.height / 2;
+    return Offset(
+      (localPosition.dx - halfWidth).clamp(-halfWidth, halfWidth),
+      (localPosition.dy - halfHeight).clamp(-halfHeight, halfHeight),
+    );
   }
 
   void _onPanStart(DragStartDetails details) {
@@ -393,7 +448,8 @@ class _InteractiveGlassState extends State<InteractiveGlass>
   /// which is the same "do not clobber a newer claim" rule [_releaseGlow]
   /// applies once this surface's own press finally reaches zero.
   ///
-  /// Radius is held at [_glowRadius] for the whole press rather than
+  /// Radius is held at the surface's [_glowRadiusFor] for the whole press
+  /// rather than
   /// ramping it up alongside [_glowMaxStrength]: the uniform this writes
   /// reaches a shader that floors its falloff distance at roughly one
   /// physical pixel regardless of what radius asks for, so a radius
@@ -425,7 +481,7 @@ class _InteractiveGlassState extends State<InteractiveGlass>
     }
     final next = GlassGlow(
       centre: centre,
-      radius: _glowRadius,
+      radius: _glowRadiusFor(context.size ?? Size.zero),
       strength: _glowMaxStrength * press,
     );
     notifier.value = next;

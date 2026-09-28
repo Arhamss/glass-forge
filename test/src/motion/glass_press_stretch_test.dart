@@ -21,6 +21,48 @@ void main() {
     );
   }
 
+  test('a wide surface stretches toward the finger, not along a diagonal', () {
+    // A finger at the corner of a 200x80 surface is 22 degrees off its long
+    // axis. Normalising the anchor by each half-extent first turns it into
+    // (1, 1) -- 45 degrees -- and stretching a wide surface along a diagonal
+    // it does not have is a shear: the card leans over like a parallelogram.
+    final m = transformFor(
+      const GlassMotionState(
+        translation: Offset.zero,
+        velocity: Offset.zero,
+        press: 1,
+        pressAnchor: Offset(100, 40),
+      ),
+      stretch,
+    );
+    // The stretch's long axis is the eigenvector of the symmetric 2x2 with
+    // the larger eigenvalue.
+    final a = m.entry(0, 0);
+    final b = m.entry(0, 1);
+    final d = m.entry(1, 1);
+    final angle = 0.5 * math.atan2(2 * b, a - d);
+    expect(angle, closeTo(math.atan2(40, 100), 0.02));
+  });
+
+  test('a finger at the edge reaches no further than a unit reach', () {
+    final m = transformFor(
+      const GlassMotionState(
+        translation: Offset.zero,
+        velocity: Offset.zero,
+        press: 1,
+        pressAnchor: Offset(100, 40),
+      ),
+      stretch,
+    );
+    // Largest stretch of the 2x2: at most 1 + intensity.
+    final a = m.entry(0, 0);
+    final b = m.entry(0, 1);
+    final d = m.entry(1, 1);
+    final mean = (a + d) / 2;
+    final radius = math.sqrt(((a - d) / 2) * ((a - d) / 2) + b * b);
+    expect(mean + radius, lessThanOrEqualTo(1 + stretch.intensity + 1e-9));
+  });
+
   test('a zero anchor is the identity', () {
     final m = transformFor(
       const GlassMotionState(
@@ -170,9 +212,10 @@ void main() {
       final along = velocityStretch;
       final across = 1 / velocityStretch;
 
-      // The anchor is at 45 degrees on a square surface, so its reach is
-      // (1, 1) and A (the anchor matrix) has a00 == a11 and a nonzero a01.
-      final reachDistance = math.sqrt(2);
+      // The anchor is at 45 degrees on a square surface, at its corner: a
+      // reach of (1, 1), capped to 1 because no finger reaches further than
+      // the edge. A (the anchor matrix) has a00 == a11 and a nonzero a01.
+      const reachDistance = 1.0;
       final pressAlong = 1 + activeStretch.intensity * reachDistance;
       final pressAcross =
           1 /
