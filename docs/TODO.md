@@ -2,7 +2,13 @@
 
 Resume file. Updated at the end of a working session; read it first.
 
-## 2026-09-28 — example app replaced (uncommitted)
+## 2026-09-28 — ready to publish
+
+`publish_to: none` is gone and `flutter pub publish --dry-run` passes. The
+GitHub repo (github.com/Arhamss/glass-forge) is public and `main` is
+pushed. Publishing itself (`flutter pub publish`) is Arham's call.
+
+## 2026-09-28 — example app replaced
 
 The 33-entry catalogue is gone. `example/` is now a playground: one screen,
 three scenes (Lens, Liquid, Kit) behind a floating glass tab bar, and a
@@ -787,40 +793,17 @@ and C3, see above.
   an API with a sharp edge, and this is the third distinct way the same
   missing tolerance has drawn blood.
 
-- **Publishing as-is would ship an asset declaration for a file that is not
-  in the archive.** Investigation finished on 2026-09-24; this is no longer
-  a cosmetic warning and it blocks a real publish.
-
-  `pubspec.yaml:55` declares `build/shaderbundles/geometry.shaderbundle` under
-  `assets:`. `hook/build.dart` generates that file, and `.gitignore:37` ignores
-  `build/`, so **`pub publish` excludes it** — the archive carries only the
-  manifest, `shaders/gpu/geometry.shaderbundle.json`. Confirmed by grepping
-  the dry-run's own file listing.
-
-  **The declaration is load-bearing, so it cannot simply be deleted.** Checked
-  against the real consumer rather than reasoned about: `example/` depends on
-  the package by path, and its built app contains
-  `packages/glass_forge/build/shaderbundles/geometry.shaderbundle` — exactly
-  the key `gpu_geometry_producer_io.dart` tries first — with the same entry in
-  its `AssetManifest`. Removing the declaration would take the Flutter GPU
-  producer away from consumers, not just silence a warning. (An earlier probe
-  that removed it left the Impeller lane at its one pre-existing failure, which
-  is why this looked safe; that probe only proved the *package's own tests* do
-  not need it.)
-
-  So a path dependency works and a pub.dev install would not. The fix is a
-  real choice, not a tidy-up, and wants a decision:
-  - **Ship the compiled bundle** — un-ignore that one file and commit it.
-    Costs a binary in the repo and a staleness risk against the shaders.
-  - **Stop declaring it as an asset** and load it through whatever the build
-    hook produces for consumers, which is what the native-assets API is for.
-    Cleanest, and the largest change.
-  - **Publish without the GPU path**, letting `GpuGeometryProducer` fail-soft
-    to the runtime producer as it already does when the bundle is absent.
-    Honest, and costs the accelerated path for everyone who installs.
-
-  Not urgent while the package is unpublished — but it is a publish blocker,
-  not a warning to wave through.
+- ~~**Publishing as-is would ship an asset declaration for a file that is not
+  in the archive.**~~ **Not a blocker — tested 2026-09-28.** The archive
+  never needs the file: `hook/build.dart` compiles the bundle in every
+  consumer's build, into the package's own `build/shaderbundles/`, before
+  Flutter bundles assets. Verified by building a copy of the example
+  against a publish-shaped copy of the package with no `build/` at all:
+  the app shipped the real 3,789,072-byte bundle, byte-for-byte the size a
+  path dependency gets. Residual risk, worth watching: the hook writes into
+  the package root, which for a hosted install is inside the pub cache —
+  writable today, but if Flutter ever confines hooks to their output
+  directory, the asset declaration and the hook have to move together.
 
 - **`repository` and `issue_tracker` are unset** in `pubspec.yaml`, because
   pub.dev checks that the URLs resolve and no public repo exists yet.

@@ -12,9 +12,6 @@ topics:
   - ui
   - animation
 
-# Remove when the package is ready to publish.
-publish_to: none
-
 environment:
   sdk: ^3.13.0
   flutter: ">=3.47.0"
