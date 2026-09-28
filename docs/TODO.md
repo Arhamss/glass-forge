@@ -2,6 +2,41 @@
 
 Resume file. Updated at the end of a working session; read it first.
 
+## 2026-09-28 — example app replaced (uncommitted)
+
+The 33-entry catalogue is gone. `example/` is now a playground: one screen,
+three scenes (Lens, Liquid, Kit) behind a floating glass tab bar, and a
+`GlassDetentSheet` tuner with a knob for every `GlassMaterial` field, nine
+presets that morph into each other, a tier pin and "Copy Dart". Its tests
+are `example/test/playground_test.dart` (9, about a second — the six-minute
+snippet suite went with the catalogue).
+
+Look, tuned against the simulator with Arham's macOS Control Center
+as the reference: a light frost (1), a 12% neutral tint, a deep refracting
+rim (`edgeRefraction` 24) and a bright highlight (2). It could not look like
+that until the edge-band fix below: a deep rim used to draw a seam.
+
+Package changes made on the way, each with a test that failed on the old
+code first:
+- **Edge band profile** (`shaders/common/profile.glsl`): the squircle
+  height was used as the displacement, folding the image in a ring at the
+  band's inner edge — a 35 px jump in the sampled image, measured. Now
+  refracted through the slope; `edge_band_axis_test.dart` pins no-seam and
+  rim-peak. Impeller lane unchanged at 82/2/1.
+- **Press-stretch** direction and cap (`glass_jiggle.dart`), and the press
+  anchor during a drag (`interactive_glass.dart`).
+- **`GlassDetentSheet.material`**, and a **debug warning past
+  `kMaxShapes`** (8 per pass — the Kit scene hit it and lost a tile).
+
+Open:
+- `kMaxShapes` is 8 per material pass, from the uniform budget. A real
+  screen of glass controls hits it; chunking passes or packing shapes
+  differently would lift it.
+- `GlassMaterial.regular` / `.clear()` do not look like iOS side by side
+  with it (Arham, 2026-09-28). The example no longer offers them. Worth
+  re-fitting against fresh captures — frost in particular bites far
+  harder than its number suggests.
+
 ## State
 
 Branch `main`, **not pushed** (`origin` is a local `.bundle`, and there is

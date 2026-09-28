@@ -1,5 +1,34 @@
 ## Unreleased
 
+- Fixed: the edge band drew a hard ring inset from every shape's edge,
+  which read as a bezel. The convex squircle the band is built on is the
+  glass's *height*; it was being used directly as the displacement, which
+  falls to zero with infinite steepness at the band's inner edge and folds
+  the image there. The displacement is now what refracting through that
+  surface's slope gives: strongest at the rim, easing to zero with no seam.
+  `edgeRefraction` keeps its meaning — the displacement at the edge.
+- Fixed: press-stretch on a non-square surface sheared it. The reach was
+  normalised per axis and that normalised vector used as the stretch
+  direction, so a finger at the corner of a wide card stretched it along a
+  45-degree diagonal. The direction is now the finger's own, and the reach
+  is capped at the edge.
+- `InteractiveGlass`'s touch glow is sized to the pressed surface (its
+  longest side, 48 to 320) instead of a fixed 320. The glow is one light
+  per layer, so a fixed 320 washed a whole screen of tiles white for a
+  press on any one of them.
+- A debug warning when more shapes share one material in a `GlassLayer`
+  than a pass can carry (`kMaxShapes`, 8). The extras were silently not
+  drawn.
+- `GlassDetentSheet.material` replaces the sheet role's material for an app
+  with a look of its own. Null keeps the role's, so nothing changes by
+  default; label colour, shadows and motion still come from the role.
+- Fixed: dragging an `InteractiveGlass` stretched it into a needle toward
+  the finger. Pointer moves arrive in the coordinate space of the
+  pointer-down, so the press anchor grew with the drag distance and the
+  press-stretch with it. The anchor is now measured against where the
+  surface is, recomputed as it springs after the finger, and clamped to the
+  surface's own extent.
+
 - `GlassDetentSheet.bottomGap` separates the floating sheet's bottom inset
   from its side ones. A sheet that floats over other glass has to clear
   that chrome's full height before their backdrop passes would overlap, and
