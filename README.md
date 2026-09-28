@@ -321,6 +321,26 @@ lens rises out of the pill, swells a little past the bar's edges, and sinks
 back as it lands, so there is never glass on glass at rest. It fades with
 the bar, and Reduce Motion replaces it with an instant pill.
 
+`showGlassSheet` presents a modal glass sheet from the bottom edge and
+completes with whatever it is popped with.
+
+```dart
+final picked = await showGlassSheet<String>(
+  context: context,
+  builder: (context) => GlassButton(
+    onPressed: () => Navigator.of(context).pop('done'),
+    child: const Text('Done'),
+  ),
+);
+```
+
+It is a handoff, not a cross-fade: a `GlassScaffold`'s bars fade to nothing
+in the first part of the sheet's arrival, and only then does the sheet's own
+glass rise, so the two are never stacked filters over the same pixels. The
+page beneath dims under a painted scrim. A scrim tap, a drag down or a fling
+dismisses it unless `isDismissible` is false; Reduce Motion presents it
+instantly.
+
 ## Presets
 
 `GlassMaterial.regular(brightness:)` and `GlassMaterial.clear()` are fitted

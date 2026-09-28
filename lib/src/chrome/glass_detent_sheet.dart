@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/chrome/detent_geometry.dart';
 import 'package:glass_forge/src/chrome/glass_detent.dart';
 import 'package:glass_forge/src/chrome/glass_detent_sheet_controller.dart';
+import 'package:glass_forge/src/chrome/glass_sheet_handle.dart';
 import 'package:glass_forge/src/chrome/glass_sheet_scroll_physics.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
@@ -545,7 +546,8 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
               data: IconThemeData(color: style.labelColor),
               child: Column(
                 children: <Widget>[
-                  if (widget.showHandle) _Handle(color: style.labelColor),
+                  if (widget.showHandle)
+                    GlassSheetHandle(color: style.labelColor),
                   Expanded(
                     child: MediaQuery.removePadding(
                       context: context,
@@ -609,34 +611,4 @@ class GlassDetentSheetScope extends InheritedWidget {
   @override
   bool updateShouldNotify(GlassDetentSheetScope oldWidget) =>
       !identical(oldWidget.controller, controller);
-}
-
-/// The grab indicator.
-///
-/// Drawn, not a `Glass` of its own: a capsule of glass on a sheet of glass is
-/// a second refraction over the first, which is the stacked filter this
-/// package exists to avoid. `GlassHostScope` is the general form of this rule.
-class _Handle extends StatelessWidget {
-  const _Handle({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Center(
-        child: Container(
-          width: 36,
-          height: 5,
-          decoration: BoxDecoration(
-            // Apple's own indicator is a low-contrast fill, not the label
-            // colour at full strength: it is an affordance, not content.
-            color: color.withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(2.5),
-          ),
-        ),
-      ),
-    );
-  }
 }

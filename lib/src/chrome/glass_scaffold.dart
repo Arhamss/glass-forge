@@ -1,5 +1,6 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
+import 'package:glass_forge/src/chrome/glass_handoff.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/widgets/glass_layer.dart';
 import 'package:glass_forge/src/widgets/glass_presence.dart';
@@ -24,10 +25,11 @@ import 'package:glass_forge/src/widgets/glass_presence.dart';
 ///
 /// Each bar's glass fades through its own [GlassPresence], driven by the
 /// inverse of `ModalRoute.of(context)?.secondaryAnimation`: full presence
-/// while nothing covers the page, ramping to none as a covering route
-/// arrives. That is the handoff `showGlassSheet` needs — the chrome beneath
-/// a sheet must reach presence 0 before the sheet's own glass rises, or the
-/// two are a stacked backdrop filter over the same pixels.
+/// while nothing covers the page, reaching none in the first 40% of a
+/// covering route's arrival. That is the handoff `showGlassSheet` needs —
+/// the chrome beneath a sheet must reach presence 0 before the sheet's own
+/// glass rises, or the two are a stacked backdrop filter over the same
+/// pixels.
 ///
 /// ```dart
 /// GlassScaffold(
@@ -129,9 +131,23 @@ class _GlassScaffoldBodyState extends State<_GlassScaffoldBody> {
     // `Navigator` push — means nothing can ever cover it, so it stays at
     // full presence for its whole life rather than tracking an animation
     // that will never move.
+    //
+    // Otherwise the bars are gone within the first part of the covering
+    // route's animation rather than across all of it, so that a covering
+    // glass surface (`showGlassSheet`'s, riding the rest) never renders
+    // while they still do. `secondaryAnimation` is the covering route's own
+    // animation, handed over by `Navigator`, and nothing on that route can
+    // reshape it — so the reshaping happens here. `drive` rather than a
+    // `CurvedAnimation`: it registers nothing on `secondary` until someone
+    // listens, so there is nothing to dispose when the route changes.
     _presence = secondary == null
         ? const AlwaysStoppedAnimation<double>(1)
-        : ReverseAnimation(secondary);
+        : secondary.drive(
+            Tween<double>(
+              begin: 1,
+              end: 0,
+            ).chain(CurveTween(curve: coveredChromeInterval)),
+          );
   }
 
   void _handleTopBarSize(Size size) {

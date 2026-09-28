@@ -426,4 +426,39 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('the showGlassSheet example builds', (tester) async {
+    // The same snippet as the `showGlassSheet` doc comment. Tier off only
+    // to skip the software-rasterised matte a sliding sheet rebakes every
+    // frame off Impeller; the example itself is unchanged.
+    String? picked;
+    await tester.pumpWidget(
+      GlassTierScope(
+        requested: GlassTier.off,
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () async {
+                picked = await showGlassSheet<String>(
+                  context: context,
+                  builder: (context) => GlassButton(
+                    onPressed: () => Navigator.of(context).pop('done'),
+                    child: const Text('Done'),
+                  ),
+                );
+              },
+              child: const SizedBox.expand(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(picked, 'done');
+    expect(tester.takeException(), isNull);
+  });
 }
