@@ -176,7 +176,14 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
           top: padding.top + 14,
           left: 24,
           right: 20,
-          child: _Header(caption: _captions[_scene]),
+          // Steps aside for the toast, which takes its place rather than
+          // landing on top of its text.
+          child: AnimatedOpacity(
+            opacity: _toast == null ? 1 : 0,
+            duration: motion(context, const Duration(milliseconds: 220)),
+            curve: Curves.easeOut,
+            child: _Header(caption: _captions[_scene]),
+          ),
         ),
         Positioned(
           left: 0,
@@ -358,6 +365,9 @@ class _Toast extends StatelessWidget {
           ? const SizedBox.shrink()
           : Glass(
               key: ValueKey(text),
+              // Chrome, not the tuned material: a toast has to read over
+              // the photo whatever the tuner is set to.
+              material: chromeMaterial,
               shape: const GlassRoundedRectangle(
                 radius: BorderRadius.all(Radius.circular(22)),
               ),

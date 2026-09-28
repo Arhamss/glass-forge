@@ -129,20 +129,6 @@ const GlassMaterial chromeMaterial = GlassMaterial(
   lightDirection: Offset(-0.7071, -0.7071),
 );
 
-/// The tab bar's selection: a clear lens that bends the bar and the photo
-/// beneath it.
-const GlassMaterial selectionMaterial = GlassMaterial(
-  thickness: 16,
-  edgeRefraction: 22,
-  frost: 0.5,
-  chromaticAberration: 0.08,
-  tint: Color(0xFFFFFFFF),
-  tintOpacity: 0.1,
-  saturation: 1.3,
-  highlight: 2.2,
-  lightDirection: Offset(-0.7071, -0.7071),
-);
-
 /// The sheet's: frostier and darker again, because it carries a screenful
 /// of labels over a busy photograph.
 const GlassMaterial sheetMaterial = GlassMaterial(

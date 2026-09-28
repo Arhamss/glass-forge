@@ -41,11 +41,18 @@ class Glyph extends StatelessWidget {
   Widget build(BuildContext context) {
     final tint =
         color ?? IconTheme.of(context).color ?? const Color(0xFFFFFFFF);
-    return SvgPicture.asset(
-      asset,
-      width: size,
-      height: size,
-      colorFilter: ColorFilter.mode(tint, BlendMode.srcIn),
+    // Centred the way `Icon` is: handed tight constraints — the whole face
+    // of a `Glass`, say, or a fixed-size `Container` — a bare SVG would
+    // stretch to fill them and ignore [size].
+    return Center(
+      widthFactor: 1,
+      heightFactor: 1,
+      child: SvgPicture.asset(
+        asset,
+        width: size,
+        height: size,
+        colorFilter: ColorFilter.mode(tint, BlendMode.srcIn),
+      ),
     );
   }
 }
