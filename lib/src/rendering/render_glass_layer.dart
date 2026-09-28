@@ -20,6 +20,7 @@ import 'package:glass_forge/src/rendering/render_glass_shape.dart';
 import 'package:glass_forge/src/scene/glass_scene.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
 import 'package:glass_forge/src/shapes/shape_geometry.dart';
+import 'package:glass_forge/src/shapes/shape_limits.dart';
 
 /// Un-does the registry's "register the shipped accelerated producers once"
 /// guard, so a test can observe registration happening fresh, paired with
@@ -405,6 +406,17 @@ class RenderGlassLayer extends RenderProxyBox {
     glow = _glowListenable?.value ?? const GlassGlow.none();
   }
 
+  /// Whether the shape-limit warning has been printed for this layer. Once
+  /// is enough: it would otherwise repeat on every reassignment.
+  bool _warnedShapeLimit = false;
+
+  static String _ordinal(int n) => switch (n % 10) {
+    1 when n % 100 != 11 => '${n}st',
+    2 when n % 100 != 12 => '${n}nd',
+    3 when n % 100 != 13 => '${n}rd',
+    _ => '${n}th',
+  };
+
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
@@ -556,6 +568,22 @@ class RenderGlassLayer extends RenderProxyBox {
         record.geometry,
       );
     }
+
+    assert(() {
+      for (final pass in _passes.values) {
+        final count = pass.scene.shapes.length;
+        if (count > kMaxShapes && !_warnedShapeLimit) {
+          _warnedShapeLimit = true;
+          debugPrint(
+            'glass_forge: $count shapes share one material in this '
+            'GlassLayer, and a pass carries at most $kMaxShapes. Shapes past '
+            'the ${_ordinal(kMaxShapes)} are not drawn at all. Give some of '
+            'them a material of their own — each material is its own pass.',
+          );
+        }
+      }
+      return true;
+    }(), 'debug-only warning; always true');
 
     _passes.removeWhere((key, pass) {
       if (pass.scene.shapes.isNotEmpty) {
