@@ -97,6 +97,24 @@ controller and never reads it back.
 
 [`motor`]: https://pub.dev/packages/motor
 
+## Controls
+
+`GlassButton` resolves `GlassSurfaceRole.control` for its material, shape and
+label colour, and never draws glass on glass: built on content it is real
+glass over `InteractiveGlass`; built under `GlassHostScope` — inside a glass
+toolbar, say — it paints a flat tint with a scale on press instead.
+
+```dart
+GlassButton(
+  onPressed: () {},
+  child: const Text('Continue'),
+)
+```
+
+`onPressed: null` disables it. Every control in this package shares
+`GlassControlFrame` for semantics, keyboard activation (Enter and Space) and
+a 44 × 44 minimum hit target that grows the tap area, never the glass.
+
 ## Tiering
 
 Glass is expensive, and the honest answer on a cold-throttled mid-range phone

@@ -77,6 +77,22 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the GlassButton example builds', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          child: Center(
+            child: GlassButton(
+              onPressed: () {},
+              child: const Text('Continue'),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the tier-scope and theme examples build', (tester) async {
     await tester.pumpWidget(
       const GlassTierScope(
