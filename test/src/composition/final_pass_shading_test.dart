@@ -140,6 +140,91 @@ Future<double> _rimGain(GlassProfile profile, Color backdrop) async {
   return peak - base;
 }
 
+/// The backdrop for the edge-band test: a horizontal ramp that climbs 8
+/// levels per texel across x = 16..48 -- the region the left band's samples
+/// land in -- and is flat either side of it.
+///
+/// Steep on purpose. Across a ramp of about one level per texel (0 to 255
+/// over the canvas), a bilinear read rounds to exactly the texel
+/// nearest-neighbour picks, so the two reads came out bit-identical and no
+/// assertion could tell them apart. At 8 levels per texel, a read that
+/// lands between two texels shows up as a value neither texel holds.
+int _steepRamp(int x) => ((x - 16) * 8).clamp(0, 255);
+
+/// Paints [ramp] as 1 px columns through an edge band and reads it back.
+///
+/// Columns, not a `ui.Gradient`: Impeller dithers gradients by a couple of
+/// levels, which puts runs and stray values into the source itself.
+Future<ByteData> _renderRampThroughBand(
+  GlassMaterial material,
+  int Function(int x) ramp,
+) async {
+  final producer = RuntimeGeometryProducer();
+  final composition = GlassComposition();
+  try {
+    final scene = GlassScene()
+      ..register(
+        'a',
+        ShapeGeometry.resolve(
+          shape: const GlassRoundedRectangle(
+            radius: BorderRadius.all(Radius.circular(24)),
+          ),
+          size: const Size(200, 200),
+          toLayer: Matrix4.translationValues(20, 20, 0),
+          devicePixelRatio: 1,
+        ),
+      );
+    final matte = producer.produce(
+      scene,
+      MatteRequest(
+        devicePixelRatio: 1,
+        maxDisplacement: material.maxDisplacement,
+        edgeRefraction: material.edgeRefraction,
+        refractionSpread: material.refractionSpread,
+        antialiasWidth: 0.5,
+        profile: material.profile,
+      ),
+    )!;
+    final filter = composition.build(
+      matte: matte,
+      material: material,
+      snapshot: FilterSnapshot.of(
+        matte: matte,
+        devicePixelRatio: 1,
+        materialRevision: material.revision,
+        coordinateMapping: Float32List.fromList(<double>[1, 0, 0, 1, 0, 0]),
+        presence: 1,
+        glow: const GlassGlow.none(),
+      ),
+      devicePixelRatio: 1,
+      presence: 1,
+      glow: const GlassGlow.none(),
+    )!;
+    final recorder = ui.PictureRecorder();
+    const bounds = Rect.fromLTWH(0, 0, _canvas, _canvas);
+    final canvas = Canvas(recorder)
+      ..saveLayer(bounds, Paint()..imageFilter = filter);
+    for (var x = 0; x < _canvas.toInt(); x++) {
+      final v = ramp(x);
+      canvas.drawRect(
+        Rect.fromLTWH(x.toDouble(), 0, 1, _canvas),
+        Paint()..color = Color.fromARGB(255, v, v, v),
+      );
+    }
+    canvas.restore();
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(_canvas.toInt(), _canvas.toInt());
+    picture.dispose();
+    final bytes = (await image.toByteData())!;
+    image.dispose();
+    producer.release(matte);
+    return bytes;
+  } finally {
+    composition.dispose();
+    producer.dispose();
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(ShaderLibrary.instance.warmUp);
@@ -228,6 +313,55 @@ void main() {
         }
       }
       expect(greys.length, greaterThan(10));
+    },
+  );
+
+  test(
+    'the edge band reads its backdrop between texels where it displaces, '
+    'so a refracted gradient is not stair-stepped',
+    () async {
+      // Read nearest-neighbour (flutter#186945), every displaced sample
+      // snaps to a whole texel, so across the band the output only ever
+      // holds values some source column holds: a continuous refraction
+      // drawn as steps. Since 2026-09-28 the band's displacement varies
+      // continuously across its whole width -- the case that made the
+      // dome stair-step -- so it reads bilinearly wherever it displaces.
+      final material = _lit(GlassProfile.edgeBand).copyWith(
+        highlight: 0,
+        contour: 0,
+        edgeRefraction: 24,
+      );
+      final bytes = await _renderRampThroughBand(material, _steepRamp);
+      final sources = <int>{for (var x = 0; x < _canvas; x++) _steepRamp(x)};
+
+      // The left band, clear of the antialiased rim texel at x = 20 and
+      // away from the corners, where the displacement runs along the ramp.
+      var between = 0;
+      var inBand = 0;
+      for (var y = 60; y < 180; y += 4) {
+        for (var x = 21; x < 34; x++) {
+          final i = (y * _canvas.toInt() + x) * 4;
+          expect(bytes.getUint8(i + 3), 255, reason: '($x, $y) not covered');
+          inBand++;
+          if (!sources.contains(bytes.getUint8(i + 1))) {
+            between++;
+          }
+        }
+      }
+      expect(between, greaterThan(inBand ~/ 2));
+
+      // The flat interior is not displaced: it reproduces its own column
+      // exactly. This cannot see whether it took one tap or four -- a
+      // bilinear read at zero displacement lands on the texel centre and
+      // returns the same value -- so the single-tap interior is held by the
+      // shader's `displaced` gate, not by this test.
+      for (var x = 40; x < 48; x++) {
+        expect(
+          bytes.getUint8((120 * _canvas.toInt() + x) * 4 + 1),
+          _steepRamp(x),
+          reason: 'interior column $x',
+        );
+      }
     },
   );
 

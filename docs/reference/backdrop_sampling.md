@@ -309,6 +309,56 @@ backdrop through `gfSampleBilinear` when the pass is a dome
 flat interior never needed it. Cost: 4 taps instead of 1 (12 instead of 3
 under chromatic aberration), on dome surfaces only.
 
+**Update, 2026-09-28 — the edge band reads bilinearly where it displaces.**
+Since the edge band's profile became the refracted slope of a convex
+squircle (`gfEdgeProfile`), its displacement varies continuously across the
+band, which is the dome's case. Measured before changing anything, in
+`test/src/composition/final_pass_shading_test.dart` (edge band,
+`edgeRefraction: 24`, a 200 px rounded rectangle, DPR 1):
+
+- **The ruler matters more than the shader.** A ramp of 0 to 255 across the
+  240 px canvas climbs about one level per texel, and at that slope a
+  bilinear read rounds to exactly the value nearest-neighbour picks: forcing
+  bilinear everywhere gave *bit-identical* output. A `ui.Gradient` is no
+  better as a ruler, because Impeller dithers it by about two levels and the
+  source row already holds runs. The test paints 1 px columns instead,
+  climbing 8 levels per texel across the band's source region only.
+- **Under that ruler, the nearest read never lands between texels.** Of 390
+  band texels (30 rows, x = 21..33), **0** held a value no source column
+  holds — every sample snapped to a whole texel. With the band routed
+  through `gfSampleBilinear`, **360 of 390** do. The matte's 8-bit
+  displacement is not the cause: near zero it moves in steps of about
+  0.2 px, too small to see.
+- **The matte is not coarser than the screen.** It is baked in layer-local
+  physical pixels (`ShapeGeometry.resolve` scales by DPR; `MatteGeneration
+  .bounds` is physical) and bound with `setImageSampler`'s default
+  `FilterQuality.none`, which is a nearest read of one matte texel per
+  physical pixel. It would only step if an ancestor scaled the layer up.
+
+`final_render.frag` now reads bilinearly on the dome everywhere, as before,
+and on the edge band only where the decoded magnitude is non-zero. The flat
+interior encodes exactly zero, so it keeps its single tap and the extra
+cost (4 taps instead of 1, 12 instead of 3 under chromatic aberration) stays
+confined to the band.
+
+**Not fixed here: the band folds near its rim.** The profile's
+displacement falls faster than one pixel per pixel just inside the edge, so
+the sample position runs *backwards* there, stalls, and only then runs
+forward. It is a mirrored strip plus a magnified stall, and no sampling
+filter removes it — it is a look decision for the profile. Measured along
+the row y = 120 from x = 21 (sample position in source pixels, bilinear,
+±0.5 px):
+
+| `edgeRefraction` | runs backwards | stalls at | back to 1:1 by |
+|---|---|---|---|
+| 24 | x 21–24 (33.5 → 29.5) | ≈29.5–30, x 24–28 | ≈x 36 |
+| 40 | x 21–28 (46.5 → 36) | ≈36–36.5, x 27–32 | ≈x 45 |
+| 60 | x 21–32 (63.5 → 44) | ≈44–44.5, x 31–37 | ≈x 55 |
+
+Some fold is inherent while the band's height equals `edgeRefraction`: the
+profile falls from 1 to 0 over one band, so its steepest slope is at least
+one pixel per pixel.
+
 ## flutter#186945 and the upstream issue
 
 flutter#186945: `ImageFilter.shader`'s backdrop sampler is nearest-neighbour

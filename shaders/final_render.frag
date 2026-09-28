@@ -30,13 +30,21 @@ vec2 gfMirrorUV(vec2 uv) {
     return mix(m, 2.0 - m, step(1.0, m));
 }
 
-// One backdrop read. The dome takes it bilinearly: its displacement varies
-// continuously across the whole surface and magnifies what is behind it, and
-// read nearest-neighbour (flutter#186945) every edge through it came out
-// stair-stepped by a pixel or two. The edge band displaces a band at the rim
-// and leaves its interior alone, so it keeps the single tap it always had.
-vec3 gfBackdrop(vec2 uv) {
-    if (uSurface.x > 0.5) {
+// One backdrop read, bilinear wherever the surface bends it.
+//
+// Read nearest-neighbour (flutter#186945), a displaced sample snaps to a
+// whole texel, so a displacement that varies continuously comes out as
+// steps: every edge seen through the dome was stair-stepped by a pixel or
+// two. The edge band's displacement has varied continuously across its
+// whole width since its profile became the refracted squircle slope, and
+// under a steep ramp not one texel of it landed between two source texels
+// (final_pass_shading_test.dart). So both surfaces read bilinearly where
+// they displace. `displaced` is false only where the magnitude is exactly
+// zero -- the edge band's flat interior, which reads its own texel and gains
+// nothing from four taps -- so that interior keeps the single tap it always
+// had, and the extra cost stays confined to the band.
+vec3 gfBackdrop(vec2 uv, bool displaced) {
+    if (displaced) {
         return gfSampleBilinear(uv, uSize);
     }
     return texture(uBackdrop, uv).rgb;
@@ -98,6 +106,9 @@ void main() {
     vec2 displacement = normal * -magnitude;
 
     vec2 offsetUV = (frag + displacement) / uSize;
+    // The dome reads bilinearly everywhere, as it always has; the edge band
+    // only where it moves the backdrop at all. See gfBackdrop.
+    bool displaced = uSurface.x > 0.5 || magnitude > 0.0;
 
     vec3 refracted;
     // Threshold in PIXELS, not in unit-free aberration. Upstream compares the
@@ -108,12 +119,12 @@ void main() {
         vec2 rUV = (frag + displacement * (1.0 + spread)) / uSize;
         vec2 bUV = (frag + displacement * (1.0 - spread)) / uSize;
         refracted = vec3(
-            gfBackdrop(gfMirrorUV(rUV)).r,
-            gfBackdrop(gfMirrorUV(offsetUV)).g,
-            gfBackdrop(gfMirrorUV(bUV)).b
+            gfBackdrop(gfMirrorUV(rUV), displaced).r,
+            gfBackdrop(gfMirrorUV(offsetUV), displaced).g,
+            gfBackdrop(gfMirrorUV(bUV), displaced).b
         );
     } else {
-        refracted = gfBackdrop(gfMirrorUV(offsetUV));
+        refracted = gfBackdrop(gfMirrorUV(offsetUV), displaced);
     }
 
     // Saturation, on Rec.709 luma.
