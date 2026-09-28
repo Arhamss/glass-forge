@@ -110,6 +110,53 @@ void main() {
     expect(printed.where((m) => m.contains('187820')), isEmpty);
   });
 
+  testWidgets('every overlapping pass pair warns in the same paint', (
+    tester,
+  ) async {
+    final printed = <String>[];
+    final original = debugPrint;
+    debugPrint = (message, {wrapWidth}) {
+      if (message != null) printed.add(message);
+    };
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GlassLayer(
+            child: Stack(
+              children: <Widget>[
+                for (final (left, frost) in [
+                  (0.0, 4.0),
+                  (20.0, 8.0),
+                  (40.0, 12.0),
+                ])
+                  Positioned(
+                    left: left,
+                    top: 0,
+                    child: Glass(
+                      shape: const GlassOval(),
+                      material: GlassMaterial(frost: frost),
+                      child: const SizedBox(width: 100, height: 100),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+    } finally {
+      debugPrint = original;
+    }
+
+    expect(
+      printed.where((m) => m.contains('187820')),
+      hasLength(3),
+      reason:
+          'three overlapping shapes in different passes should produce '
+          'three warnings in the same paint',
+    );
+  });
+
   testWidgets('two shrunken shapes that do not meet on screen do not '
       'warn', (tester) async {
     // The catalogue index's arrangement, reduced: each thumbnail fits a

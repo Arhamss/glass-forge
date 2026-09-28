@@ -683,6 +683,9 @@ class RenderGlassLayer extends RenderProxyBox {
           if (!boundsA.overlaps(boundsB)) {
             continue;
           }
+          // Once per pair of passes, in either order — and every new pair in
+          // this paint, not just the first: returning after one left the
+          // rest unreported until some later paint that might never come.
           if (_warnedOverlaps.contains((assignedB, assignedA)) ||
               !_warnedOverlaps.add((assignedA, assignedB))) {
             continue;
@@ -696,7 +699,6 @@ class RenderGlassLayer extends RenderProxyBox {
             'with a GlassBlendGroup, or hand one off to the other with '
             'GlassPresence so only one is present at a time.',
           );
-          return true;
         }
       }
       return true;
