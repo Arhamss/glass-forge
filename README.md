@@ -255,6 +255,26 @@ Surfaces adapt by size, following Apple: small elements like a control flip
 light/dark against their background, large ones like a sheet adapt without
 flipping. The gate is thinness, not area.
 
+## Chrome
+
+`GlassScaffold` makes the one-`GlassLayer` composition rule the default
+instead of something to get right by hand: your background and body paint
+behind the layer, your bars are the only glass inside it, and the body gets
+padding back so a `ListView` clears the bars on its own.
+
+```dart
+GlassScaffold(
+  background: const ColoredBox(color: Color(0xFF101820)),
+  topBar: GlassSurface.navigationBar(child: YourTitle()),
+  body: ListView(children: rows),
+)
+```
+
+Each bar fades through its own presence, tied to the enclosing route: full
+while nothing covers the screen, ramping to none as a sheet or another route
+arrives over it, so the two are never both a backdrop filter over the same
+pixels.
+
 ## Presets
 
 `GlassMaterial.regular(brightness:)` and `GlassMaterial.clear()` are fitted

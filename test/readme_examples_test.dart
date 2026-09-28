@@ -358,4 +358,22 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('the GlassScaffold example builds', (tester) async {
+    // `YourTitle()` and `rows` in the README are hypothetical — a caller's
+    // own title widget and their own list of rows. Substituted here with a
+    // real widget and a real list, same shape as the README's snippet.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassScaffold(
+          background: const ColoredBox(color: Color(0xFF101820)),
+          topBar: const GlassSurface.navigationBar(
+            child: SizedBox(height: 44),
+          ),
+          body: ListView(children: const [SizedBox(height: 40)]),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
 }

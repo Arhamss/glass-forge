@@ -12,6 +12,7 @@ library;
 export 'src/chrome/glass_detent.dart';
 export 'src/chrome/glass_detent_sheet.dart';
 export 'src/chrome/glass_detent_sheet_controller.dart';
+export 'src/chrome/glass_scaffold.dart';
 export 'src/chrome/glass_sheet_scroll_physics.dart';
 export 'src/composition/glass_glow.dart' show GlassGlow;
 export 'src/controls/glass_button.dart';
