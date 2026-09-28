@@ -8,13 +8,19 @@ import 'package:glass_forge_example/src/playground.dart';
 import 'package:glass_forge_example/src/ui.dart';
 
 /// The same glass as real interface, laid out like Control Center: pill
-/// tiles with an icon well, round toggles, a media tile and two sliders —
-/// all of it tuned live by the sheet below.
+/// tiles with an icon well, round toggles, a media tile, a switch and two
+/// sliders — all of it tuned live by the sheet below.
 ///
-/// Nothing here is glass inside glass. The wells, tracks and buttons that
-/// sit *on* a tile are painted — two shapes in one pass would just union
-/// into one outline, and a second pass over the first is the stacking
-/// Apple tells you not to do.
+/// The toggles are the package's own [GlassButton]; the switch and the
+/// sliders are [GlassSwitch] and [GlassSlider], sitting on tiles that are
+/// glass, so they paint rather than stack a second refraction on the first.
+/// Eleven glass shapes in all, three past the eight one draw carries. The
+/// layer draws shapes that sit apart as separate clusters, but these sit
+/// 12 apart — well inside the reach of each other's refraction — so they
+/// would be one cluster of eleven and three would go undrawn. So the
+/// buttons keep the layer's pass and the modules — media, switch and
+/// sliders — take a second one through [_Module]: the same tuned material,
+/// two draws of seven and four.
 class KitScene extends StatelessWidget {
   const KitScene({super.key});
 
@@ -54,7 +60,7 @@ class KitScene extends StatelessWidget {
                 SizedBox(
                   width: 128,
                   height: _tile * 2 + _gap,
-                  child: _NowPlaying(),
+                  child: _Module(child: _NowPlaying()),
                 ),
               ],
             ),
@@ -84,27 +90,64 @@ class KitScene extends StatelessWidget {
           ),
           SizedBox(height: _gap),
           Arrive(
+            delay: Duration(milliseconds: 90),
+            child: Row(
+              children: [
+                _RoundToggle(icon: Glyphs.torch, label: 'Torch'),
+                SizedBox(width: _gap),
+                _RoundToggle(icon: Glyphs.timer, label: 'Timer'),
+                SizedBox(width: _gap),
+                Expanded(child: _Module(child: _SwitchTile())),
+              ],
+            ),
+          ),
+          SizedBox(height: _gap),
+          Arrive(
             delay: Duration(milliseconds: 120),
-            child: _SliderTile(
-              title: 'Display',
-              low: Glyphs.sun,
-              high: Glyphs.sunBold,
-              initial: 0.55,
+            child: _Module(
+              child: _SliderTile(
+                title: 'Display',
+                low: Glyphs.sun,
+                high: Glyphs.sunBold,
+                initial: 0.55,
+              ),
             ),
           ),
           SizedBox(height: _gap),
           Arrive(
             delay: Duration(milliseconds: 180),
-            child: _SliderTile(
-              title: 'Sound',
-              low: Glyphs.volumeLow,
-              high: Glyphs.volumeHigh,
-              initial: 0.7,
+            child: _Module(
+              child: _SliderTile(
+                title: 'Sound',
+                low: Glyphs.volumeLow,
+                high: Glyphs.volumeHigh,
+                initial: 0.7,
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+/// Held by identity: every [_Module] shares this one object, and so one
+/// backdrop pass of their own.
+const Animation<double> _modulePass = AlwaysStoppedAnimation<double>(1);
+
+/// Puts [child]'s glass in the modules' pass rather than the layer's.
+///
+/// Passes are keyed by material *and* presence, so a presence that never
+/// moves is a second pass wearing the same material — the tuner still
+/// reaches it, and the buttons' pass is left with seven shapes.
+class _Module extends StatelessWidget {
+  const _Module({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPresence(presence: _modulePass, child: child);
   }
 }
 
@@ -152,6 +195,41 @@ class _Well extends StatelessWidget {
   }
 }
 
+/// A title over its state, as the pill tiles print it.
+class _Caption extends StatelessWidget {
+  const _Caption({required this.title, required this.state});
+
+  final String title;
+  final String state;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Font.title.copyWith(fontSize: 15),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        AnimatedSwitcher(
+          duration: motion(context, const Duration(milliseconds: 200)),
+          child: Text(
+            state,
+            key: ValueKey(state),
+            style: Font.body.copyWith(fontSize: 13),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A pill tile that toggles: a [GlassButton] in the tile's shape.
 class _PillToggle extends StatefulWidget {
   const _PillToggle({
     required this.icon,
@@ -174,65 +252,36 @@ class _PillToggleState extends State<_PillToggle> {
 
   @override
   Widget build(BuildContext context) {
+    // The button's own padding — 10 above and below a 44 pt well — makes
+    // the tile's 64.
     return Semantics(
-      button: true,
       toggled: _on,
-      label: widget.title,
-      excludeSemantics: true,
-      child: InteractiveGlass(
-        pressScale: 0.97,
+      child: GlassButton(
+        shape: _pill,
         pressStretch: _tileStretch,
-        onTap: () {
-          unawaited(HapticFeedback.selectionClick());
-          setState(() => _on = !_on);
-        },
-        child: SizedBox(
-          height: KitScene._tile,
-          child: Glass(
-            shape: _pill,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Row(
-                children: [
-                  _Well(icon: widget.icon, on: _on),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.title,
-                          style: Font.title.copyWith(fontSize: 15),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        AnimatedSwitcher(
-                          duration: motion(
-                            context,
-                            const Duration(milliseconds: 200),
-                          ),
-                          child: Text(
-                            _on ? widget.on : 'Off',
-                            key: ValueKey(_on),
-                            style: Font.body.copyWith(fontSize: 13),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+        semanticLabel: widget.title,
+        onPressed: () => setState(() => _on = !_on),
+        child: Row(
+          children: [
+            _Well(icon: widget.icon, on: _on),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ExcludeSemantics(
+                child: _Caption(
+                  title: widget.title,
+                  state: _on ? widget.on : 'Off',
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
+/// A round toggle: a [GlassButton] that fills white when on, like Control
+/// Center's.
 class _RoundToggle extends StatefulWidget {
   const _RoundToggle({
     required this.icon,
@@ -255,45 +304,92 @@ class _RoundToggleState extends State<_RoundToggle> {
   Widget build(BuildContext context) {
     final duration = motion(context, const Duration(milliseconds: 320));
     return Semantics(
-      button: true,
       toggled: _on,
-      label: widget.label,
-      excludeSemantics: true,
-      child: InteractiveGlass(
-        pressScale: 0.9,
-        onTap: () {
-          unawaited(HapticFeedback.selectionClick());
-          setState(() => _on = !_on);
-        },
-        child: SizedBox.square(
-          dimension: KitScene._tile,
-          child: Glass(
-            shape: const GlassOval(),
-            // On, the whole button fills white, like Control Center's; the
-            // disc grows out of the centre rather than cutting in.
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                AnimatedScale(
-                  scale: _on ? 1 : 0,
-                  duration: duration,
-                  curve: _on ? Curves.easeOutBack : Curves.easeIn,
-                  child: const DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xF2FFFFFF),
+      child: GlassButton(
+        shape: const GlassOval(),
+        semanticLabel: widget.label,
+        onPressed: () => setState(() => _on = !_on),
+        // The button pads its label by 20 across and 10 down; a label of
+        // 24 by 44 makes the circle 64. The face overflows that label to
+        // fill the whole circle, and the glass clips it round.
+        child: SizedBox(
+          width: KitScene._tile - 40,
+          height: KitScene._tile - 20,
+          child: OverflowBox(
+            maxWidth: KitScene._tile,
+            maxHeight: KitScene._tile,
+            child: SizedBox.square(
+              dimension: KitScene._tile,
+              // The disc grows out of the centre rather than cutting in.
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  AnimatedScale(
+                    scale: _on ? 1 : 0,
+                    duration: duration,
+                    curve: _on ? Curves.easeOutBack : Curves.easeIn,
+                    child: const DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xF2FFFFFF),
+                      ),
+                      child: SizedBox.expand(),
                     ),
-                    child: SizedBox.expand(),
+                  ),
+                  TweenAnimationBuilder<Color?>(
+                    tween: ColorTween(end: _on ? Tone.ground : Tone.primary),
+                    duration: duration,
+                    builder: (context, color, _) =>
+                        Glyph(widget.icon, size: 26, color: color),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A pill tile holding a [GlassSwitch]. The tile is glass, so the switch
+/// paints its knob rather than refracting on top of it.
+class _SwitchTile extends StatefulWidget {
+  const _SwitchTile();
+
+  @override
+  State<_SwitchTile> createState() => _SwitchTileState();
+}
+
+class _SwitchTileState extends State<_SwitchTile> {
+  bool _on = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: KitScene._tile,
+      child: Glass(
+        shape: _pill,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 10, right: 6),
+          child: Row(
+            children: [
+              _Well(icon: Glyphs.battery, on: _on),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ExcludeSemantics(
+                  child: _Caption(
+                    title: 'Low Power',
+                    state: _on ? 'On' : 'Off',
                   ),
                 ),
-                TweenAnimationBuilder<Color?>(
-                  tween: ColorTween(end: _on ? Tone.ground : Tone.primary),
-                  duration: duration,
-                  builder: (context, color, _) =>
-                      Glyph(widget.icon, size: 26, color: color),
-                ),
-              ],
-            ),
+              ),
+              GlassSwitch(
+                value: _on,
+                semanticLabel: 'Low Power Mode',
+                onChanged: (on) => setState(() => _on = on),
+              ),
+            ],
           ),
         ),
       ),
@@ -426,7 +522,8 @@ class _PressState extends State<_Press> {
   }
 }
 
-/// A titled tile with a thin track, dragged anywhere along its width.
+/// A titled tile with a [GlassSlider] between two glyphs. The tile is
+/// glass, so the slider paints its thumb.
 class _SliderTile extends StatefulWidget {
   const _SliderTile({
     required this.title,
@@ -445,89 +542,41 @@ class _SliderTile extends StatefulWidget {
 }
 
 class _SliderTileState extends State<_SliderTile> {
-  /// Where the track starts and ends inside the tile: past the padding and
-  /// the icon at each end.
-  static const double _inset = 48;
-
   late double _value = widget.initial;
 
-  void _set(Offset local, double width) {
-    final track = width - _inset * 2;
-    setState(() => _value = ((local.dx - _inset) / track).clamp(0.0, 1.0));
-  }
-
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        return Semantics(
-          slider: true,
-          label: widget.title,
-          value: '${(_value * 100).round()}%',
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onHorizontalDragUpdate: (d) => _set(d.localPosition, width),
-            onTapDown: (d) => _set(d.localPosition, width),
-            child: SizedBox(
-              width: width,
-              height: 76,
-              child: Glass(
-                shape: const GlassSuperellipse(
-                  radius: BorderRadius.all(Radius.circular(28)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.title,
-                        style: Font.title.copyWith(fontSize: 15),
-                      ),
-                      const Spacer(),
-                      Row(
-                        children: [
-                          Glyph(widget.low, size: 18, color: Tone.primary),
-                          const SizedBox(width: 12),
-                          Expanded(child: _Track(value: _value)),
-                          const SizedBox(width: 12),
-                          Glyph(widget.high, size: 20, color: Tone.primary),
-                        ],
-                      ),
-                    ],
+    return SizedBox(
+      height: 84,
+      child: Glass(
+        shape: const GlassSuperellipse(
+          radius: BorderRadius.all(Radius.circular(28)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.title, style: Font.title.copyWith(fontSize: 15)),
+              const Spacer(),
+              Row(
+                children: [
+                  Glyph(widget.low, size: 18, color: Tone.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GlassSlider(
+                      value: _value,
+                      semanticLabel: widget.title,
+                      semanticValue: (v) => '${(v * 100).round()}%',
+                      onChanged: (v) => setState(() => _value = v),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Glyph(widget.high, size: 20, color: Tone.primary),
+                ],
               ),
-            ),
+            ],
           ),
-        );
-      },
-    );
-  }
-}
-
-class _Track extends StatelessWidget {
-  const _Track({required this.value});
-
-  final double value;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(3),
-      child: SizedBox(
-        height: 6,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            const ColoredBox(color: Color(0x33FFFFFF)),
-            FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: value,
-              child: const ColoredBox(color: Color(0xFFFFFFFF)),
-            ),
-          ],
         ),
       ),
     );

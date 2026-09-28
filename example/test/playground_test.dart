@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:glass_forge/benchmark.dart' show warmUpGlassForgeShaders;
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge_example/main.dart';
 import 'package:glass_forge_example/src/controls.dart';
 import 'package:glass_forge_example/src/playground.dart';
 import 'package:glass_forge_example/src/presets.dart';
-import 'package:glass_forge_example/src/tab_bar.dart';
+import 'package:glass_forge_example/src/scenes/kit.dart';
+import 'package:glass_forge_example/src/tuner.dart';
 
 void main() {
+  // Baked mattes need the shaders; without them no pass bakes, and the
+  // shape-limit warning — raised at bake time — could never print. First,
+  // before any widget test: loaded after one has run, it never completes.
+  setUpAll(warmUpGlassForgeShaders);
+
   group('GlassMaterialTween', () {
     test('lands exactly on both ends', () {
       final a = presets[1].material;
@@ -148,6 +155,109 @@ void main() {
       await tester.pump();
       final context = tester.element(find.byType(GlassLayer));
       expect(GlassTierScope.of(context).requested, GlassTier.flat);
+    });
+
+    testWidgets('the tab bar is the package GlassTabBar', (tester) async {
+      await pumpApp(tester);
+      final bar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
+      expect(bar.tabs.map((t) => t.label), ['Lens', 'Liquid', 'Kit']);
+      expect(bar.currentIndex, 0);
+    });
+
+    testWidgets('dragging along the tab bar switches where it lands', (
+      tester,
+    ) async {
+      await pumpApp(tester);
+      Finder tab(String label) => find.descendant(
+        of: find.byType(GlassTabBar),
+        matching: find.text(label),
+      );
+      final from = tester.getCenter(tab('Lens'));
+      final to = tester.getCenter(tab('Kit'));
+      final gesture = await tester.startGesture(from);
+      // In steps, as a finger does, so the drag is recognised and followed.
+      for (var i = 1; i <= 10; i++) {
+        await gesture.moveTo(Offset.lerp(from, to, i / 10)!);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      // Nothing is committed while the finger is still down.
+      expect(
+        tester.widget<GlassTabBar>(find.byType(GlassTabBar)).currentIndex,
+        0,
+      );
+      await gesture.up();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        tester.widget<GlassTabBar>(find.byType(GlassTabBar)).currentIndex,
+        2,
+      );
+      expect(find.byType(KitScene), findsOneWidget);
+    });
+
+    testWidgets('the tuner on the sheet paints its controls, adding no '
+        'glass', (tester) async {
+      await pumpApp(tester);
+      await tester.drag(find.text('Material'), const Offset(0, -400));
+      await tester.pump(const Duration(seconds: 1));
+      final tuner = find.byType(Tuner);
+      expect(
+        find.descendant(of: tuner, matching: find.byType(GlassSlider)),
+        findsWidgets,
+      );
+      expect(
+        find.descendant(
+          of: tuner,
+          matching: find.byType(GlassSegmentedControl<GlassProfile>),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: tuner, matching: find.byType(Glass)),
+        findsNothing,
+      );
+    });
+  });
+
+  group('Kit', () {
+    // On its own layer, with no tier scope: the app's scope resolves to
+    // `off` under flutter_tester's software backend, which bakes nothing
+    // and so could never warn. A bare layer keeps the accelerated default.
+    testWidgets('draws more than eight glass controls, and every one', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1179, 2556);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      final printed = <String>[];
+      final original = debugPrint;
+      debugPrint = (message, {wrapWidth}) {
+        if (message != null) printed.add(message);
+      };
+      try {
+        await tester.pumpWidget(
+          PlaygroundScope(
+            playground: Playground(),
+            child: const MaterialApp(
+              home: GlassLayer(
+                material: glassMaterial,
+                child: Center(child: KitScene()),
+              ),
+            ),
+          ),
+        );
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump();
+      } finally {
+        debugPrint = original;
+      }
+      expect(find.byType(Glass).evaluate().length, greaterThan(8));
+      expect(
+        printed.where((m) => m.contains('cluster carries at most')),
+        isEmpty,
+      );
+      // Two passes side by side, 12 apart: close, never touching.
+      expect(printed.where((m) => m.contains('overlap')), isEmpty);
     });
   });
 }

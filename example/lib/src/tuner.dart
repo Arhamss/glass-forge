@@ -56,14 +56,14 @@ class Tuner extends StatelessWidget {
 
     return [
       const SectionLabel('Shape of the lens'),
-      Segmented<GlassProfile>(
+      _Choice<GlassProfile>(
         options: GlassProfile.values,
         selected: m.profile,
         labelOf: (p) => p == GlassProfile.edgeBand ? 'Edge band' : 'Dome',
         onChanged: (p) => tweak(m.copyWith(profile: p)),
       ),
       const SizedBox(height: 8),
-      Segmented<GlassVariant>(
+      _Choice<GlassVariant>(
         options: GlassVariant.values,
         selected: m.variant,
         labelOf: (v) => v == GlassVariant.regular ? 'Regular' : 'Clear',
@@ -71,7 +71,7 @@ class Tuner extends StatelessWidget {
       ),
       const SectionLabel('Refraction'),
       ..._spaced([
-        TuneSlider(
+        _Knob(
           label: 'Bend',
           value: m.edgeRefraction,
           min: 0,
@@ -79,7 +79,7 @@ class Tuner extends StatelessWidget {
           format: (v) => '${v.round()} px',
           onChanged: (v) => tweak(m.copyWith(edgeRefraction: v)),
         ),
-        TuneSlider(
+        _Knob(
           label: 'Thickness',
           value: m.thickness,
           min: 1,
@@ -87,7 +87,7 @@ class Tuner extends StatelessWidget {
           format: (v) => '${v.round()} px',
           onChanged: (v) => tweak(m.copyWith(thickness: v)),
         ),
-        TuneSlider(
+        _Knob(
           label: 'Spread',
           value: m.refractionSpread,
           min: 0,
@@ -95,7 +95,7 @@ class Tuner extends StatelessWidget {
           format: (v) => v.toStringAsFixed(2),
           onChanged: (v) => tweak(m.copyWith(refractionSpread: v)),
         ),
-        TuneSlider(
+        _Knob(
           label: 'Dispersion',
           value: m.chromaticAberration,
           min: 0,
@@ -106,7 +106,7 @@ class Tuner extends StatelessWidget {
       ]),
       const SectionLabel('Surface'),
       ..._spaced([
-        TuneSlider(
+        _Knob(
           label: 'Frost',
           value: m.frost,
           min: 0,
@@ -114,7 +114,7 @@ class Tuner extends StatelessWidget {
           format: (v) => v.toStringAsFixed(1),
           onChanged: (v) => tweak(m.copyWith(frost: v)),
         ),
-        TuneSlider(
+        _Knob(
           label: 'Saturation',
           value: m.saturation,
           min: 0,
@@ -122,7 +122,7 @@ class Tuner extends StatelessWidget {
           format: (v) => '${v.toStringAsFixed(2)}×',
           onChanged: (v) => tweak(m.copyWith(saturation: v)),
         ),
-        TuneSlider(
+        _Knob(
           label: 'Tint',
           value: m.tintOpacity,
           min: 0,
@@ -142,7 +142,7 @@ class Tuner extends StatelessWidget {
       ]),
       const SectionLabel('Light'),
       ..._spaced([
-        TuneSlider(
+        _Knob(
           label: 'Highlight',
           value: m.highlight,
           min: 0,
@@ -150,7 +150,7 @@ class Tuner extends StatelessWidget {
           format: (v) => v.toStringAsFixed(2),
           onChanged: (v) => tweak(m.copyWith(highlight: v)),
         ),
-        TuneSlider(
+        _Knob(
           label: 'Light angle',
           value: degrees,
           min: 0,
@@ -163,7 +163,7 @@ class Tuner extends StatelessWidget {
             );
           },
         ),
-        TuneSlider(
+        _Knob(
           label: 'Contour',
           value: m.contour,
           min: 0,
@@ -173,7 +173,7 @@ class Tuner extends StatelessWidget {
         ),
       ]),
       const SectionLabel('Liquid'),
-      TuneSlider(
+      _Knob(
         label: 'Blend',
         value: playground.blend,
         min: 0,
@@ -182,7 +182,7 @@ class Tuner extends StatelessWidget {
         onChanged: (v) => playground.blend = v,
       ),
       const SectionLabel('Quality tier'),
-      Segmented<GlassTier?>(
+      _Choice<GlassTier?>(
         options: const [
           null,
           GlassTier.full,
@@ -211,6 +211,103 @@ class Tuner extends StatelessWidget {
       children[i],
     ],
   ];
+}
+
+/// A labelled [GlassSlider]: the name and the value printed above the
+/// track. The tuner sits on the sheet's glass, so the slider paints.
+class _Knob extends StatelessWidget {
+  const _Knob({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.format,
+    required this.onChanged,
+  });
+
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final String Function(double value) format;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    // A preset may sit past a slider's range; the slider shows it pinned
+    // at the end rather than refusing it.
+    final shown = value.clamp(min, max);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            children: [
+              Text(label, style: Font.body.copyWith(color: Tone.primary)),
+              const Spacer(),
+              Text(
+                format(value),
+                style: Font.mono.copyWith(color: Tone.secondary),
+              ),
+            ],
+          ),
+        ),
+        GlassSlider(
+          value: shown,
+          min: min,
+          max: max,
+          semanticLabel: label,
+          semanticValue: format,
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+}
+
+/// A [GlassSegmentedControl] over [options], each named by [labelOf].
+///
+/// On the sheet's glass its pill paints white, so the chosen label is drawn
+/// dark to read on it.
+class _Choice<T> extends StatelessWidget {
+  const _Choice({
+    required this.options,
+    required this.selected,
+    required this.labelOf,
+    required this.onChanged,
+    super.key,
+  });
+
+  final List<T> options;
+  final T selected;
+  final String Function(T option) labelOf;
+  final ValueChanged<T> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassSegmentedControl<T>(
+      selected: selected,
+      onChanged: (option) {
+        unawaited(HapticFeedback.selectionClick());
+        onChanged(option);
+      },
+      segments: [
+        for (final option in options)
+          GlassSegment<T>(
+            value: option,
+            label: AnimatedDefaultTextStyle(
+              duration: motion(context, const Duration(milliseconds: 220)),
+              style: Font.body.copyWith(
+                fontSize: 13,
+                color: option == selected ? Tone.ground : Tone.secondary,
+              ),
+              child: Text(labelOf(option)),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 class _Header extends StatelessWidget {

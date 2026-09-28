@@ -26,6 +26,9 @@ abstract final class Glyphs {
   static const String reset = 'assets/icons/refresh.svg';
   static const String code = 'assets/icons/code.svg';
   static const String done = 'assets/icons/tick_circle.svg';
+  static const String torch = 'assets/icons/flash.svg';
+  static const String timer = 'assets/icons/timer_start.svg';
+  static const String battery = 'assets/icons/battery_charging.svg';
 }
 
 /// An Iconsax glyph, tinted like an [Icon]: [color], or the ambient

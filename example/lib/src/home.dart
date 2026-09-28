@@ -12,15 +12,23 @@ import 'package:glass_forge_example/src/presets.dart';
 import 'package:glass_forge_example/src/scenes/kit.dart';
 import 'package:glass_forge_example/src/scenes/lens.dart';
 import 'package:glass_forge_example/src/scenes/liquid.dart';
-import 'package:glass_forge_example/src/tab_bar.dart';
 import 'package:glass_forge_example/src/tuner.dart';
 import 'package:glass_forge_example/src/ui.dart';
 
-const List<SceneTab> _tabs = [
-  SceneTab('Lens', Glyphs.lens),
-  SceneTab('Liquid', Glyphs.liquid),
-  SceneTab('Kit', Glyphs.kit),
+/// No colour on the glyphs: the bar tints them through its `IconTheme`,
+/// bright for the selected tab and dimmed for the rest.
+const List<GlassTab> _tabs = [
+  GlassTab(icon: Glyph(Glyphs.lens, size: 22), label: 'Lens'),
+  GlassTab(icon: Glyph(Glyphs.liquid, size: 22), label: 'Liquid'),
+  GlassTab(icon: Glyph(Glyphs.kit, size: 22), label: 'Kit'),
 ];
+
+/// The package tab bar's height, above the safe area it builds in.
+const double _barHeight = 62;
+
+/// How wide the bar is: a comfortable thumb's width per tab, not the whole
+/// screen.
+const double _barWidth = 92.0 * 3 + 12;
 
 const List<String> _captions = [
   'Pick it up and move it. Tap to change shape.',
@@ -33,8 +41,9 @@ const List<String> _captions = [
 /// **One `GlassLayer` for everything.** It captures the photograph once and
 /// every `Glass` below registers into it. The layer's material is the one
 /// the tuner edits, so every scene — and the photo button, and the toast —
-/// changes together. Only the tab bar and the sheet bring materials of
-/// their own, because they are chrome and have to stay readable.
+/// changes together. Only the chrome — the tab bar, the sheet, the photo
+/// button and the toast — wears materials of its own, because it has to
+/// stay readable whatever the tuner is set to.
 class Home extends StatefulWidget {
   const Home({super.key});
 
@@ -120,7 +129,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
     final playground = PlaygroundScope.of(context);
     final padding = MediaQuery.paddingOf(context);
     final barBottom = padding.bottom + 8;
-    final sheetGap = barBottom + GlassTabBar.height + 10;
+    final sheetGap = barBottom + _barHeight + 10;
     final headerHeight = padding.top + 96;
 
     final scene = switch (_shown) {
@@ -139,7 +148,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
           animation: _sheet,
           builder: (context, child) {
             final bottom = math.max(
-              barBottom + GlassTabBar.height,
+              barBottom + _barHeight,
               _sheetTop(padding.bottom, sheetGap),
             );
             return Positioned(
@@ -156,11 +165,12 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 // Out, then in — never both at once. Two scenes on screen
-                // together share one pass, and a pass carries at most eight
-                // shapes: the Kit's eight and the Liquid's four together
-                // would leave four of them undrawn for the length of the
-                // transition. Scale, not fade: a fade reaches only the
-                // labels, while a transform reaches the glass itself.
+                // together share a pass, and shapes close together draw as
+                // one cluster of at most eight: the Kit's buttons and the
+                // Liquid's drops overlapping mid-swap would leave some of
+                // them undrawn for the length of the transition. Scale, not
+                // fade: a fade reaches only the labels, while a transform
+                // reaches the glass itself.
                 child: ScaleTransition(
                   scale: _swapScale,
                   child: FadeTransition(
@@ -188,18 +198,34 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
         Positioned(
           left: 0,
           right: 0,
-          bottom: barBottom,
+          bottom: 0,
           child: Center(
-            // Fades out before the rising sheet reaches it: two backdrop
-            // passes over the same pixels is the one thing glass must not
-            // do (flutter#187820).
-            child: Arrive(
-              delay: const Duration(milliseconds: 200),
-              child: GlassTabBar(
-                tabs: _tabs,
-                selected: _scene,
-                presence: _barPresence,
-                onSelected: (i) => unawaited(_select(i)),
+            child: SizedBox(
+              // The bar keeps 16 clear of the screen's edges itself.
+              width: _barWidth + 32,
+              // It builds the safe area in, keeping at least 8 below it;
+              // above a home indicator, 8 more lifts it clear of the line.
+              child: Padding(
+                padding: EdgeInsets.only(bottom: padding.bottom > 0 ? 8 : 0),
+                // Fades out before the rising sheet reaches it: two
+                // backdrop passes over the same pixels is the one thing
+                // glass must not do (flutter#187820). The bar reads its
+                // presence from here and hands it to its lens as well.
+                child: GlassPresence(
+                  presence: _barPresence,
+                  child: Arrive(
+                    delay: const Duration(milliseconds: 200),
+                    child: GlassTabBar(
+                      tabs: _tabs,
+                      currentIndex: _scene,
+                      onTap: (i) {
+                        if (i != _scene) {
+                          unawaited(_select(i));
+                        }
+                      },
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -326,9 +352,9 @@ class _PhotoButton extends StatelessWidget {
         },
         child: const SizedBox.square(
           dimension: 50,
-          // Chrome, so the chrome's material — which is also what keeps the
-          // scene's pass for the scene: a pass carries at most eight shapes,
-          // and the Kit alone has eight.
+          // Chrome, so the chrome's material — which also keeps it out of
+          // the scene's pass, whose Kit buttons already fill most of the
+          // eight shapes a cluster carries.
           child: Glass(
             material: chromeMaterial,
             shape: GlassOval(),
