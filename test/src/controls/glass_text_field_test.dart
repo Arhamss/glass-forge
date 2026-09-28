@@ -25,7 +25,16 @@ const GlassMaterial _inert = GlassMaterial(
 /// `SelectionOverlay`, which asserts on an `Overlay` ancestor. A real app
 /// always has one, through its `Navigator`; a bare `WidgetsApp`-less harness
 /// has to add it back by hand.
-Widget _harness({required Widget child, bool onGlass = false}) {
+///
+/// [supportsSystemContextMenu] threads a `MediaQuery` reporting
+/// `supportsShowingSystemContextMenu` — the other half, alongside
+/// `debugDefaultTargetPlatformOverride`, of what
+/// `SystemContextMenu.isSupported` checks.
+Widget _harness({
+  required Widget child,
+  bool onGlass = false,
+  bool supportsSystemContextMenu = false,
+}) {
   final content = onGlass
       ? Glass(
           shape: const GlassOval(),
@@ -34,16 +43,21 @@ Widget _harness({required Widget child, bool onGlass = false}) {
       : Center(child: child);
   return Directionality(
     textDirection: TextDirection.ltr,
-    child: Overlay(
-      initialEntries: [
-        OverlayEntry(
-          builder: (context) => GlassLayer(
-            tier: GeometryTier.none,
-            material: _inert,
-            child: SizedBox(width: 240, height: 200, child: content),
+    child: MediaQuery(
+      data: MediaQueryData(
+        supportsShowingSystemContextMenu: supportsSystemContextMenu,
+      ),
+      child: Overlay(
+        initialEntries: [
+          OverlayEntry(
+            builder: (context) => GlassLayer(
+              tier: GeometryTier.none,
+              material: _inert,
+              child: SizedBox(width: 240, height: 200, child: content),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }
@@ -186,6 +200,99 @@ void main() {
     );
     handle.dispose();
   });
+
+  testWidgets(
+    'shows the system context menu where the device supports it',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(
+          supportsSystemContextMenu: true,
+          child: const GlassTextField(),
+        ),
+      );
+
+      expect(find.byType(SystemContextMenu), findsNothing);
+
+      // A tap first: `showToolbar` only opens an already-existing selection
+      // overlay, and that overlay isn't created until the first selection
+      // change — the same order Flutter's own `system_context_menu_test.dart`
+      // uses.
+      await tester.tap(find.byType(GlassTextField));
+      await tester.pump();
+
+      final state = tester.state<EditableTextState>(
+        find.byType(EditableText),
+      );
+      expect(state.showToolbar(), isTrue);
+      await tester.pump();
+
+      expect(find.byType(SystemContextMenu), findsOneWidget);
+    },
+    // Not `addTearDown` + a manual `debugDefaultTargetPlatformOverride`
+    // assignment: the test framework's own end-of-test invariant check runs
+    // before `addTearDown` callbacks do, and fails if that override is
+    // still non-null at that point. `variant` resets it through the
+    // framework's own `setUp`/`tearDown` hooks instead, which run in time.
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
+  testWidgets(
+    'shows nothing where the device does not support the system menu',
+    (tester) async {
+      // Neither `supportsSystemContextMenu` nor the target platform is
+      // overridden here — both already default to a combination
+      // `SystemContextMenu.isSupported` reads as unsupported, which is
+      // exactly the case this test means to cover.
+      await tester.pumpWidget(_harness(child: const GlassTextField()));
+
+      await tester.tap(find.byType(GlassTextField));
+      await tester.pump();
+
+      final state = tester.state<EditableTextState>(
+        find.byType(EditableText),
+      );
+      // No assertion, and no menu: `_resolveContextMenuBuilder` returned
+      // null rather than an `EditableTextContextMenuBuilder` that would
+      // have built (and asserted inside) `SystemContextMenu.editableText`
+      // on an unsupported device.
+      expect(state.showToolbar(), isTrue);
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(SystemContextMenu), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'a custom contextMenuBuilder overrides the default',
+    (tester) async {
+      var built = 0;
+      await tester.pumpWidget(
+        _harness(
+          supportsSystemContextMenu: true,
+          child: GlassTextField(
+            contextMenuBuilder: (context, editableTextState) {
+              built++;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(GlassTextField));
+      await tester.pump();
+
+      final state = tester.state<EditableTextState>(
+        find.byType(EditableText),
+      );
+      expect(state.showToolbar(), isTrue);
+      await tester.pump();
+
+      expect(built, 1);
+      expect(find.byType(SystemContextMenu), findsNothing);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
 
   testWidgets(
     'a focused field inside a scroll view ends up clear of the keyboard',

@@ -55,15 +55,29 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 /// )
 /// ```
 ///
-/// No Material ancestor is required. The selection toolbar and drag handles
-/// Material and Cupertino each build are themselves Material- or
-/// Cupertino-specific widgets, which the "`package:flutter/widgets.dart`
-/// only" rule this package holds every widget to rules out reaching for.
-/// This field therefore passes `EmptyTextSelectionControls` — no popup menu,
-/// no drag handles — while every keyboard-driven path (typing, arrow-key
-/// caret movement, Cmd/Ctrl+C/V, double-tap-to-select-word) keeps working
-/// through the IME and the platform's own text-editing shortcuts, which do
-/// not go through `TextSelectionControls` at all.
+/// No Material ancestor is required, and the "`package:flutter/widgets.dart`
+/// only" rule this package holds every widget to rules out reaching for
+/// `AdaptiveTextSelectionToolbar` or the Material/Cupertino drag handles —
+/// both live outside the widgets library. That still leaves the one popup
+/// menu the widgets library itself can show: [SystemContextMenu], the
+/// platform-rendered menu on iOS 16 and above. By default this field uses
+/// it wherever [SystemContextMenu.isSupported] says the device can show it —
+/// "the system selection toolbar… keeps working" from B5, satisfied with
+/// the *actual* system menu rather than a Flutter-painted approximation of
+/// one — and shows nothing where it can't (Android, desktop, older iOS).
+/// [contextMenuBuilder] overrides that default outright; an app that also
+/// imports Material can pass `AdaptiveTextSelectionToolbar.editableText` to
+/// get a toolbar everywhere, at the cost of the import this package itself
+/// can't take. Likewise [selectionControls] — null keeps this field's own
+/// default of zero-size drag handles (the system menu needs none, and a
+/// full `TextSelectionControls` that isn't handles-only would otherwise
+/// win the toolbar outright and silently block [contextMenuBuilder] — see
+/// `text_selection.dart`), and non-null shows this field's own handles
+/// through whatever controls the app supplies, e.g.
+/// `cupertinoTextSelectionControls`. Every keyboard-driven path (typing,
+/// arrow-key caret movement, Cmd/Ctrl+C/V, double-tap-to-select-word) works
+/// regardless of either: none of it goes through `TextSelectionControls` or
+/// a context menu builder at all.
 class GlassTextField extends StatefulWidget {
   /// Creates a text field.
   const GlassTextField({
@@ -75,6 +89,8 @@ class GlassTextField extends StatefulWidget {
     this.onChanged,
     this.onSubmitted,
     this.backdrop,
+    this.selectionControls,
+    this.contextMenuBuilder,
     super.key,
   });
 
@@ -107,6 +123,22 @@ class GlassTextField extends StatefulWidget {
   /// What is behind this field, for the same adaptation `GlassSurface`
   /// offers.
   final Color? backdrop;
+
+  /// Selection drag handles. Null keeps this field's own default —
+  /// `EmptyTextSelectionControls`, no handles — which this package can
+  /// reach without a Material or Cupertino import. Pass a real
+  /// implementation (`cupertinoTextSelectionControls`,
+  /// `materialTextSelectionControls`) from an app that already imports one
+  /// of those to get this field's own drag handles back.
+  final TextSelectionControls? selectionControls;
+
+  /// Builds the selection's popup menu. Null keeps this field's own
+  /// default: [SystemContextMenu.editableText] wherever
+  /// [SystemContextMenu.isSupported] says the device can show it (iOS 16+),
+  /// nothing elsewhere. Pass a builder — most usefully
+  /// `AdaptiveTextSelectionToolbar.editableText` from an app that imports
+  /// Material — to get a Flutter-painted menu everywhere else too.
+  final EditableTextContextMenuBuilder? contextMenuBuilder;
 
   @override
   State<GlassTextField> createState() => _GlassTextFieldState();
@@ -318,6 +350,27 @@ class _GlassTextFieldState extends State<GlassTextField>
 
   double _lerp(double a, double b, double t) => a + (b - a) * t;
 
+  /// [GlassTextField.contextMenuBuilder], or this field's own default:
+  /// [SystemContextMenu.editableText] where the device can show it, and no
+  /// builder at all — not one that builds an empty widget — where it can't.
+  /// `SystemContextMenu.editableText` itself asserts if built on a device
+  /// [SystemContextMenu.isSupported] says can't show it, so this has to be
+  /// resolved before `EditableText` is built, not inside a builder that
+  /// runs on demand.
+  EditableTextContextMenuBuilder? _resolveContextMenuBuilder(
+    BuildContext context,
+  ) {
+    final custom = widget.contextMenuBuilder;
+    if (custom != null) {
+      return custom;
+    }
+    if (!SystemContextMenu.isSupported(context)) {
+      return null;
+    }
+    return (context, editableTextState) =>
+        SystemContextMenu.editableText(editableTextState: editableTextState);
+  }
+
   Widget _paintedBody({
     required GlassShape shape,
     required GlassMaterial material,
@@ -401,7 +454,15 @@ class _GlassTextFieldState extends State<GlassTextField>
               cursorColor: style.labelColor,
               backgroundCursorColor: style.labelColor.withValues(alpha: 0.2),
               selectionColor: style.labelColor.withValues(alpha: 0.24),
-              selectionControls: emptyTextSelectionControls,
+              selectionControls:
+                  widget.selectionControls ?? _defaultSelectionControls,
+              // A real `selectionControls` implementation renders actual
+              // handles; this field's own default,
+              // `EmptyTextSelectionControls`, renders a zero-size one —
+              // showing handles for it would ask `EditableText` to place
+              // handles nothing occupies.
+              showSelectionHandles: widget.selectionControls != null,
+              contextMenuBuilder: _resolveContextMenuBuilder(context),
               onChanged: widget.onChanged,
               onSubmitted: widget.onSubmitted,
             ),
@@ -411,6 +472,29 @@ class _GlassTextFieldState extends State<GlassTextField>
     );
   }
 }
+
+/// [EmptyTextSelectionControls]'s zero-size handles, but with
+/// [TextSelectionHandleControls] mixed in on top so
+/// `EditableTextState.showToolbar` defers the popup menu to
+/// [GlassTextField.contextMenuBuilder] instead of this class's own (equally
+/// empty) `buildToolbar`.
+///
+/// `text_selection.dart`'s own precedence rule is blunt:
+/// `TextSelectionOverlay.showToolbar` uses a plain `TextSelectionControls`'
+/// own `buildToolbar` outright whenever one is supplied, and only falls
+/// back to `contextMenuBuilder` when `selectionControls` is null or mixes in
+/// `TextSelectionHandleControls`. `EmptyTextSelectionControls` alone does
+/// neither — passing it straight through would silently swallow every
+/// context menu this field tries to show, system or custom.
+class _GlassSelectionHandleControls extends EmptyTextSelectionControls
+    with TextSelectionHandleControls {}
+
+/// This field's own default [GlassTextField.selectionControls]: zero-size
+/// handles that never contest [GlassTextField.contextMenuBuilder] for the
+/// toolbar. Not `const` — matching `emptyTextSelectionControls` itself,
+/// which the framework also declares as a plain `final`, not `const`.
+final TextSelectionControls _defaultSelectionControls =
+    _GlassSelectionHandleControls();
 
 /// Clips to [shape] at the real, laid-out size.
 ///

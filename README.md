@@ -184,9 +184,12 @@ ring on top. The caret and selection are painted above the glass as a
 `Stack` sibling, never inside it, so they are never refracted, and a
 focused field inside a scroll view calls `Scrollable.ensureVisible` to
 track the keyboard's own show/hide animation clear of it. With no Material
-ancestor required, the selection toolbar and drag handles Material and
-Cupertino each build are unavailable; typing, arrow-key caret movement and
-the platform's own copy/paste shortcuts all keep working regardless.
+ancestor required, the field shows the real system selection menu
+(`SystemContextMenu`) wherever the device supports it — iOS 16 and
+above — and nothing elsewhere by default; `contextMenuBuilder` and
+`selectionControls` let an app that already imports Material or Cupertino
+pass its own toolbar and drag handles in. Typing, arrow-key caret movement
+and the platform's own copy/paste shortcuts all keep working regardless.
 
 ## Tiering
 
