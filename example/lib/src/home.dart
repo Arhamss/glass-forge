@@ -23,9 +23,6 @@ const List<GlassTab> _tabs = [
   GlassTab(icon: Glyph(Glyphs.kit, size: 22), label: 'Kit'),
 ];
 
-/// The package tab bar's height, above the safe area it builds in.
-const double _barHeight = 62;
-
 /// How wide the bar is: a comfortable thumb's width per tab, not the whole
 /// screen.
 const double _barWidth = 92.0 * 3 + 12;
@@ -129,7 +126,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
     final playground = PlaygroundScope.of(context);
     final padding = MediaQuery.paddingOf(context);
     final barBottom = padding.bottom + 8;
-    final sheetGap = barBottom + _barHeight + 10;
+    final sheetGap = barBottom + GlassTabBar.height + 10;
     final headerHeight = padding.top + 96;
 
     final scene = switch (_shown) {
@@ -148,7 +145,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
           animation: _sheet,
           builder: (context, child) {
             final bottom = math.max(
-              barBottom + _barHeight,
+              barBottom + GlassTabBar.height,
               _sheetTop(padding.bottom, sheetGap),
             );
             return Positioned(
@@ -216,6 +213,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                   child: Arrive(
                     delay: const Duration(milliseconds: 200),
                     child: GlassTabBar(
+                      material: chromeMaterial,
                       tabs: _tabs,
                       currentIndex: _scene,
                       onTap: (i) {

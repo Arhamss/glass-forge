@@ -14,13 +14,16 @@ import 'package:glass_forge_example/src/ui.dart';
 /// The toggles are the package's own [GlassButton]; the switch and the
 /// sliders are [GlassSwitch] and [GlassSlider], sitting on tiles that are
 /// glass, so they paint rather than stack a second refraction on the first.
-/// Eleven glass shapes in all, three past the eight one draw carries. The
-/// layer draws shapes that sit apart as separate clusters, but these sit
-/// 12 apart — well inside the reach of each other's refraction — so they
-/// would be one cluster of eleven and three would go undrawn. So the
-/// buttons keep the layer's pass and the modules — media, switch and
-/// sliders — take a second one through [_Module]: the same tuned material,
-/// two draws of seven and four.
+/// Eleven glass shapes in all, three past the eight one draw carries.
+/// Settled, that is fine: the layer draws shapes that sit apart as separate
+/// clusters, and at 12 apart these are. But each row fades in through
+/// [Arrive], and a `Glass` under a fully transparent `Opacity` does not
+/// paint, so on the first frames it has not been placed yet — every such
+/// shape sits at the layer's origin and all eleven read as one cluster,
+/// which the layer warns about. So the buttons keep the layer's pass and
+/// the modules — media, switch and sliders — take a second one through
+/// [_Module]: the same tuned material, two passes of seven and four, and
+/// no cluster past eight even before anything has been placed.
 class KitScene extends StatelessWidget {
   const KitScene({super.key});
 
@@ -254,27 +257,25 @@ class _PillToggleState extends State<_PillToggle> {
   Widget build(BuildContext context) {
     // The button's own padding — 10 above and below a 44 pt well — makes
     // the tile's 64.
-    return Semantics(
+    return GlassButton(
       toggled: _on,
-      child: GlassButton(
-        shape: _pill,
-        pressStretch: _tileStretch,
-        semanticLabel: widget.title,
-        onPressed: () => setState(() => _on = !_on),
-        child: Row(
-          children: [
-            _Well(icon: widget.icon, on: _on),
-            const SizedBox(width: 10),
-            Expanded(
-              child: ExcludeSemantics(
-                child: _Caption(
-                  title: widget.title,
-                  state: _on ? widget.on : 'Off',
-                ),
+      shape: _pill,
+      pressStretch: _tileStretch,
+      semanticLabel: widget.title,
+      onPressed: () => setState(() => _on = !_on),
+      child: Row(
+        children: [
+          _Well(icon: widget.icon, on: _on),
+          const SizedBox(width: 10),
+          Expanded(
+            child: ExcludeSemantics(
+              child: _Caption(
+                title: widget.title,
+                state: _on ? widget.on : 'Off',
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -303,47 +304,45 @@ class _RoundToggleState extends State<_RoundToggle> {
   @override
   Widget build(BuildContext context) {
     final duration = motion(context, const Duration(milliseconds: 320));
-    return Semantics(
+    return GlassButton(
       toggled: _on,
-      child: GlassButton(
-        shape: const GlassOval(),
-        semanticLabel: widget.label,
-        onPressed: () => setState(() => _on = !_on),
-        // The button pads its label by 20 across and 10 down; a label of
-        // 24 by 44 makes the circle 64. The face overflows that label to
-        // fill the whole circle, and the glass clips it round.
-        child: SizedBox(
-          width: KitScene._tile - 40,
-          height: KitScene._tile - 20,
-          child: OverflowBox(
-            maxWidth: KitScene._tile,
-            maxHeight: KitScene._tile,
-            child: SizedBox.square(
-              dimension: KitScene._tile,
-              // The disc grows out of the centre rather than cutting in.
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  AnimatedScale(
-                    scale: _on ? 1 : 0,
-                    duration: duration,
-                    curve: _on ? Curves.easeOutBack : Curves.easeIn,
-                    child: const DecoratedBox(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xF2FFFFFF),
-                      ),
-                      child: SizedBox.expand(),
+      shape: const GlassOval(),
+      semanticLabel: widget.label,
+      onPressed: () => setState(() => _on = !_on),
+      // The button pads its label by 20 across and 10 down; a label of
+      // 24 by 44 makes the circle 64. The face overflows that label to
+      // fill the whole circle, and the glass clips it round.
+      child: SizedBox(
+        width: KitScene._tile - 40,
+        height: KitScene._tile - 20,
+        child: OverflowBox(
+          maxWidth: KitScene._tile,
+          maxHeight: KitScene._tile,
+          child: SizedBox.square(
+            dimension: KitScene._tile,
+            // The disc grows out of the centre rather than cutting in.
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                AnimatedScale(
+                  scale: _on ? 1 : 0,
+                  duration: duration,
+                  curve: _on ? Curves.easeOutBack : Curves.easeIn,
+                  child: const DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xF2FFFFFF),
                     ),
+                    child: SizedBox.expand(),
                   ),
-                  TweenAnimationBuilder<Color?>(
-                    tween: ColorTween(end: _on ? Tone.ground : Tone.primary),
-                    duration: duration,
-                    builder: (context, color, _) =>
-                        Glyph(widget.icon, size: 26, color: color),
-                  ),
-                ],
-              ),
+                ),
+                TweenAnimationBuilder<Color?>(
+                  tween: ColorTween(end: _on ? Tone.ground : Tone.primary),
+                  duration: duration,
+                  builder: (context, color, _) =>
+                      Glyph(widget.icon, size: 26, color: color),
+                ),
+              ],
             ),
           ),
         ),

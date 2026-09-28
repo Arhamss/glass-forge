@@ -268,8 +268,9 @@ class _Knob extends StatelessWidget {
 
 /// A [GlassSegmentedControl] over [options], each named by [labelOf].
 ///
-/// On the sheet's glass its pill paints white, so the chosen label is drawn
-/// dark to read on it.
+/// The type is set here and the colour left to the control, which draws
+/// the chosen label dark on the white pill it paints on the sheet's glass.
+/// The others are dimmed to the tuner's secondary tone.
 class _Choice<T> extends StatelessWidget {
   const _Choice({
     required this.options,
@@ -284,28 +285,38 @@ class _Choice<T> extends StatelessWidget {
   final String Function(T option) labelOf;
   final ValueChanged<T> onChanged;
 
+  /// [Font.body] at 13, with no colour of its own to override the
+  /// control's.
+  static const TextStyle _type = TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+    letterSpacing: -0.1,
+  );
+
+  static const TextStyle _dimmed = TextStyle(color: Tone.secondary);
+
   @override
   Widget build(BuildContext context) {
-    return GlassSegmentedControl<T>(
-      selected: selected,
-      onChanged: (option) {
-        unawaited(HapticFeedback.selectionClick());
-        onChanged(option);
-      },
-      segments: [
-        for (final option in options)
-          GlassSegment<T>(
-            value: option,
-            label: AnimatedDefaultTextStyle(
-              duration: motion(context, const Duration(milliseconds: 220)),
-              style: Font.body.copyWith(
-                fontSize: 13,
-                color: option == selected ? Tone.ground : Tone.secondary,
+    return DefaultTextStyle.merge(
+      style: _type,
+      child: GlassSegmentedControl<T>(
+        selected: selected,
+        onChanged: (option) {
+          unawaited(HapticFeedback.selectionClick());
+          onChanged(option);
+        },
+        segments: [
+          for (final option in options)
+            GlassSegment<T>(
+              value: option,
+              label: Text(
+                labelOf(option),
+                style: option == selected ? null : _dimmed,
               ),
-              child: Text(labelOf(option)),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }
