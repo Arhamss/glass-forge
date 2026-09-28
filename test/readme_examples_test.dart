@@ -138,6 +138,35 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the GlassSegmentedControl example builds', (tester) async {
+    var range = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          child: Center(
+            child: SizedBox(
+              width: 240,
+              child: StatefulBuilder(
+                builder: (context, setState) {
+                  return GlassSegmentedControl<int>(
+                    segments: const [
+                      GlassSegment(value: 0, label: Text('Day')),
+                      GlassSegment(value: 1, label: Text('Week')),
+                      GlassSegment(value: 2, label: Text('Month')),
+                    ],
+                    selected: range,
+                    onChanged: (next) => setState(() => range = next),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the tier-scope and theme examples build', (tester) async {
     await tester.pumpWidget(
       const GlassTierScope(

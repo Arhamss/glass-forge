@@ -145,6 +145,27 @@ The thumb stretches along the track under a fast drag, through
 `GlassJiggle`; `divisions` snaps it to evenly spaced steps, and the arrow
 keys step it by one division, or a tenth of the range without one.
 
+`GlassSegmentedControl` is a row of mutually exclusive choices under a
+travelling pill — real glass on content, painted under `GlassHostScope`.
+
+```dart
+GlassSegmentedControl<int>(
+  segments: const [
+    GlassSegment(value: 0, label: Text('Day')),
+    GlassSegment(value: 1, label: Text('Week')),
+    GlassSegment(value: 2, label: Text('Month')),
+  ],
+  selected: range,
+  onChanged: (next) => setState(() => range = next),
+)
+```
+
+The pill can be dragged from anywhere in the control, not only from the
+pill itself, and snaps to the nearest segment on release; a tap on a
+segment, or the arrow keys while one is focused, select it outright. Each
+segment is its own semantics node — a selectable button, `isSelected` on
+exactly the chosen one.
+
 ## Tiering
 
 Glass is expensive, and the honest answer on a cold-throttled mid-range phone

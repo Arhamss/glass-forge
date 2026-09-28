@@ -33,6 +33,7 @@ class GlassControlFrame extends StatelessWidget {
     this.autofocus = false,
     this.button = true,
     this.toggled,
+    this.selected,
     this.slider = false,
     this.value,
     this.increasedValue,
@@ -74,6 +75,15 @@ class GlassControlFrame extends StatelessWidget {
   /// switch. A non-null value sets both `SemanticsFlag.hasToggledState` and
   /// `SemanticsFlag.isToggled` to it, which is what `GlassSwitch` needs.
   final bool? toggled;
+
+  /// Whether semantics reports this as one selected item of a group.
+  ///
+  /// Null — the default — reports no selection state at all. A non-null
+  /// value sets `SemanticsFlag.isSelected`, which is what
+  /// `GlassSegmentedControl` needs on the one segment of its group that is
+  /// currently chosen — a distinct flag from [toggled], which a screen
+  /// reader announces differently (a switch or checkbox, not a tab).
+  final bool? selected;
 
   /// Whether semantics reports this as a slider — `GlassSlider`'s only use
   /// of this frame beyond the shared 44 × 44 hit target and focus handling.
@@ -152,6 +162,7 @@ class GlassControlFrame extends StatelessWidget {
       button: button,
       slider: slider,
       toggled: toggled,
+      selected: selected,
       enabled: enabled,
       label: semanticLabel,
       value: value,
