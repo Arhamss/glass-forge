@@ -360,17 +360,40 @@ void main() {
   });
 
   testWidgets('the GlassScaffold example builds', (tester) async {
-    // `YourTitle()` and `rows` in the README are hypothetical — a caller's
-    // own title widget and their own list of rows. Substituted here with a
-    // real widget and a real list, same shape as the README's snippet.
+    // `rows` in the README is hypothetical — a caller's own list of rows.
+    // Substituted here with a real list, same shape as the README's
+    // snippet.
     await tester.pumpWidget(
       MaterialApp(
         home: GlassScaffold(
           background: const ColoredBox(color: Color(0xFF101820)),
-          topBar: const GlassSurface.navigationBar(
-            child: SizedBox(height: 44),
-          ),
+          topBar: const GlassAppBar(title: Text('Messages')),
           body: ListView(children: const [SizedBox(height: 40)]),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the GlassAppBar example builds', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          child: GlassAppBar(
+            leading: GlassButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.arrow_back),
+              semanticLabel: 'Back',
+            ),
+            title: const Text('Messages'),
+            actions: [
+              GlassButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.search),
+                semanticLabel: 'Search',
+              ),
+            ],
+          ),
         ),
       ),
     );

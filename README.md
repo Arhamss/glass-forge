@@ -265,7 +265,7 @@ padding back so a `ListView` clears the bars on its own.
 ```dart
 GlassScaffold(
   background: const ColoredBox(color: Color(0xFF101820)),
-  topBar: GlassSurface.navigationBar(child: YourTitle()),
+  topBar: GlassAppBar(title: const Text('Messages')),
   body: ListView(children: rows),
 )
 ```
@@ -274,6 +274,31 @@ Each bar fades through its own presence, tied to the enclosing route: full
 while nothing covers the screen, ramping to none as a sheet or another route
 arrives over it, so the two are never both a backdrop filter over the same
 pixels.
+
+`GlassAppBar` is that top bar: a leading widget, a title centred iOS style
+between it and the actions, and the top safe area built in.
+
+```dart
+GlassAppBar(
+  leading: GlassButton.icon(
+    onPressed: () {},
+    icon: const Icon(Icons.arrow_back),
+    semanticLabel: 'Back',
+  ),
+  title: const Text('Messages'),
+  actions: [
+    GlassButton.icon(
+      onPressed: () {},
+      icon: const Icon(Icons.search),
+      semanticLabel: 'Search',
+    ),
+  ],
+)
+```
+
+A `GlassButton.icon` action renders as paint, not a second sheet of glass
+stacked on the bar's — every control in this package knows it is drawn on
+glass through the same `GlassHostScope` this bar sets up for its children.
 
 `GlassTabBar` is the bottom bar to put in it: a floating capsule with the
 bottom safe area built in, one selectable button per tab.
