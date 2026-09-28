@@ -27,10 +27,11 @@ GlassLayer(
 )
 ```
 
-The [example app](example/) shows the rest: a catalogue of 33 entries, one
-per capability, each live beside the Dart that produced it — the dome lens,
-Apple's two fitted materials, liquid blending, spring motion, and the tier
-engine explaining its own decision.
+The [example app](example/) is a playground: three live scenes — a lens you
+drag and reshape, drops that melt together, and a set of everyday controls —
+under a sheet with a knob for every field of `GlassMaterial`, presets that
+morph into one another, a quality-tier pin, and a button that copies the
+material you ended up with as Dart.
 
 ## How it works, in one paragraph
 

@@ -1,7 +1,7 @@
 name: glass_forge_example
 description: >-
-  A catalogue of 33 named entries, index to detail, showing what glass_forge
-  renders and how it is written.
+  A playground for glass_forge: three live scenes and a sheet of knobs for
+  every field of the glass material.
 publish_to: none
 version: 1.0.0+1
 
@@ -14,6 +14,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_svg: ^2.3.0
   glass_forge:
     path: ../
 
@@ -35,6 +36,7 @@ flutter:
     enable-swift-package-manager: true
 
   assets:
+    - assets/icons/
     - assets/images/
     - assets/licenses/
 
