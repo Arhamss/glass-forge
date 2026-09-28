@@ -32,6 +32,7 @@ class GlassControlFrame extends StatelessWidget {
     this.focusNode,
     this.autofocus = false,
     this.button = true,
+    this.toggled,
     super.key,
   });
 
@@ -59,6 +60,14 @@ class GlassControlFrame extends StatelessWidget {
   /// Whether semantics reports this as a button rather than another
   /// interactive role.
   final bool button;
+
+  /// Whether semantics reports a toggle state, and if so, which value.
+  ///
+  /// Null — the default — reports no toggle state at all, which is right
+  /// for `GlassButton` and every other control that is not a two-state
+  /// switch. A non-null value sets both `SemanticsFlag.hasToggledState` and
+  /// `SemanticsFlag.isToggled` to it, which is what `GlassSwitch` needs.
+  final bool? toggled;
 
   /// The least a control's hit target may measure on either axis.
   ///
@@ -104,6 +113,7 @@ class GlassControlFrame extends StatelessWidget {
       excludeSemantics: true,
       container: true,
       button: button,
+      toggled: toggled,
       enabled: enabled,
       label: semanticLabel,
       onTap: enabled ? onActivate : null,

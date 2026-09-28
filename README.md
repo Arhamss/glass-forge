@@ -115,6 +115,21 @@ GlassButton(
 `GlassControlFrame` for semantics, keyboard activation (Enter and Space) and
 a 44 × 44 minimum hit target that grows the tap area, never the glass.
 
+`GlassSwitch` is a track and a knob: the track is always painted — real
+glass on a 64 × 28 capsule this thin reads as a smear, not a control — and
+only the knob, the one lens-profile element Apple's own switch has, becomes
+glass, and only on content.
+
+```dart
+GlassSwitch(
+  value: enabled,
+  onChanged: (next) => setState(() => enabled = next),
+)
+```
+
+The knob drags, flicks and settles to whichever side it ends up past, on
+the theme's `settle` spring; a tap toggles it outright.
+
 ## Tiering
 
 Glass is expensive, and the honest answer on a cold-throttled mid-range phone

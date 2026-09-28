@@ -93,6 +93,27 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the GlassSwitch example builds', (tester) async {
+    var enabled = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          child: Center(
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                return GlassSwitch(
+                  value: enabled,
+                  onChanged: (next) => setState(() => enabled = next),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the tier-scope and theme examples build', (tester) async {
     await tester.pumpWidget(
       const GlassTierScope(
