@@ -17,12 +17,11 @@ import 'package:flutter/rendering.dart';
 /// what makes 8 bits enough. The two channels are companded in opposite
 /// directions, deliberately, because they need precision in opposite places:
 ///
-/// - Displacement magnitude follows the convex-squircle edge profile, which
-///   is steep near the inner edge of the band and goes nearly flat as it
-///   approaches the shape edge — where the magnitude is largest. Banding
-///   shows up where the signal is flattest, since many screen pixels then
-///   land on the same few code points, so this channel spends its precision
-///   near the maximum via `1 - sqrt(1 - x)`.
+/// - Displacement magnitude peaks at the shape edge and eases to zero at the
+///   band's inner edge. This channel spends its precision near the maximum
+///   via `1 - sqrt(1 - x)`, where the magnitude is largest and a code step
+///   is the most pixels; near zero a step is about 0.8% of the range, a
+///   twentieth of a pixel at the example's 6 px band.
 /// - Signed edge distance is what coverage, the contour and the bevel key
 ///   off of, and all three are computed near distance zero — the shape edge
 ///   itself. This channel spends its precision near zero via `sqrt(x)`.

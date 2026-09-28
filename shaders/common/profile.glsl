@@ -6,8 +6,10 @@
 // stores distance and direction. Refracting the whole surface, as a physical
 // slab model does, is both more expensive and less faithful.
 //
-// The profile is a convex squircle, which a Snell ray-trace study found to be
-// the best match to Apple among circle, convex, concave and lip profiles.
+// The surface is a convex squircle, which a Snell ray-trace study found to be
+// the best match to Apple among circle, convex, concave and lip profiles --
+// and the displacement is what refracting through that surface's slope
+// gives, not the height curve itself (see gfEdgeProfile).
 
 // Analytic gradient of the scene distance field, by central difference on the
 // SDF itself rather than screen-space derivatives. Portable everywhere,
@@ -55,11 +57,32 @@ float gfNeckFade(vec2 difference, float epsilon) {
     return smoothstep(0.1, 0.6, length(difference) / (2.0 * epsilon));
 }
 
-// Convex squircle: y = (1 - (1 - x)^4)^(1/4), x in 0..1 across the band.
+// The displacement a convex-squircle *surface* produces, as a fraction of
+// its peak. `t` runs 1 at the rim to 0 at the band's inner edge.
+//
+// The squircle z = (1 - (1 - s)^4)^(1/4) is the glass's height, s being
+// how far in from the rim (kube.io's ray-trace, docs/reference/
+// apple_liquid_glass_spec.md). Light bends by the surface's *slope*, not its
+// height, so the view ray is refracted through the tilt atan(z'(s)) at
+// n = 1.5 and the bend it picks up is normalised to the rim's, where the
+// surface stands vertical.
+//
+// This used to return the height itself. As a displacement that falls to
+// zero with infinite steepness at the inner edge, so the image folded back
+// on itself there -- a hard ring inset from every shape's edge, reading as a
+// bezel. The slope eases to zero like (1 - s)^3 instead: the band melts into
+// the flat interior with no seam, and all the bend sits at the rim.
 float gfEdgeProfile(float t) {
-    float u = 1.0 - clamp(t, 0.0, 1.0);
+    float u = clamp(t, 0.0, 1.0);          // 1 - s: 1 at the rim
+    if (u >= 1.0) {
+        return 1.0;
+    }
     float u2 = u * u;
-    return pow(max(0.0, 1.0 - u2 * u2), 0.25);
+    float slope = u2 * u * pow(max(1.0 - u2 * u2, 1e-6), -0.75);
+    float tilt = atan(slope);
+    float bend = tilt - asin(sin(tilt) / 1.5);
+    // tan(pi/2 - asin(1/1.5)) = sqrt(5)/2: the bend of a vertical face.
+    return tan(bend) / 1.118034;
 }
 
 // Displacement magnitude at signed distance `sd`, for a band of `height`
@@ -74,12 +97,12 @@ float gfDisplacementMagnitude(float sd, float height, float amount) {
 // How deep into a shape the band's samples reach, in pixels.
 //
 // A texel `s` pixels in samples the backdrop `s + gfDisplacementMagnitude`
-// in. In units of the band, x + r * (1 - x^4)^(1/4) with r = amount/height,
-// which peaks at (1 + r^(4/3))^(3/4) -- 1.68 bands at Apple's spread of 0,
-// so the deepest sample lands well inside the band's own inner edge.
+// in. In units of the band that is x + r * g(x) with r = amount/height, and
+// g falls from 1 at the rim to 0 at the inner edge convexly, so the sum
+// never exceeds its larger end: r at the rim, 1 at the inner edge.
 float gfEdgeBandReach(float height, float amount) {
     float r = amount / max(height, 1e-3);
-    return height * pow(1.0 + pow(r, 4.0 / 3.0), 0.75);
+    return height * max(1.0, r);
 }
 
 // How much of the band a shape `depth` pixels deep at its core has room

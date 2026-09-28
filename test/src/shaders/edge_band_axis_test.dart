@@ -148,18 +148,53 @@ void main() {
     });
   }
 
-  test('a shape deep enough for its band keeps the fitted profile', () async {
-    // 600 px deep against a band of 82: nothing is fitted here, so the
-    // magnitude must be exactly the convex squircle the presets were fitted
-    // with. Half-way through the band that is (1 - 0.5^4)^(1/4) of the
-    // edge refraction.
+  test('the band fades into the flat interior without a seam', () async {
+    // 600 px deep against a band of 82: nothing is fitted here. Walking in
+    // from the rim, where each texel samples the backdrop must move on
+    // smoothly through the inner half of the band and into the interior.
+    //
+    // It did not, for as long as the profile was the convex squircle used
+    // directly as the displacement. That curve is a *height* -- kube.io's
+    // ray-trace refracts through its slope -- and as a displacement it falls
+    // to zero with infinite steepness at the band's inner edge, so the image
+    // folded back on itself there: a hard ring inset from every shape's
+    // edge, which reads as a bezel rather than as glass.
     const size = Size(1200, 1200);
     final texel = await _bake(size);
     final x = _at.dx + size.width / 2;
-    final y = _at.dy + _edgeRefraction / 2;
-    final t = texel(x, y);
-    final expected =
-        _edgeRefraction * math.pow(1 - math.pow(0.5, 4), 0.25).toDouble();
-    expect(t.displacement.dy, closeTo(expected, 1.5));
+
+    double sampleAt(double depth) {
+      final y = _at.dy + depth;
+      return y + texel(x, y).displacement.dy;
+    }
+
+    var worstJump = 0.0;
+    var worstAt = 0.0;
+    for (var d = _edgeRefraction / 2; d < _edgeRefraction + 8; d++) {
+      final jump = (sampleAt(d + 1) - sampleAt(d) - 1).abs();
+      if (jump > worstJump) {
+        worstJump = jump;
+        worstAt = d;
+      }
+    }
+    expect(
+      worstJump,
+      lessThan(1.5),
+      reason:
+          'the sample jumped ${worstJump.toStringAsFixed(1)} px more than '
+          'the texel moved, ${worstAt.toStringAsFixed(0)} px in',
+    );
+  });
+
+  test('the displacement peaks at the rim', () async {
+    // edgeRefraction is the displacement *at the edge*: the knob keeps the
+    // meaning the presets were fitted with, whatever the curve inside.
+    const size = Size(1200, 1200);
+    final texel = await _bake(size);
+    final x = _at.dx + size.width / 2;
+    final rim = texel(x, _at.dy + 1.5).displacement.dy;
+    final inside = texel(x, _at.dy + _edgeRefraction / 2).displacement.dy;
+    expect(rim, greaterThan(0.6 * _edgeRefraction));
+    expect(inside, lessThan(rim / 4));
   });
 }
