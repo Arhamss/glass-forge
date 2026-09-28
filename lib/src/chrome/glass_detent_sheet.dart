@@ -8,6 +8,7 @@ import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/design/glass_tokens.dart';
+import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/motion/glass_motion.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
@@ -58,6 +59,7 @@ class GlassDetentSheet extends StatefulWidget {
     this.onDetentChanged,
     this.controller,
     this.backdrop,
+    this.material,
     this.gap = 12,
     this.bottomGap,
     this.floatingRadius,
@@ -92,6 +94,14 @@ class GlassDetentSheet extends StatefulWidget {
 
   /// What is behind the sheet, where the app knows — see `GlassSurface`.
   final Color? backdrop;
+
+  /// The sheet's material, in place of the one the sheet role resolves to.
+  ///
+  /// Null keeps the role's — Apple's fitted regular material at the role's
+  /// blur and tint steps, which is right for a sheet of body text. An app
+  /// with a look of its own names one here; the label colour, shadows and
+  /// motion still come from the role.
+  final GlassMaterial? material;
 
   /// How far the floating sheet is inset from the screen's **side** edges.
   final double gap;
@@ -511,7 +521,7 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
         shape: GlassRoundedRectangle(
           radius: BorderRadius.circular(metrics.radius),
         ),
-        material: style.material,
+        material: widget.material ?? style.material,
         // The drag detector sits *inside* the glass, not around it. Only
         // this order puts the surface itself on the hit-test path: a `Glass`
         // whose children all decline a hit adds nothing of its own, and a

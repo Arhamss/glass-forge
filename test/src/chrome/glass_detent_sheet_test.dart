@@ -94,6 +94,32 @@ Widget _layer({
 }
 
 void main() {
+  testWidgets('a named material replaces the sheet role material', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host());
+    await tester.pumpAndSettle();
+    final roles = tester.widget<Glass>(_sheet).material;
+    expect(roles, isNotNull);
+
+    const own = GlassMaterial(thickness: 6, edgeRefraction: 10, frost: 1);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          tier: GeometryTier.none,
+          child: GlassDetentSheet(
+            detents: const [GlassDetent.fraction(0.1), GlassDetent.fraction(1)],
+            material: own,
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<Glass>(_sheet).material, own);
+    expect(own, isNot(roles));
+  });
+
   testWidgets('opens at its initial detent', (tester) async {
     await tester.pumpWidget(_host());
     await tester.pumpAndSettle();
