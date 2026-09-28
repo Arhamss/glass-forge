@@ -49,6 +49,26 @@ class RenderGlassShape extends RenderProxyBox {
   /// Whether a post-frame callback to repaint [_layer] is already queued.
   bool _layerRepaintScheduled = false;
 
+  /// Whether this shape is in its pass's scene: painted, or composited
+  /// from an earlier paint, where it really is.
+  ///
+  /// False from attach until the first paint, and again for every stretch
+  /// in which it is attached and laid out but not drawn -- under an
+  /// `Opacity` at zero, in an `IndexedStack`'s hidden children, in a lazy
+  /// list's cache region. The layer keeps such a shape's registration, so
+  /// its pass is ready the frame it appears, but leaves it out of the
+  /// matte, the clusters and the diagnostics. See
+  /// [syncGeometryIfSubtreePaintMissedIt] for how "not drawn" is told from
+  /// "drawn from a repaint boundary's retained layer".
+  bool _placed = false;
+
+  /// Holds the empty layer this shape leaves where it paints, when a repaint
+  /// boundary sits between it and [_layer]. See [_PlacementMarker].
+  final LayerHandle<_PlacementMarker> _marker = LayerHandle<_PlacementMarker>();
+
+  /// Whether a post-frame check of [_marker] is already queued.
+  bool _placementCheckScheduled = false;
+
   /// Which of [_layer]'s subtree paints this shape last read its transform
   /// in, or null if it has not read one since it attached.
   ///
@@ -201,6 +221,9 @@ class RenderGlassShape extends RenderProxyBox {
     _lastSyncedTransform = null;
     _justSyncedFromLayout = false;
     _readInSubtreePaint = null;
+    _placed = false;
+    _marker.layer?.remove();
+    _marker.layer = null;
     _leaveGroup();
     _presence?.removeListener(_onPresenceChanged);
     super.detach();
@@ -275,16 +298,18 @@ class RenderGlassShape extends RenderProxyBox {
   /// repaint boundary means the layer itself does not paint, it bakes
   /// nothing that frame either, and [_scheduleLayerRepaint] brings it along.
   ///
-  /// The case that does render from one is a shape that lays out and then is
-  /// never painted — a lazy list's rows in the cache region, which are built
-  /// and laid out ahead of the viewport and skipped by
-  /// `RenderSliverMultiBoxAdaptor.paint`. Re-registering the last transform
-  /// is right for those: it is where the shape was when it last painted, and
-  /// holding still is what it does. A shape that has *never* painted has no
-  /// such answer and must not invent one — registering the identity puts it
-  /// at the layer's own origin, which is a phantom refraction in the corner
-  /// of the screen, seen in exactly this case while writing this fix. Hence
-  /// [_nowhereYet].
+  /// Nor is one rendered from where a shape lays out and is then not
+  /// painted -- a lazy list's rows in the cache region, built and laid out
+  /// ahead of the viewport and skipped by `RenderSliverMultiBoxAdaptor.paint`,
+  /// or anything under an `Opacity` at zero. Registration keeps such a shape
+  /// in its pass's *assignment*, so the pass is pushed the frame it first
+  /// paints, but [_placed] keeps it out of the pass's *scene* until then, and
+  /// [syncGeometryIfSubtreePaintMissedIt] takes it back out when it stops
+  /// being drawn. The placeholder still has to be nothing rather than a
+  /// guess: registering the identity puts it at the layer's own origin,
+  /// which was a phantom refraction in the corner of the screen before
+  /// [_placed] existed, and is still what the layer's whole-layer registry
+  /// and its diagnostics would read. Hence [_nowhereYet].
   void _syncGeometry() {
     final target = _layer;
     if (target == null || !hasSize || !attached) {
@@ -298,11 +323,11 @@ class RenderGlassShape extends RenderProxyBox {
   /// The placeholder transform for a shape that has never painted.
   ///
   /// Deliberately singular: zero in the linear part, so `ShapeGeometry`
-  /// resolves an empty basis and the shader's coverage term collapses — the
+  /// resolves an empty basis and an empty box at the layer's origin — the
   /// shape registers, taking its place in the layer's pass assignment
-  /// alongside its material and blend group, and draws nothing until its
-  /// first paint says where it is. `Matrix4.zero` on its own will not do:
-  /// `MatrixUtils.transformPoint` divides by the w row, so a fully zero
+  /// alongside its material and blend group, and is held out of the matte
+  /// until its first paint says where it is. `Matrix4.zero` on its own will
+  /// not do: `MatrixUtils.transformPoint` divides by the w row, so a fully zero
   /// matrix resolves an origin of NaN rather than of nothing.
   static final Matrix4 _nowhereYet = Matrix4.zero()..setEntry(3, 3, 1);
 
@@ -320,14 +345,43 @@ class RenderGlassShape extends RenderProxyBox {
       _group,
       _presence,
       _presence?.value ?? 1.0,
+      placed: _placed,
     );
   }
 
   @override
   void paint(PaintingContext context, Offset offset) {
     _syncGeometryIfTransformChanged();
+    final target = _layer;
+    if (target != null && _hasRepaintBoundaryBelow(target)) {
+      final marker = _marker.layer ??= _PlacementMarker(
+        _schedulePlacementCheck,
+      );
+      context.addLayer(marker);
+    } else {
+      _marker.layer?.remove();
+      _marker.layer = null;
+    }
     // In place. Deliberately ordinary.
     super.paint(context, offset);
+  }
+
+  /// Whether a repaint boundary sits between this shape and [target].
+  ///
+  /// Where one does, the boundary can put this shape on screen from its
+  /// retained layer without this shape painting at all, so "did not paint"
+  /// stops meaning "not drawn". That is the one case [_marker] exists for.
+  bool _hasRepaintBoundaryBelow(RenderGlassLayer target) {
+    for (
+      var node = parent;
+      node != null && !identical(node, target);
+      node = node.parent
+    ) {
+      if (node.isRepaintBoundary) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Catches a move [performLayout] did not.
@@ -375,7 +429,12 @@ class RenderGlassShape extends RenderProxyBox {
   /// this shape: the boundary repaints its own subtree without the layer
   /// painting at all, so this shape can move with nothing upstream of it
   /// running. Without the deferral that move would never reach a matte.
-  void _syncGeometryIfTransformChanged() {
+  ///
+  /// [placed] is whether the shape is on screen: true from [paint], and
+  /// whatever [syncGeometryIfSubtreePaintMissedIt] found for a shape that
+  /// missed its layer's paint. A change in it registers even when the
+  /// transform has not moved, and never otherwise.
+  void _syncGeometryIfTransformChanged({bool placed = true}) {
     final target = _layer;
     if (target == null || !hasSize || !attached) {
       return;
@@ -383,9 +442,13 @@ class RenderGlassShape extends RenderProxyBox {
     _readInSubtreePaint = target.subtreePaint;
     final transform = getTransformTo(target);
     final wasPlaceholder = _justSyncedFromLayout;
+    final wasPlaced = _placed;
     final needsExtraRepaint = !wasPlaceholder && !target.isPaintingSubtree;
     _justSyncedFromLayout = false;
-    if (_lastSyncedTransform == transform && !wasPlaceholder) {
+    _placed = placed;
+    if (_lastSyncedTransform == transform &&
+        !wasPlaceholder &&
+        wasPlaced == placed) {
       return;
     }
     _lastSyncedTransform = transform;
@@ -396,10 +459,15 @@ class RenderGlassShape extends RenderProxyBox {
   }
 
   /// Reads this shape's transform on [target]'s behalf, if this shape did
-  /// not already read it inside the subtree paint [target] has just made.
+  /// not already read it inside the subtree paint [target] has just made --
+  /// or takes it out of its pass, if it is not on screen at all.
   ///
+  /// A shape can miss that paint for two opposite reasons, and this is
+  /// where they are told apart.
+  ///
+  /// **It is on screen, drawn from a repaint boundary's retained layer.**
   /// A shape moves without painting whenever something between it and the
-  /// layer moves it and a repaint boundary in between absorbs the repaint —
+  /// layer moves it and a repaint boundary in between absorbs the repaint --
   /// every row of a `ListView` is wrapped in one, and a scroll re-lays out
   /// nothing, so a scrolled row neither lays out nor paints. Nothing else
   /// would ever ask it where it went, and what it holds is where it was
@@ -407,25 +475,86 @@ class RenderGlassShape extends RenderProxyBox {
   /// for why the moment straight after the subtree paint is the one to ask
   /// in, and what asking costs.
   ///
+  /// **It is not on screen.** An ancestor laid it out and then chose not to
+  /// paint it: `Opacity` at zero, `Offstage`, an `IndexedStack`'s other
+  /// children, a lazy list's cache region. Left in its pass, it would stay
+  /// in the matte wherever it last registered -- a refraction with nothing
+  /// over it, and a member of whichever cluster sits there.
+  ///
+  /// With no repaint boundary between this shape and [target], only the
+  /// second is possible: [target] painted its subtree, so everything in it
+  /// that anything painted, painted. With one in between, [_marker] says
+  /// which: it sits in the boundary's retained layer, so it hangs from the
+  /// layer tree [target] has just painted into -- [subtreeRoot] -- exactly
+  /// when that boundary was composited into it this frame. A layer that
+  /// was not is dropped from its old parent when that parent repaints, so
+  /// the walk up from [_marker] ends somewhere else.
+  ///
+  /// Either way the transform is re-read, so the layer's whole-layer
+  /// registry holds where the shape really is even while it is out of its
+  /// pass -- a row scrolled into the cache region is at -130, not where it
+  /// was last drawn.
+  ///
   /// Cheap when there is nothing to do: one identity check and one integer
   /// comparison, no walk. A shape that did take part in that paint has
-  /// already registered this frame's transform and is left alone.
-  ///
-  /// A shape that has **never** painted is left alone too, and that is not
-  /// laziness. [_nowhereYet] is what such a shape holds, and it holds it
-  /// deliberately: a lazy list builds and lays out rows in the cache region
-  /// ahead of the viewport, and those rows are off-screen, so registering
-  /// them as shapes with no interior keeps them out of the pass and out of
-  /// the matte's bounds. What this method is for is the opposite case — a
-  /// shape that *did* paint somewhere real and has since been moved without
-  /// being asked to paint again.
-  void syncGeometryIfSubtreePaintMissedIt(RenderGlassLayer target) {
+  /// already registered this frame's transform and is left alone. A shape
+  /// that has **never** painted is left alone too: it has never been placed,
+  /// so there is nothing to withdraw, and it has no transform to re-read
+  /// that is not a guess.
+  void syncGeometryIfSubtreePaintMissedIt(
+    RenderGlassLayer target,
+    Layer Function() subtreeRoot,
+  ) {
     if (!identical(_layer, target) ||
         _lastSyncedTransform == null ||
         _readInSubtreePaint == target.subtreePaint) {
       return;
     }
-    _syncGeometryIfTransformChanged();
+    final marker = _marker.layer;
+    _syncGeometryIfTransformChanged(
+      placed: marker != null && identical(_rootOf(marker), subtreeRoot()),
+    );
+  }
+
+  static Layer _rootOf(Layer layer) {
+    var node = layer;
+    for (var up = node.parent; up != null; up = up.parent) {
+      node = up;
+    }
+    return node;
+  }
+
+  /// Checks, once this frame is composited, whether [_marker] being moved
+  /// in or out of the layer tree changed whether this shape is on screen,
+  /// and has [_layer] repaint if it did.
+  ///
+  /// [syncGeometryIfSubtreePaintMissedIt] only runs when [_layer] paints,
+  /// and a repaint boundary between the two can hide or show this shape
+  /// without it: an `Opacity` inside a list row reaching zero repaints the
+  /// row and nothing above it. Without this, the matte would keep this
+  /// shape, or keep missing it, until something else made the layer paint.
+  ///
+  /// After the frame, not now: the marker is detached and re-attached every
+  /// time its boundary's layer is re-appended, which is every frame a
+  /// scrolling list repaints, so only the settled tree says anything. And
+  /// only a mismatch repaints, so a repaint that settles it asks for no
+  /// other.
+  void _schedulePlacementCheck() {
+    if (_placementCheckScheduled) {
+      return;
+    }
+    _placementCheckScheduled = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _placementCheckScheduled = false;
+      final marker = _marker.layer;
+      final target = _layer;
+      if (marker == null || target == null || !attached) {
+        return;
+      }
+      if (marker.attached != _placed) {
+        target.markNeedsPaint();
+      }
+    });
   }
 
   void _scheduleLayerRepaint(RenderGlassLayer target) {
@@ -439,5 +568,31 @@ class RenderGlassShape extends RenderProxyBox {
         target.markNeedsPaint();
       }
     });
+  }
+}
+
+/// An empty layer a shape adds where it paints, so the layer tree can say
+/// later whether that paint is still on screen.
+///
+/// It draws nothing and costs one split in its boundary's picture, which is
+/// why a shape adds it only where a repaint boundary sits between it and its
+/// glass layer -- the one case where "did not paint this frame" and "not on
+/// screen" come apart. See
+/// `RenderGlassShape.syncGeometryIfSubtreePaintMissedIt`.
+class _PlacementMarker extends ContainerLayer {
+  _PlacementMarker(this._onMoved);
+
+  final VoidCallback _onMoved;
+
+  @override
+  void attach(Object owner) {
+    super.attach(owner);
+    _onMoved();
+  }
+
+  @override
+  void detach() {
+    super.detach();
+    _onMoved();
   }
 }

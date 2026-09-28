@@ -101,6 +101,11 @@ class _GlassPass {
   /// The matte baked for [scene], if any.
   MatteGeneration? matte;
 
+  /// Whether this pass has a cluster past [kMaxShapes] that has already
+  /// been reported. Debug-only bookkeeping for
+  /// [RenderGlassLayer._debugWarnOnShapeLimit].
+  bool warnedShapeLimit = false;
+
   /// The `(revision, generation, request)` triple [matte] was last asked
   /// for under. See [RenderGlassLayer._refreshMatte].
   int? refreshedRevision;
@@ -116,9 +121,14 @@ class _ShapeRecord {
     required this.group,
     required this.presenceScope,
     required this.presence,
+    required this.placed,
   });
 
   ShapeGeometry geometry;
+
+  /// Whether this shape is drawn where [geometry] says, and so belongs in
+  /// its pass's scene. See `RenderGlassShape._placed`.
+  bool placed;
 
   /// The material this shape declared, or null to inherit the layer's.
   GlassMaterial? declared;
@@ -407,10 +417,6 @@ class RenderGlassLayer extends RenderProxyBox {
     glow = _glowListenable?.value ?? const GlassGlow.none();
   }
 
-  /// Whether the shape-limit warning has been printed for this layer. Once
-  /// is enough: it would otherwise repeat on every reassignment.
-  bool _warnedShapeLimit = false;
-
   /// The pairs of passes whose overlap has already been reported, as
   /// `(a, b)` in the order they were found. The check runs every paint, and
   /// an overlap that persists would otherwise print sixty times a second —
@@ -442,14 +448,21 @@ class RenderGlassLayer extends RenderProxyBox {
   /// group the shape joined, held only for identity. [presenceScope] is the
   /// identity of whatever drives this shape's presence, or null, and
   /// [presence] is its current value, 0 to 1.
+  ///
+  /// [placed] says whether the shape is drawn where [geometry] puts it. An
+  /// unplaced shape -- one that has not painted yet, or has stopped being
+  /// painted -- keeps its pass assignment, so the pass is ready for the
+  /// frame it appears, but stays out of that pass's scene: out of the
+  /// matte, its clusters and the diagnostics that read them.
   void registerShape(
     Object key,
     ShapeGeometry geometry,
     GlassMaterial? material,
     Object? group,
     Object? presenceScope,
-    double presence,
-  ) {
+    double presence, {
+    bool placed = true,
+  }) {
     scene.register(key, geometry);
 
     final existing = _records[key];
@@ -460,12 +473,15 @@ class RenderGlassLayer extends RenderProxyBox {
         group: group,
         presenceScope: presenceScope,
         presence: presence,
+        placed: placed,
       );
       _assignmentsDirty = true;
       return;
     }
 
-    existing.geometry = geometry;
+    existing
+      ..geometry = geometry
+      ..placed = placed;
     if (existing.declared != material ||
         !identical(existing.group, group) ||
         !identical(existing.presenceScope, presenceScope)) {
@@ -485,7 +501,21 @@ class RenderGlassLayer extends RenderProxyBox {
     existing.presence = presence;
     final assigned = existing.assigned;
     if (assigned != null) {
-      _passes[assigned]?.scene.register(key, geometry);
+      _placeInPass(_passes[assigned], key, existing);
+    }
+  }
+
+  /// Puts [record] into [pass]'s scene if it is placed, and takes it out if
+  /// it is not. Either is free when nothing changes: [GlassScene] bumps its
+  /// revision, and so rebakes, only on a real change.
+  static void _placeInPass(_GlassPass? pass, Object key, _ShapeRecord record) {
+    if (pass == null) {
+      return;
+    }
+    if (record.placed) {
+      pass.scene.register(key, record.geometry);
+    } else {
+      pass.scene.unregister(key);
     }
   }
 
@@ -570,14 +600,17 @@ class RenderGlassLayer extends RenderProxyBox {
         _passes[assigned]?.scene.unregister(entry.key);
       }
       record.assigned = target;
-      (_passes[target] ??= _GlassPass(target)).scene.register(
-        entry.key,
-        record.geometry,
-      );
+      _placeInPass(_passes[target] ??= _GlassPass(target), entry.key, record);
     }
 
+    // By assignment, not by scene: a pass whose shapes are all unplaced has
+    // an empty scene and is still theirs, and has to be pushed the frame
+    // they first paint.
+    final inUse = <_PassKey>{
+      for (final record in _records.values) ?record.assigned,
+    };
     _passes.removeWhere((key, pass) {
-      if (pass.scene.shapes.isNotEmpty) {
+      if (inUse.contains(key)) {
         return false;
       }
       _retirePass(pass);
@@ -648,7 +681,7 @@ class RenderGlassLayer extends RenderProxyBox {
         // by _reassignPasses before the presence fold above runs -- but
         // skipped rather than forced, since this is a diagnostic and
         // should never be what crashes a debug build.
-        if (assignedA == null) {
+        if (assignedA == null || !a.placed) {
           continue;
         }
         if (!GlassComposition.willRender(assignedA.material, a.presence)) {
@@ -658,7 +691,7 @@ class RenderGlassLayer extends RenderProxyBox {
         for (var j = i + 1; j < entries.length; j++) {
           final b = entries[j];
           final assignedB = b.assigned;
-          if (assignedB == null || assignedA == assignedB) {
+          if (assignedB == null || !b.placed || assignedA == assignedB) {
             continue;
           }
           if (!GlassComposition.willRender(assignedB.material, b.presence)) {
@@ -791,7 +824,7 @@ class RenderGlassLayer extends RenderProxyBox {
     _subtreePaint++;
     try {
       super.paint(context, offset);
-      _resyncShapesThatDidNotPaint();
+      _resyncShapesThatDidNotPaint(context);
     } finally {
       _paintingSubtree = false;
     }
@@ -830,7 +863,16 @@ class RenderGlassLayer extends RenderProxyBox {
   /// [_subtreePaint] and nothing walks at all. What it adds where it does
   /// walk is one ancestor walk per silent shape, against the one the clip
   /// chain already makes per shape from `paint` itself.
-  void _resyncShapesThatDidNotPaint() {
+  ///
+  /// The same sweep takes out of their passes the shapes that did not paint
+  /// because nothing drew them -- see
+  /// `RenderGlassShape.syncGeometryIfSubtreePaintMissedIt` for how the two
+  /// are told apart. For a shape under a repaint boundary that needs the
+  /// root of the layer tree [context] has just painted into, found by
+  /// adding an empty probe layer there, walking up from it and taking it
+  /// out again. Only when such a shape missed the paint: the probe splits
+  /// the picture it lands in.
+  void _resyncShapesThatDidNotPaint(PaintingContext context) {
     // A snapshot: re-registering a shape mutates `_records`' values, and
     // iterating the map's own keys while that happens is only safe as long
     // as nobody adds or removes one. Nothing here does, but a list of the
@@ -839,8 +881,25 @@ class RenderGlassLayer extends RenderProxyBox {
     final shapes = _records.keys.whereType<RenderGlassShape>().toList(
       growable: false,
     );
+    Layer? root;
+    Layer subtreeRoot() {
+      final known = root;
+      if (known != null) {
+        return known;
+      }
+      final probe = ContainerLayer();
+      context.addLayer(probe);
+      Layer top = probe;
+      for (var up = probe.parent; up != null; up = up.parent) {
+        top = up;
+      }
+      // Removing drops the parent's handle, the only one, which disposes it.
+      probe.remove();
+      return root = top;
+    }
+
     for (final shape in shapes) {
-      shape.syncGeometryIfSubtreePaintMissedIt(this);
+      shape.syncGeometryIfSubtreePaintMissedIt(this, subtreeRoot);
     }
   }
 
@@ -1265,8 +1324,8 @@ class RenderGlassLayer extends RenderProxyBox {
     _refreshMatte(pass);
   }
 
-  /// Warns, once per layer, when a cluster of [pass]'s shapes is larger
-  /// than one draw carries.
+  /// Warns when a cluster of [pass]'s shapes is larger than one draw
+  /// carries -- once each time that starts being true.
   ///
   /// Per cluster, not per pass: a pass bakes each cluster of nearby or
   /// blended shapes as its own draw (see `shape_clusters.dart`), so only a
@@ -1280,29 +1339,37 @@ class RenderGlassLayer extends RenderProxyBox {
   /// sits at the layer origin with no extent, so every such shape looked
   /// like one cluster there, and clusters change as shapes move without
   /// any re-sort at all.
+  ///
+  /// Re-armed whenever no cluster is over: it used to be once per layer for
+  /// good, so one transient over-cap cluster -- a shape animating through
+  /// its neighbours, or unplaced shapes piled at the origin before this
+  /// layer left them out -- used up the only warning, and a later cluster
+  /// that really did drop shapes went unreported. Checked only at a bake,
+  /// which is when clusters can change, so a condition that persists still
+  /// prints once.
   void _debugWarnOnShapeLimit(_GlassPass pass, MatteRequest request) {
-    if (_warnedShapeLimit || pass.scene.shapes.length <= kMaxShapes) {
+    final over = pass.scene.shapes.length > kMaxShapes
+        ? clusterShapes(pass.scene.shapes, padding: clusterPadding(request))
+              .map((cluster) => cluster.shapes.length)
+              .where((count) => count > kMaxShapes)
+              .firstOrNull
+        : null;
+    if (over == null) {
+      pass.warnedShapeLimit = false;
       return;
     }
-    final clusters = clusterShapes(
-      pass.scene.shapes,
-      padding: clusterPadding(request),
-    );
-    for (final cluster in clusters) {
-      final count = cluster.shapes.length;
-      if (count > kMaxShapes) {
-        _warnedShapeLimit = true;
-        debugPrint(
-          'glass_forge: $count shapes of one material sit close enough '
-          'together in this GlassLayer to be drawn as one cluster, and a '
-          'cluster carries at most $kMaxShapes. Shapes past the '
-          '${_ordinal(kMaxShapes)} in it are not drawn at all. Space them '
-          'further apart, or give some of them a material of their own — '
-          'each material is its own pass.',
-        );
-        return;
-      }
+    if (pass.warnedShapeLimit) {
+      return;
     }
+    pass.warnedShapeLimit = true;
+    debugPrint(
+      'glass_forge: $over shapes of one material sit close enough '
+      'together in this GlassLayer to be drawn as one cluster, and a '
+      'cluster carries at most $kMaxShapes. Shapes past the '
+      '${_ordinal(kMaxShapes)} in it are not drawn at all. Space them '
+      'further apart, or give some of them a material of their own — '
+      'each material is its own pass.',
+    );
   }
 
   /// What a pass of [material] asks its producer to bake.
