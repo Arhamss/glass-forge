@@ -2,6 +2,18 @@
 
 Resume file. Updated at the end of a working session; read it first.
 
+## 2026-09-28 — CI run locally, all green
+
+Every CI job, run locally on a clean worktree of the pushed commit with
+Flutter 3.47.2: license_check, SkSL web build, analyze, format, bloc lint,
+631 unit tests, the Impeller lane (85/0/0 — needed `--enable-flutter-gpu`),
+and VGV's package job. Two fixes to `main.yaml` for that last one: it hung
+forever with VGV's test bundling (a memoised `ShaderLibrary.warmUp` future
+from a fake-async zone — test isolation, not an app bug), so
+`test_optimization: false`; and its default 100% coverage gate against a
+measured 81.27% is now an 80% ratchet. Not run locally: the cspell spell
+check (npx is gated in this shell) and the PR-title check (PRs only).
+
 ## 2026-09-28 — ready to publish
 
 `publish_to: none` is gone and `flutter pub publish --dry-run` passes. The
@@ -808,10 +820,9 @@ and C3, see above.
 - **`repository` and `issue_tracker` are unset** in `pubspec.yaml`, because
   pub.dev checks that the URLs resolve and no public repo exists yet.
   `publish_to: none` is still set.
-- **One Impeller test fails**, before and after the move: the fail-soft test
-  in `test/src/rendering/render_glass_layer_test.dart` expects
-  `GpuGeometryProducer` but the lane runs without `--enable-flutter-gpu`.
-  Pre-existing; CI fails on it too.
+- ~~**One Impeller test fails**~~ **Fixed 2026-09-28** — it was the lane,
+  not the package: the step lacked `--enable-flutter-gpu`. With it the lane
+  is 85 passed, 0 skipped, 0 failed; `shaders.yaml` now passes the flag.
 - **The other session (`glass-forge-b7`) was never told about the move.** The
   permission classifier blocked the message. It should pull before working.
 - The edge band shows **stair-stepped contours** when refracting a smooth

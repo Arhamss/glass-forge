@@ -71,5 +71,14 @@ jobs:
       # (no GPU/Vulkan for Impeller to bind to), move these tests to a
       # device/integration lane rather than deleting them or dropping the
       # flag on the step above.
+      #
+      # `--enable-flutter-gpu` as well: the accelerated geometry producer is
+      # Flutter GPU, and without it the fail-soft test in
+      # render_glass_layer_test.dart failed on every run and the two
+      # cross-producer parity tests in gpu_geometry_producer_test.dart
+      # skipped. With it, the lane is 85 passed, 0 skipped, 0 failed
+      # (macOS, Flutter 3.47.2).
       - name: flutter test (impeller)
-        run: flutter test --tags impeller --run-skipped --enable-impeller
+        run: >-
+          flutter test --tags impeller --run-skipped --enable-impeller
+          --enable-flutter-gpu

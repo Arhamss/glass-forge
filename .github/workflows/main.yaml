@@ -26,3 +26,19 @@ jobs:
       # 3.44.x, which cannot resolve that constraint, so the job failed at
       # `pub get` and had never actually run anything.
       flutter_version: "3.47.2"
+      # One isolate per test file, as plain `flutter test` runs them. VGV's
+      # optimisation bundles every file into one isolate, and this suite
+      # depends on per-file isolation: `ShaderLibrary` is a process-wide
+      # singleton whose `warmUp()` is memoised, and `RenderGlassLayer` calls
+      # it on attach. Bundled, the first widget test to mount a GlassLayer
+      # memoises that future inside its fake-async zone, which is never
+      # pumped again once the test ends — and the next file's
+      # `setUpAll(ShaderLibrary.instance.warmUp)` waits on it forever.
+      # Reproduced locally on 2026-09-28: the run hangs at
+      # backdrop_pass_clip_test.dart's setUpAll with every process idle.
+      test_optimization: false
+      # A ratchet, not a target. VGV defaults to 100, which this package has
+      # never met: measured at 81.27% on 2026-09-28, with the Impeller-tagged
+      # rendering tests skipped as this job skips them. Raise it as coverage
+      # grows; never lower it to make a red run green.
+      min_coverage: 80
