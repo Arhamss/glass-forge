@@ -4,6 +4,9 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/glass_segmented_control.dart';
+import 'package:glass_forge/src/design/glass_legibility.dart';
+import 'package:glass_forge/src/design/glass_surfaces.dart';
+import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
@@ -32,7 +35,16 @@ const List<GlassSegment<int>> _threeSegments = [
 /// [child] in a layer, either on content or, with [onGlass], nested inside a
 /// real `Glass` so `GlassHostScope.isOnGlass` reads true for it. Always
 /// [_width] wide, the geometry every drag offset below assumes.
-Widget _harness({required Widget child, bool onGlass = false}) {
+///
+/// [brightness] stands in for the platform scheme — light unless a test
+/// asks otherwise, the same default a bare `MediaQueryData` carries, so
+/// every test written before this parameter existed still sees what it
+/// always saw.
+Widget _harness({
+  required Widget child,
+  bool onGlass = false,
+  Brightness brightness = Brightness.light,
+}) {
   final sized = SizedBox(width: _width, child: child);
   final content = onGlass
       ? Glass(
@@ -40,12 +52,15 @@ Widget _harness({required Widget child, bool onGlass = false}) {
           child: Center(child: sized),
         )
       : Center(child: sized);
-  return Directionality(
-    textDirection: TextDirection.ltr,
-    child: GlassLayer(
-      tier: GeometryTier.none,
-      material: _inert,
-      child: SizedBox(width: _width, height: 200, child: content),
+  return MediaQuery(
+    data: MediaQueryData(platformBrightness: brightness),
+    child: Directionality(
+      textDirection: TextDirection.ltr,
+      child: GlassLayer(
+        tier: GeometryTier.none,
+        material: _inert,
+        child: SizedBox(width: _width, height: 200, child: content),
+      ),
     ),
   );
 }
@@ -423,4 +438,92 @@ void main() {
       expect(pillOf(tester).left, 160);
     },
   );
+
+  group('the selected label reads against its own pill', () {
+    /// The backdrop that hurts [brightness] most — pure white flips a dark
+    /// scheme's own worst case, pure black a light scheme's — the same
+    /// convention `glass_surfaces_test.dart` measures every role's promise
+    /// against.
+    Color worstBackdropFor(Brightness brightness) =>
+        brightness == Brightness.dark
+        ? const Color(0xFFFFFFFF)
+        : const Color(0xFF000000);
+
+    /// The contrast between the selected segment's rendered label colour and
+    /// its pill.
+    ///
+    /// Off a glass host the pill is a real, translucent `Glass` — there is
+    /// no fixed colour to check it against directly, so this measures the
+    /// same worst case `style.labelColor`'s own package-wide promise is held
+    /// to: the control role's material, composited at its own opacity over
+    /// the backdrop that scheme faces worst. On a glass host the pill paints
+    /// flat and always white (`GlassSegmentedControl._pillColor`), so that
+    /// is what this checks against directly instead.
+    Future<double> selectedContrast(
+      WidgetTester tester, {
+      required bool onGlass,
+      required Brightness brightness,
+    }) async {
+      late GlassSurfaceStyle style;
+      await tester.pumpWidget(
+        _harness(
+          onGlass: onGlass,
+          brightness: brightness,
+          child: Builder(
+            builder: (context) {
+              style = GlassTheme.surfaceOf(
+                context,
+                GlassSurfaceRole.control,
+                size: const Size(_width, GlassControlFrame.minimumExtent),
+              );
+              return GlassSegmentedControl<int>(
+                segments: _threeSegments,
+                selected: 0,
+                onChanged: (_) {},
+              );
+            },
+          ),
+        ),
+      );
+
+      final labelStyle = tester
+          .widget<DefaultTextStyle>(
+            find
+                .ancestor(
+                  of: find.text('Day'),
+                  matching: find.byType(DefaultTextStyle),
+                )
+                .first,
+          )
+          .style;
+      final labelColor = labelStyle.color!;
+
+      final pillColor = onGlass
+          ? const Color(0xFFFFFFFF)
+          : GlassLegibility.surfaceOver(
+              tint: style.material.tint,
+              opacity: style.material.tintOpacity,
+              backdrop: worstBackdropFor(brightness),
+            );
+
+      return GlassLegibility.contrastRatio(pillColor, labelColor);
+    }
+
+    for (final brightness in Brightness.values) {
+      for (final onGlass in [false, true]) {
+        testWidgets(
+          'onGlass=$onGlass, ${brightness.name} scheme: selected label '
+          'clears 3:1 against its pill',
+          (tester) async {
+            final contrast = await selectedContrast(
+              tester,
+              onGlass: onGlass,
+              brightness: brightness,
+            );
+            expect(contrast, greaterThanOrEqualTo(3.0));
+          },
+        );
+      }
+    }
+  });
 }

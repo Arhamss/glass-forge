@@ -5,6 +5,7 @@ import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
+import 'package:glass_forge/src/design/glass_tint.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
@@ -369,7 +370,12 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
               children: [
                 for (var i = 0; i < _segmentCount; i++)
                   Expanded(
-                    child: _segment(i, enabled: enabled, style: style),
+                    child: _segment(
+                      i,
+                      enabled: enabled,
+                      style: style,
+                      onGlass: onGlass,
+                    ),
                   ),
               ],
             ),
@@ -385,18 +391,54 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
     int index, {
     required bool enabled,
     required GlassSurfaceStyle style,
+    required bool onGlass,
   }) {
     final segment = widget.segments[index];
+    final selected = segment.value == widget.selected;
     return GlassControlFrame(
       onActivate: enabled ? () => _select(index) : null,
       onIncrease: enabled ? _selectNext : null,
       onDecrease: enabled ? _selectPrevious : null,
-      selected: segment.value == widget.selected,
+      selected: selected,
       child: DefaultTextStyle.merge(
-        style: TextStyle(color: style.labelColor),
+        style: TextStyle(
+          color: _labelColorFor(
+            style: style,
+            onGlass: onGlass,
+            selected: selected,
+          ),
+        ),
         child: segment.label,
       ),
     );
+  }
+
+  /// The colour a segment's label is drawn in.
+  ///
+  /// Every segment but the selected one sits on the track, whose tint is
+  /// exactly what `style.labelColor` was chosen to clear — the package-wide
+  /// promise `glass_surfaces_test.dart` proves for every role. The selected
+  /// segment sits on the pill instead, and the pill is not always that same
+  /// surface: off a glass host it is a real [Glass] drawn in the ambient
+  /// material, so `style.labelColor` is still the right label; on a glass
+  /// host — where a second backdrop pass is refused (flutter#187820) — the
+  /// pill in [_pill] paints flat instead, and always white, the same
+  /// deliberate choice `GlassSwitch._knobColor` and `GlassSlider._thumbColor`
+  /// make. That fixed white surface is decoupled from whichever material
+  /// `style.labelColor` was tuned against, so a dark scheme's white label
+  /// would land on it invisibly. The selected label on that one surface
+  /// takes the light scheme's own label colour instead — pure black, the ink
+  /// [GlassTintRamp.appleLight] already guarantees reads against a light
+  /// surface, and the painted pill is exactly that.
+  Color _labelColorFor({
+    required GlassSurfaceStyle style,
+    required bool onGlass,
+    required bool selected,
+  }) {
+    if (selected && onGlass) {
+      return GlassTintRamp.appleLight.label;
+    }
+    return style.labelColor;
   }
 
   Widget _pill({
