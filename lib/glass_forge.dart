@@ -18,6 +18,7 @@ export 'src/controls/glass_button.dart';
 export 'src/controls/glass_segmented_control.dart';
 export 'src/controls/glass_slider.dart';
 export 'src/controls/glass_switch.dart';
+export 'src/controls/glass_text_field.dart';
 export 'src/design/glass_legibility.dart';
 export 'src/design/glass_motion_defaults.dart';
 export 'src/design/glass_surface.dart';

@@ -166,6 +166,28 @@ segment, or the arrow keys while one is focused, select it outright. Each
 segment is its own semantics node — a selectable button, `isSelected` on
 exactly the chosen one.
 
+`GlassTextField` wraps `EditableText` — real glass on content, painted
+under `GlassHostScope` — rather than reimplementing IME, composing text or
+tap-to-place-caret handling.
+
+```dart
+GlassTextField(
+  controller: controller,
+  placeholder: 'Search',
+  onChanged: (value) => print(value),
+)
+```
+
+Focus reads as the glass lighting up: the material's highlight and tint
+opacity animate brighter on the theme's `settle` spring, never a painted
+ring on top. The caret and selection are painted above the glass as a
+`Stack` sibling, never inside it, so they are never refracted, and a
+focused field inside a scroll view calls `Scrollable.ensureVisible` to
+track the keyboard's own show/hide animation clear of it. With no Material
+ancestor required, the selection toolbar and drag handles Material and
+Cupertino each build are unavailable; typing, arrow-key caret movement and
+the platform's own copy/paste shortcuts all keep working regardless.
+
 ## Tiering
 
 Glass is expensive, and the honest answer on a cold-throttled mid-range phone

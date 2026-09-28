@@ -167,6 +167,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the GlassTextField example builds', (tester) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          child: Center(
+            child: SizedBox(
+              width: 240,
+              child: GlassTextField(
+                controller: controller,
+                placeholder: 'Search',
+                onChanged: (value) {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the tier-scope and theme examples build', (tester) async {
     await tester.pumpWidget(
       const GlassTierScope(
