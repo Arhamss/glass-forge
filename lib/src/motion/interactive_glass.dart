@@ -97,6 +97,7 @@ class InteractiveGlass extends StatefulWidget {
     ),
     this.behavior = HitTestBehavior.opaque,
     this.onTap,
+    this.glow = true,
     super.key,
   }) : assert(pressScale > 0, 'a press scales a surface, it does not erase it');
 
@@ -135,6 +136,18 @@ class InteractiveGlass extends StatefulWidget {
 
   /// Called on a tap that was not a drag.
   final VoidCallback? onTap;
+
+  /// Whether a press lights the touch glow.
+  ///
+  /// `true` unconditionally claims the layer's shared glow channel on every
+  /// press — see the design decision on [GlassGlowScope]. Setting this
+  /// `false` stops this surface's own presses from ever claiming or writing
+  /// that channel, while its depth, scale and stretch respond exactly as
+  /// they otherwise would; every other surface in the layer still glows
+  /// normally when pressed itself. Flipping this to `false` mid-press
+  /// releases whatever claim this surface was already holding, the same
+  /// way letting go of the surface does.
+  final bool glow;
 
   @override
   State<InteractiveGlass> createState() => _InteractiveGlassState();
@@ -271,6 +284,14 @@ class _InteractiveGlassState extends State<InteractiveGlass>
         ..dispose();
       _controller = _createController()..addListener(_onMotionChanged);
       _rawDrag = Offset.zero;
+    }
+    // Independent of the controller swap above: turning the glow off mid-
+    // press must let go of whatever claim this surface is holding right
+    // now, rather than waiting for the next spring tick to notice — the
+    // press can easily be static (finger down, not moving) with no tick
+    // due until it lifts.
+    if (oldWidget.glow && !widget.glow) {
+      _releaseGlow();
     }
   }
 
@@ -462,6 +483,10 @@ class _InteractiveGlassState extends State<InteractiveGlass>
   /// lit area still grows as the press deepens — it never passes through
   /// the unsafe combination in the first place.
   void _publishGlow() {
+    if (!widget.glow) {
+      _releaseGlow();
+      return;
+    }
     final press = _controller.value.press;
     if (press <= 0) {
       _releaseGlow();

@@ -63,6 +63,7 @@ Widget _harness({
   double pressScale = 0.96,
   GlassJiggle jiggle = const GlassJiggle(),
   GlassPressStretch pressStretch = const GlassPressStretch.none(),
+  bool glow = true,
   Size size = const Size(100, 100),
   VoidCallback? onTap,
 }) {
@@ -81,6 +82,7 @@ Widget _harness({
               pressScale: pressScale,
               jiggle: jiggle,
               pressStretch: pressStretch,
+              glow: glow,
               onTap: onTap,
               child: const Glass(
                 shape: GlassRoundedRectangle(
@@ -561,6 +563,23 @@ void main() {
     expect(glow.glow.value.radius, lessThanOrEqualTo(64));
     await gesture.up();
     await _settle(tester, _motionOf(tester));
+  });
+
+  testWidgets('glow: false never claims or writes the shared channel', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_harness(size: const Size(64, 64), glow: false));
+    final glow = tester.widget<GlassGlowScope>(find.byType(GlassGlowScope));
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(InteractiveGlass)),
+    );
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(glow.glow.value.strength, 0, reason: 'glow: false still glowed');
+    await gesture.up();
+    await _settle(tester, _motionOf(tester));
+    expect(glow.glow.value.strength, 0);
   });
 
   testWidgets('a finger past the edge reaches no further than the edge', (

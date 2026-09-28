@@ -1,5 +1,4 @@
 import 'package:flutter/widgets.dart';
-import 'package:glass_forge/src/composition/glass_glow.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
@@ -9,7 +8,6 @@ import 'package:glass_forge/src/motion/reduce_motion.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
-import 'package:glass_forge/src/widgets/glass_layer.dart';
 
 /// A tappable capsule of glass, or its painted stand-in on a glass surface.
 ///
@@ -50,15 +48,14 @@ class GlassButton extends StatelessWidget {
   /// [semanticLabel] is required and typed `String` here, rather than the
   /// `String?` the unnamed constructor and the shared field both carry: an
   /// icon has no text of its own for a screen reader to fall back to, so
-  /// this constructor holds callers to a real label at compile time rather
-  /// than only in a debug assert. That guarantee is exactly why this
-  /// assigns the field explicitly instead of with an initializing formal —
-  /// `this.semanticLabel` would force the parameter back down to the
-  /// field's own `String?`, which is the type this exists to not have.
+  /// this constructor holds callers to a real label at compile time. An
+  /// initializing formal with an explicit, narrower type — `String`, where
+  /// the field itself is `String?` — is what makes that a static guarantee
+  /// rather than a debug-only assert.
   const GlassButton.icon({
     required this.onPressed,
     required Widget icon,
-    required String semanticLabel,
+    required String this.semanticLabel,
     this.backdrop,
     this.focusNode,
     this.autofocus = false,
@@ -67,7 +64,6 @@ class GlassButton extends StatelessWidget {
        shape = null,
        pressStretch = const GlassPressStretch(),
        glow = true,
-       semanticLabel = semanticLabel,
        _padding = _iconPadding;
 
   /// Called on activation. Null renders this button disabled.
@@ -183,11 +179,11 @@ class GlassButton extends StatelessWidget {
       return Glass(shape: resolvedShape, child: label);
     }
 
-    final interactive = InteractiveGlass(
+    return InteractiveGlass(
       pressStretch: pressStretch,
+      glow: glow,
       child: Glass(shape: resolvedShape, child: label),
     );
-    return glow ? interactive : _SuppressedGlow(child: interactive);
   }
 }
 
@@ -252,39 +248,5 @@ class _PaintedPressScaleState extends State<_PaintedPressScale> {
         child: widget.child,
       ),
     );
-  }
-}
-
-/// Cuts [child] off from its layer's real touch-glow channel.
-///
-/// `InteractiveGlass` always writes a press into the nearest `GlassGlowScope`
-/// above it — there is no flag on it for "don't glow" to turn off. Shadowing
-/// that scope with a channel of this widget's own, written to but never
-/// read by anything that paints, is how [GlassButton.glow] is honoured
-/// without changing `InteractiveGlass` itself: `_GlassLayerState` hands its
-/// real channel straight to the render object it owns, not through this
-/// `InheritedWidget`, so a nearer, decoy scope changes what a descendant
-/// *finds* without touching what the layer actually paints.
-class _SuppressedGlow extends StatefulWidget {
-  const _SuppressedGlow({required this.child});
-
-  final Widget child;
-
-  @override
-  State<_SuppressedGlow> createState() => _SuppressedGlowState();
-}
-
-class _SuppressedGlowState extends State<_SuppressedGlow> {
-  final ValueNotifier<GlassGlow> _decoy = ValueNotifier(const GlassGlow.none());
-
-  @override
-  void dispose() {
-    _decoy.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassGlowScope(glow: _decoy, child: widget.child);
   }
 }
