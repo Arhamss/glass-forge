@@ -130,6 +130,21 @@ GlassSwitch(
 The knob drags, flicks and settles to whichever side it ends up past, on
 the theme's `settle` spring; a tap toggles it outright.
 
+`GlassSlider` is a painted track and fill under a thumb — real glass on
+content, painted under `GlassHostScope` — that can be dragged from anywhere
+in its 44-point-tall hit area, not only from the thumb itself.
+
+```dart
+GlassSlider(
+  value: volume,
+  onChanged: (next) => setState(() => volume = next),
+)
+```
+
+The thumb stretches along the track under a fast drag, through
+`GlassJiggle`; `divisions` snaps it to evenly spaced steps, and the arrow
+keys step it by one division, or a tenth of the range without one.
+
 ## Tiering
 
 Glass is expensive, and the honest answer on a cold-throttled mid-range phone

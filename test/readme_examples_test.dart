@@ -114,6 +114,30 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the GlassSlider example builds', (tester) async {
+    var volume = 0.5;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          child: Center(
+            child: SizedBox(
+              width: 240,
+              child: StatefulBuilder(
+                builder: (context, setState) {
+                  return GlassSlider(
+                    value: volume,
+                    onChanged: (next) => setState(() => volume = next),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the tier-scope and theme examples build', (tester) async {
     await tester.pumpWidget(
       const GlassTierScope(

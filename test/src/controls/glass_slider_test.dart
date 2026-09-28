@@ -1,0 +1,355 @@
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:glass_forge/src/controls/glass_slider.dart';
+import 'package:glass_forge/src/geometry/producer_registry.dart';
+import 'package:glass_forge/src/material/glass_material.dart';
+import 'package:glass_forge/src/shapes/glass_shape.dart';
+import 'package:glass_forge/src/widgets/glass.dart';
+import 'package:glass_forge/src/widgets/glass_layer.dart';
+
+/// A material that renders nothing, so the composite pass is skipped — the
+/// same reason `glass_button_test.dart` needs it outside Impeller.
+const GlassMaterial _inert = GlassMaterial(
+  frost: 0,
+  edgeRefraction: 0,
+  highlight: 0,
+);
+
+/// The width every harness below gives the slider, and the geometry every
+/// expected fraction in this file is worked out against: a 28-point thumb
+/// leaves 222 points of travel, so a pointer at `left + fraction * 222 + 14`
+/// lands exactly on that fraction.
+const double _width = 250;
+const double _thumbSize = 28;
+const double _travel = _width - _thumbSize;
+
+/// The x offset, from the slider's left edge, that lands on [fraction].
+double _xFor(double fraction) => _thumbSize / 2 + fraction * _travel;
+
+/// [child] in a layer, either on content or, with [onGlass], nested inside a
+/// real `Glass` so `GlassHostScope.isOnGlass` reads true for it. Always
+/// [_width] wide, the geometry every drag and tap offset below assumes.
+Widget _harness({required Widget child, bool onGlass = false}) {
+  final sized = SizedBox(width: _width, child: child);
+  final content = onGlass
+      ? Glass(
+          shape: const GlassOval(),
+          child: Center(child: sized),
+        )
+      : Center(child: sized);
+  return Directionality(
+    textDirection: TextDirection.ltr,
+    child: GlassLayer(
+      tier: GeometryTier.none,
+      material: _inert,
+      child: SizedBox(width: _width, height: 200, child: content),
+    ),
+  );
+}
+
+/// The point every `_xFor` offset in this file is measured from: the
+/// slider's own left edge, at its true vertical centre.
+///
+/// Not [WidgetTester.getTopLeft]: `GlassControlFrame` centres its child
+/// inside a `Center` that fills whatever height it is loosely given —
+/// here, the harness's own — rather than shrink-wrapping to the 44-point
+/// hit target, so the slider's *reported* top sits well above where the
+/// hit-testable area actually is. The rect's own vertical centre is exactly
+/// right regardless, because `Center` always centres what it is given.
+Offset _anchor(WidgetTester tester, Finder finder) {
+  final rect = tester.getRect(finder);
+  return Offset(rect.left, rect.center.dy);
+}
+
+/// Drags [finder] from [_anchor], as a mouse pointer, through the offsets
+/// in [xs] (each an x offset from the slider's left edge), then releases.
+Future<void> _dragThrough(
+  WidgetTester tester,
+  Finder finder,
+  List<double> xs,
+) async {
+  final anchor = _anchor(tester, finder);
+  final gesture = await tester.startGesture(
+    anchor + Offset(xs.first, 0),
+    kind: PointerDeviceKind.mouse,
+  );
+  for (final x in xs.skip(1)) {
+    await gesture.moveTo(anchor + Offset(x, 0));
+  }
+  await gesture.up();
+  await tester.pump();
+}
+
+void main() {
+  testWidgets('a drag reports a value in range', (tester) async {
+    double? reported;
+    await tester.pumpWidget(
+      _harness(
+        child: GlassSlider(value: 0, onChanged: (next) => reported = next),
+      ),
+    );
+
+    await _dragThrough(tester, find.byType(GlassSlider), [
+      _xFor(0),
+      _xFor(0.5),
+    ]);
+
+    expect(reported, isNotNull);
+    expect(reported, closeTo(0.5, 0.001));
+  });
+
+  testWidgets('a drag snaps to the nearest division', (tester) async {
+    double? reported;
+    await tester.pumpWidget(
+      _harness(
+        child: GlassSlider(
+          value: 0,
+          divisions: 4,
+          onChanged: (next) => reported = next,
+        ),
+      ),
+    );
+
+    // 0.6 is nearer the 0.5 division than the 0.75 one.
+    await _dragThrough(tester, find.byType(GlassSlider), [
+      _xFor(0),
+      _xFor(0.6),
+    ]);
+
+    expect(reported, closeTo(0.5, 0.001));
+  });
+
+  testWidgets('onChangeStart and onChangeEnd bracket a drag', (tester) async {
+    final events = <String>[];
+    await tester.pumpWidget(
+      _harness(
+        child: GlassSlider(
+          value: 0,
+          onChanged: (next) => events.add('change $next'),
+          onChangeStart: (v) => events.add('start $v'),
+          onChangeEnd: (v) => events.add('end $v'),
+        ),
+      ),
+    );
+
+    await _dragThrough(tester, find.byType(GlassSlider), [
+      _xFor(0),
+      _xFor(1),
+    ]);
+
+    expect(events, isNotEmpty);
+    expect(events.first, 'start 0.0');
+    expect(events.last, 'end 1.0');
+  });
+
+  testWidgets('a tap sets the value at that position', (tester) async {
+    double? reported;
+    await tester.pumpWidget(
+      _harness(
+        child: GlassSlider(value: 0, onChanged: (next) => reported = next),
+      ),
+    );
+
+    final anchor = _anchor(tester, find.byType(GlassSlider));
+    final gesture = await tester.startGesture(
+      anchor + Offset(_xFor(0.75), 0),
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.up();
+    await tester.pump();
+
+    expect(reported, closeTo(0.75, 0.001));
+  });
+
+  testWidgets('min == max does not divide by zero and holds its value', (
+    tester,
+  ) async {
+    double? reported;
+    await tester.pumpWidget(
+      _harness(
+        child: GlassSlider(
+          value: 5,
+          min: 5,
+          max: 5,
+          onChanged: (next) => reported = next,
+        ),
+      ),
+    );
+
+    await _dragThrough(tester, find.byType(GlassSlider), [
+      _xFor(0),
+      _xFor(1),
+    ]);
+
+    expect(tester.takeException(), isNull);
+    expect(reported, anyOf(isNull, 5));
+  });
+
+  testWidgets(
+    'a disabled slider never fires and ignores taps, drags and keys',
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(child: const GlassSlider(value: 0.5, onChanged: null)),
+      );
+
+      await _dragThrough(tester, find.byType(GlassSlider), [
+        _xFor(0),
+        _xFor(1),
+      ]);
+      final anchor = _anchor(tester, find.byType(GlassSlider));
+      await tester.tapAt(anchor + Offset(_xFor(0.9), 0));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('semantics report a slider with the label and value', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _harness(
+        child: GlassSlider(
+          value: 0.5,
+          onChanged: (_) {},
+          semanticLabel: 'Volume',
+        ),
+      ),
+    );
+
+    expect(
+      tester.getSemantics(find.byType(GlassSlider)),
+      isSemantics(label: 'Volume', isEnabled: true, isSlider: true),
+    );
+    handle.dispose();
+  });
+
+  testWidgets('the increase and decrease semantics actions step the value', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    var value = 0.5;
+    await tester.pumpWidget(
+      StatefulBuilder(
+        builder: (context, setState) {
+          return _harness(
+            child: GlassSlider(
+              value: value,
+              semanticLabel: 'Volume',
+              onChanged: (next) => setState(() => value = next),
+            ),
+          );
+        },
+      ),
+    );
+
+    tester.semantics.increase(find.semantics.byLabel('Volume'));
+    await tester.pump();
+    // No divisions: a step is a tenth of the 0..1 range.
+    expect(value, closeTo(0.6, 0.001));
+
+    tester.semantics.decrease(find.semantics.byLabel('Volume'));
+    await tester.pump();
+    expect(value, closeTo(0.5, 0.001));
+
+    handle.dispose();
+  });
+
+  testWidgets('arrow keys step a focused slider', (tester) async {
+    var value = 0.5;
+    await tester.pumpWidget(
+      StatefulBuilder(
+        builder: (context, setState) {
+          return _harness(
+            child: GlassSlider(
+              value: value,
+              onChanged: (next) => setState(() => value = next),
+            ),
+          );
+        },
+      ),
+    );
+
+    // No `focusNode` to reach from outside — same as `GlassSwitch`'s own
+    // key test, `GlassControlFrame` owns one internally, and this harness
+    // has exactly one focusable node.
+    FocusManager.instance.rootScope.descendants
+        .firstWhere((node) => node.canRequestFocus)
+        .requestFocus();
+    await tester.pump();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    expect(value, closeTo(0.6, 0.001));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pump();
+    expect(value, closeTo(0.5, 0.001));
+  });
+
+  testWidgets('exactly one Glass on content', (tester) async {
+    await tester.pumpWidget(
+      _harness(child: GlassSlider(value: 0.5, onChanged: (_) {})),
+    );
+
+    expect(
+      find.descendant(
+        of: find.byType(GlassSlider),
+        matching: find.byType(Glass),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('zero Glass under GlassHostScope', (tester) async {
+    await tester.pumpWidget(
+      _harness(
+        onGlass: true,
+        child: GlassSlider(value: 0.5, onChanged: (_) {}),
+      ),
+    );
+
+    expect(
+      find.descendant(
+        of: find.byType(GlassSlider),
+        matching: find.byType(Glass),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('Reduce Motion applies no stretch to a fast drag', (
+    tester,
+  ) async {
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+
+    await tester.pumpWidget(
+      _harness(child: GlassSlider(value: 0, onChanged: (_) {})),
+    );
+
+    final anchor = _anchor(tester, find.byType(GlassSlider));
+    final gesture = await tester.startGesture(
+      anchor + Offset(_xFor(0), 0),
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.moveTo(anchor + Offset(_xFor(1), 0));
+    await tester.pump();
+
+    final transform = tester.widget<Transform>(
+      find.descendant(
+        of: find.byType(GlassSlider),
+        matching: find.byType(Transform),
+      ),
+    );
+    expect(transform.transform.getColumn(0).x, 1);
+    expect(transform.transform.getColumn(1).y, 1);
+
+    await gesture.up();
+    await tester.pump();
+  });
+}

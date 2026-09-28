@@ -33,6 +33,12 @@ class GlassControlFrame extends StatelessWidget {
     this.autofocus = false,
     this.button = true,
     this.toggled,
+    this.slider = false,
+    this.value,
+    this.increasedValue,
+    this.decreasedValue,
+    this.onIncrease,
+    this.onDecrease,
     super.key,
   });
 
@@ -69,13 +75,44 @@ class GlassControlFrame extends StatelessWidget {
   /// `SemanticsFlag.isToggled` to it, which is what `GlassSwitch` needs.
   final bool? toggled;
 
+  /// Whether semantics reports this as a slider — `GlassSlider`'s only use
+  /// of this frame beyond the shared 44 × 44 hit target and focus handling.
+  ///
+  /// A slider has no single "activate" — see [onActivate], always null for
+  /// it — so [_enabled] falls back to [onIncrease] and [onDecrease] when
+  /// this is set, rather than requiring a callback this control has no use
+  /// for.
+  final bool slider;
+
+  /// The accessible value read for a slider, alongside [semanticLabel].
+  final String? value;
+
+  /// What a screen reader announces [value] would become after
+  /// [onIncrease].
+  final String? increasedValue;
+
+  /// What a screen reader announces [value] would become after
+  /// [onDecrease].
+  final String? decreasedValue;
+
+  /// Called by the increase semantics action, and by the right or up arrow
+  /// key while focused. Null both disables that action and leaves the key
+  /// unhandled, so it can still do whatever it would elsewhere.
+  final VoidCallback? onIncrease;
+
+  /// Called by the decrease semantics action, and by the left or down arrow
+  /// key while focused. Null both disables that action and leaves the key
+  /// unhandled, so it can still do whatever it would elsewhere.
+  final VoidCallback? onDecrease;
+
   /// The least a control's hit target may measure on either axis.
   ///
   /// Apple's own minimum for a tappable element, and the floor every
   /// control test in this package holds itself to.
   static const double minimumExtent = 44;
 
-  bool get _enabled => onActivate != null;
+  bool get _enabled =>
+      onActivate != null || onIncrease != null || onDecrease != null;
 
   @override
   Widget build(BuildContext context) {
@@ -113,10 +150,16 @@ class GlassControlFrame extends StatelessWidget {
       excludeSemantics: true,
       container: true,
       button: button,
+      slider: slider,
       toggled: toggled,
       enabled: enabled,
       label: semanticLabel,
+      value: value,
+      increasedValue: increasedValue,
+      decreasedValue: decreasedValue,
       onTap: enabled ? onActivate : null,
+      onIncrease: enabled ? onIncrease : null,
+      onDecrease: enabled ? onDecrease : null,
       child: result,
     );
   }
@@ -126,10 +169,25 @@ class GlassControlFrame extends StatelessWidget {
       return KeyEventResult.ignored;
     }
     final key = event.logicalKey;
-    if (key != LogicalKeyboardKey.enter && key != LogicalKeyboardKey.space) {
-      return KeyEventResult.ignored;
+    if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.space) {
+      if (onActivate == null) {
+        return KeyEventResult.ignored;
+      }
+      onActivate!.call();
+      return KeyEventResult.handled;
     }
-    onActivate?.call();
-    return KeyEventResult.handled;
+    if (onDecrease != null &&
+        (key == LogicalKeyboardKey.arrowLeft ||
+            key == LogicalKeyboardKey.arrowDown)) {
+      onDecrease!.call();
+      return KeyEventResult.handled;
+    }
+    if (onIncrease != null &&
+        (key == LogicalKeyboardKey.arrowRight ||
+            key == LogicalKeyboardKey.arrowUp)) {
+      onIncrease!.call();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 }
