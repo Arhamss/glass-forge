@@ -34,10 +34,15 @@ ShapeGeometry _oval(Offset at, {double? marker}) {
 }
 
 void main() {
-  test('the padding covers everything a shape bakes past its bounds', () {
-    // maxDisplacement + antialias width + the normal's two pixels.
-    expect(_padding, 32 + 0.5 + 2);
-    // A dome also steers by a proxy that reads farther away at a corner.
+  test('the padding is the coverage ramp, not the displacement reach', () {
+    // The final pass reads the matte only at a fragment's own position and
+    // only where it has coverage, so a cluster needs to be exact across the
+    // antialias ramp plus the filter's and the normal's pixel -- not out to
+    // maxDisplacement, which merged a 12 px-gapped tile grid into one
+    // cluster past the per-draw cap.
+    expect(_padding, 0.5 + 3);
+    expect(_padding, lessThan(_request.maxDisplacement));
+    // The same for a dome: separate domes do not steer one another.
     const dome = MatteRequest(
       devicePixelRatio: 1,
       maxDisplacement: 32,
@@ -46,7 +51,15 @@ void main() {
       antialiasWidth: 0.5,
       profile: GlassProfile.dome,
     );
-    expect(clusterPadding(dome), greaterThan(32 + 0.5 + 2 + 30));
+    expect(clusterPadding(dome), _padding);
+  });
+
+  test('tiles 12 px apart are separate clusters', () {
+    final shapes = <ShapeGeometry>[
+      for (var i = 0; i < 12; i++)
+        _oval(Offset((i % 4) * 52.0, (i ~/ 4) * 52.0)),
+    ];
+    expect(clusterShapes(shapes, padding: _padding), hasLength(12));
   });
 
   test('twelve separate shapes are twelve clusters', () {

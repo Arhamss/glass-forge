@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:glass_forge/src/geometry/geometry_producer.dart';
-import 'package:glass_forge/src/material/glass_profile.dart';
 import 'package:glass_forge/src/shapes/shape_geometry.dart';
 
 /// Shapes grouped so that no two groups' matte regions touch. Shapes in one
@@ -39,48 +38,57 @@ class ShapeCluster {
   final Rect bounds;
 }
 
-/// How far past its bounds one shape's matte can differ from "outside", in
-/// physical pixels -- the padding [clusterShapes] needs for [request].
+/// How far past its bounds a shape's matte has to be exact, in physical
+/// pixels -- the padding [clusterShapes] needs for [request].
 ///
-/// Two clusters may be drawn separately only if neither can change a texel
-/// the other draws. Each term below is a way a shape reaches past its box:
+/// Not how far the bake *writes* past a shape. The bake encodes a real
+/// distance out to `maxDisplacement` (see `gfBakeMatte` in
+/// `common/matte_pass.glsl`), but nothing downstream reads most of that:
+/// the final pass (`shaders/final_render.frag`) samples the matte once, at
+/// the fragment's own position -- displacement moves the *backdrop* read,
+/// never the matte read -- and returns transparent wherever the decoded
+/// distance leaves no coverage, before the normal, the magnitude, the
+/// shading or the glow are looked at. So outside a shape the matte only
+/// has to be right across the coverage ramp. Padding by the displacement
+/// reach instead (about 60 px at 3x) merged a Control-Centre grid of tiles
+/// with 12 px gaps into one cluster and dropped every tile past the eighth.
 ///
-///  * `maxDisplacement`: the bake writes a real encoding wherever the scene
-///    distance is at most this, and the "outside" constant beyond it (see
-///    `gfBakeMatte` in `common/matte_pass.glsl`);
-///  * `antialiasWidth`: the same margin `GlassScene.bounds` reserves for the
-///    coverage ramp;
-///  * two pixels: the normal is a central difference one pixel either side
-///    of the texel, and across that pixel this cluster's distance can grow
-///    by one while another cluster's shrinks by one;
-///  * for a dome, `3 (sqrt 2 - 1) edgeRefraction`: the dome steers by a
-///    proxy whose corners are rounded to three displacements
-///    (`gfShapeSteeringDistance` in `common/sdf.glsl`), and at a corner that
-///    proxy reads farther away than the shape itself by up to that much --
-///    far enough, unpadded, for a neighbouring cluster's proxy to win the
-///    fold and steer this one's dome from a texel it never draws.
+/// What a cluster's draw must still get right, term by term:
 ///
-/// Under-padding is not a performance bug but a correctness one: the texels
-/// between two clusters that each draw's clip leaves alone keep the cleared
-/// "outside" value, so anything the scene would have drawn there is lost.
-double clusterPadding(MatteRequest request) {
-  final steeringOvershoot = request.profile == GlassProfile.dome
-      ? 3 * (math.sqrt2 - 1) * request.edgeRefraction
-      : 0.0;
-  return request.maxDisplacement +
-      request.antialiasWidth +
-      2 +
-      steeringOvershoot;
-}
+///  * `antialiasWidth`: the coverage ramp, the same margin
+///    `GlassScene.bounds` gives the matte allocation itself -- coverage
+///    past it is already cut off at a layer's top and left edges;
+///  * one pixel: the matte is filtered, so a covered fragment blends the
+///    encodings of texels up to a pixel beyond the ramp, and a texel
+///    cleared to "outside" there would thin the fringe;
+///  * one more: the normal is a central difference a pixel either side of
+///    each of those texels, and those samples must not reach a shape the
+///    draw does not carry;
+///  * one of margin, so the two sides of a gap -- each padded by this --
+///    never both claim the same pixel after rounding.
+///
+/// Outside those texels a separately drawn cluster can only read *further*
+/// from glass than the whole scene would (a cleared texel is "outside"; a
+/// fold over fewer groups is a min over fewer terms), so it can never add
+/// coverage anywhere.
+///
+/// The dome no longer widens it. Its steering proxy rounds corners by up
+/// to three displacements, so under the old single draw a separate shape
+/// a few pixels away could win the steering fold at a dome's corner and
+/// pull that corner toward the *neighbour's* core -- cross-talk between two
+/// surfaces the caller never blended. Drawn apart, each dome steers by its
+/// own proxy, as a separate surface should. Blended shapes are unaffected:
+/// a blend group is always one cluster.
+double clusterPadding(MatteRequest request) => request.antialiasWidth + 3;
 
 /// The most [clusterShapes] widens one shape's padding for anisotropy.
 ///
 /// A shape squashed nearly flat mid-animation would otherwise pad itself
 /// by thousands of pixels and pull every other shape into its cluster --
 /// and a cluster past `kMaxShapes` drops shapes outright, which is far
-/// worse than what the clamp costs: past a 4:1 stretch, the far fringe of
-/// the matte beyond the padding, where coverage is already zero, may read
-/// as "outside" rather than as its true distance.
+/// worse than what the clamp costs: past a 4:1 stretch, the outermost
+/// texels of the antialiased fringe along the long axis may be cleared to
+/// "outside", thinning that fringe by a fraction of a pixel.
 const double _maxStretch = 4;
 
 /// Groups [shapes] into clusters that can be baked as separate draws.

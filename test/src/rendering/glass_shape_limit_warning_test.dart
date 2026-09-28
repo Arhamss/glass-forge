@@ -46,11 +46,11 @@ Widget _overlapping(int count) {
 }
 
 /// Clear space between neighbours in [_row] that keeps every shape in a
-/// cluster of its own under the default material: its matte reaches about
-/// 30 logical pixels past each shape (maxDisplacement 28.8, plus the
-/// antialias and normal margins -- see `clusterPadding`), so two shapes need
-/// more than 60 between them.
-const double _apart = 80;
+/// cluster of its own: a Control-Centre grid's gap. A cluster needs its
+/// matte exact only across the coverage ramp, about 3.5 physical pixels
+/// past each shape (see `clusterPadding`), so 12 logical pixels -- 36
+/// physical at the test's 3x -- is far apart.
+const double _apart = 12;
 
 Future<List<String>> _printedWhilePumping(
   WidgetTester tester,
@@ -92,10 +92,11 @@ void main() {
   testWidgets('shapes close enough for their mattes to meet warn too', (
     tester,
   ) async {
-    // Not overlapping, but four pixels apart: one cluster all the same.
+    // Not overlapping, but one logical pixel apart -- three physical, less
+    // than the two paddings between them: one cluster all the same.
     final printed = await _printedWhilePumping(
       tester,
-      _row(kMaxShapes + 1, spacing: 4),
+      _row(kMaxShapes + 1, spacing: 1),
     );
     expect(
       printed.where((m) => m.contains('at most $kMaxShapes')),

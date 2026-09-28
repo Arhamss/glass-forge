@@ -62,6 +62,41 @@ GlassScene _scene(Iterable<int> ovals) {
   return scene;
 }
 
+/// A Control-Centre tile grid: twelve 60 px rounded squares, four wide, with
+/// 12 px gaps -- dense enough that padding clusters by the displacement
+/// reach merged every tile into one cluster and dropped the last four.
+const double _tile = 60;
+const double _gap = 12;
+
+Rect _tileRect(int i) => Rect.fromLTWH(
+  (i % _columns) * (_tile + _gap) + 13,
+  (i ~/ _columns) * (_tile + _gap) + 7,
+  _tile,
+  _tile,
+);
+
+ShapeGeometry _tileShape(int i) => ShapeGeometry.resolve(
+  shape: const GlassRoundedRectangle(
+    radius: BorderRadius.all(Radius.circular(16)),
+  ),
+  size: const Size(_tile, _tile),
+  toLayer: Matrix4.translationValues(
+    _tileRect(i).left,
+    _tileRect(i).top,
+    0,
+  ),
+  devicePixelRatio: 1,
+  blendMarker: encodeBlendMarker(startsGroup: true, blend: 0),
+);
+
+GlassScene _tiles(Iterable<int> tiles) {
+  final scene = GlassScene();
+  for (final i in tiles) {
+    scene.register(i, _tileShape(i));
+  }
+  return scene;
+}
+
 /// A baked matte read back to the CPU, addressed in layer space.
 class _Baked {
   _Baked(this.pixels, this.generation);
@@ -198,6 +233,83 @@ void main() {
     }
   }
 
+  Future<void> expectTileGrid(GeometryProducer producer) async {
+    final all = await _bake(
+      producer,
+      _tiles(List<int>.generate(_count, (i) => i)),
+    );
+
+    // Every tile is glass at its centre -- the ninth to twelfth included,
+    // which one merged cluster capped at kMaxShapes never drew.
+    for (var i = 0; i < _count; i++) {
+      expect(
+        all.signedDistanceAt(_tileRect(i).center),
+        lessThan(0),
+        reason: 'tile ${i + 1} should bake as inside at its centre',
+      );
+    }
+
+    // Every texel in the gaps reads as outside glass, and the middle of each
+    // gap -- six pixels from both neighbours, past both clusters' clips --
+    // as far outside.
+    final grid = _tileRect(0).expandToInclude(_tileRect(_count - 1));
+    var gapTexels = 0;
+    for (var y = grid.top.floor(); y < grid.bottom.ceil(); y++) {
+      for (var x = grid.left.floor(); x < grid.right.ceil(); x++) {
+        final centre = Offset(x + 0.5, y + 0.5);
+        final inTile = <int>[
+          for (var i = 0; i < _count; i++) i,
+        ].any((i) => _tileRect(i).contains(centre));
+        if (inTile) {
+          continue;
+        }
+        gapTexels++;
+        expect(
+          all.signedDistanceAt(Offset(x.toDouble(), y.toDouble())),
+          greaterThan(0),
+          reason: 'gap texel ($x, $y) should read as outside',
+        );
+      }
+    }
+    expect(gapTexels, greaterThan(0));
+    final midGap = Offset(
+      _tileRect(0).right + _gap / 2,
+      _tileRect(0).center.dy,
+    );
+    expect(
+      all.signedDistanceAt(midGap),
+      greaterThan(_request.maxDisplacement * 0.9),
+    );
+
+    // Each tile's edge -- the antialiased fringe either side of it -- bakes
+    // exactly as the tile does on its own through the single-draw path.
+    for (final i in <int>[0, 6, 11]) {
+      final alone = await _bake(producer, _tiles(<int>[i]));
+      final fringe = _tileRect(i).inflate(_request.antialiasWidth + 1.5);
+      var compared = 0;
+      var maxDelta = 0;
+      for (var y = fringe.top.floor(); y < fringe.bottom.ceil(); y++) {
+        for (var x = fringe.left.floor(); x < fringe.right.ceil(); x++) {
+          final p = Offset(x.toDouble(), y.toDouble());
+          if (!alone.contains(p)) {
+            continue;
+          }
+          final a = all.bytesAt(p);
+          final b = alone.bytesAt(p);
+          for (var c = 0; c < 4; c++) {
+            final delta = (a[c] - b[c]).abs();
+            if (delta > maxDelta) {
+              maxDelta = delta;
+            }
+          }
+          compared++;
+        }
+      }
+      expect(compared, greaterThan(_tile * _tile));
+      expect(maxDelta, lessThanOrEqualTo(1), reason: 'tile ${i + 1}');
+    }
+  }
+
   group('runtime-effect producer', () {
     test('bakes all twelve separate ovals of one material', () async {
       final producer = RuntimeGeometryProducer();
@@ -209,6 +321,12 @@ void main() {
       final producer = RuntimeGeometryProducer();
       addTearDown(producer.dispose);
       await expectEachClusterMatchesItsShapeAlone(producer);
+    });
+
+    test('bakes a 12 px-gapped grid of twelve tiles, every one', () async {
+      final producer = RuntimeGeometryProducer();
+      addTearDown(producer.dispose);
+      await expectTileGrid(producer);
     });
   });
 
@@ -229,6 +347,15 @@ void main() {
         return;
       }
       await expectEachClusterMatchesItsShapeAlone(producer);
+    });
+
+    test('bakes a 12 px-gapped grid of twelve tiles, every one', () async {
+      final producer = await _gpuProducer();
+      if (producer == null) {
+        markTestSkipped('Flutter GPU is unavailable here.');
+        return;
+      }
+      await expectTileGrid(producer);
     });
 
     test('matches the runtime-effect producer byte for byte', () async {
