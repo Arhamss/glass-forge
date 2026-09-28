@@ -8,7 +8,9 @@ import 'package:glass_forge/src/geometry/geometry_producer.dart';
 import 'package:glass_forge/src/geometry/matte_codec.dart';
 import 'package:glass_forge/src/geometry/matte_generation.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
+import 'package:glass_forge/src/geometry/shape_clusters.dart';
 import 'package:glass_forge/src/scene/glass_scene.dart';
+import 'package:glass_forge/src/shapes/shape_geometry.dart';
 import 'package:glass_forge/src/shapes/shape_limits.dart';
 
 /// `buildShaderBundleJson`'s legacy output path for the compiled bundle,
@@ -205,7 +207,10 @@ class GpuGeometryProducer implements GeometryProducer {
       final texture = _renderMatte(
         vertex: vertex,
         fragment: fragment,
-        scene: scene,
+        clusters: clusterShapes(
+          scene.shapes,
+          padding: clusterPadding(request),
+        ),
         request: request,
         allocation: allocation,
         width: width,
@@ -230,7 +235,7 @@ class GpuGeometryProducer implements GeometryProducer {
   ui.Image _renderMatte({
     required gpu.Shader vertex,
     required gpu.Shader fragment,
-    required GlassScene scene,
+    required List<ShapeCluster> clusters,
     required MatteRequest request,
     required Rect allocation,
     required int width,
@@ -264,18 +269,65 @@ class GpuGeometryProducer implements GeometryProducer {
       ),
     );
 
-    _bindUniforms(renderPass, fragment, scene, request, allocation);
+    final hostBuffer = gpu.gpuContext.createHostBuffer();
+    void drawShapes(List<ShapeGeometry> shapes) {
+      _bindUniforms(
+        renderPass,
+        fragment,
+        hostBuffer,
+        shapes,
+        request,
+        allocation,
+      );
+      renderPass.draw(_fullScreenQuadVertices.length ~/ 2);
+    }
 
-    renderPass.draw(_fullScreenQuadVertices.length ~/ 2);
+    if (clusters.length == 1) {
+      // The common case, and exactly the single draw this always was.
+      drawShapes(clusters.single.shapes);
+    } else {
+      // The same sequence as RuntimeGeometryProducer, for the same reasons:
+      // clear the whole target to "outside" with a draw that has no shapes
+      // -- a zeroed texel decodes as the deep interior -- then one draw per
+      // cluster, scissored to its bounds. The shapeless draw rather than
+      // the attachment's clear value, so that both producers quantise the
+      // "outside" encoding through the same shader output and stay
+      // byte-identical. Blending is already off, so each draw overwrites.
+      drawShapes(const <ShapeGeometry>[]);
+      for (final cluster in clusters) {
+        final clip = cluster.bounds.intersect(allocation);
+        if (clip.isEmpty) {
+          continue;
+        }
+        // Whole pixels already (ShapeCluster.bounds, and the allocation's
+        // floored origin); round() only strips float noise. Impeller's
+        // scissor is top-left-origin in target pixels, like the rows
+        // gl_FragCoord reaches through uOrigin.
+        renderPass.setScissor(
+          gpu.Scissor(
+            x: (clip.left - allocation.left).round(),
+            y: (clip.top - allocation.top).round(),
+            width: clip.width.round(),
+            height: clip.height.round(),
+          ),
+        );
+        drawShapes(cluster.shapes);
+      }
+    }
     commandBuffer.submit();
 
     return texture.asImage();
   }
 
+  /// Binds one draw's uniforms: the first `kMaxShapes` of [shapes].
+  ///
+  /// A cluster larger than that is the one case left that drops shapes;
+  /// the layer's debug warning names it (see `RenderGlassLayer`).
   void _bindUniforms(
     gpu.RenderPass renderPass,
     gpu.Shader fragment,
-    GlassScene scene,
+    gpu.HostBuffer hostBuffer,
+    List<ShapeGeometry> shapes,
     MatteRequest request,
     Rect allocation,
   ) {
@@ -324,7 +376,6 @@ class GpuGeometryProducer implements GeometryProducer {
     // Reflection sees the real GLSL member name, not the #define alias
     // geometry_fragment.glsl gives it for the shared common/ files.
     final shapeDataOffset = offsetOf('uShapeDataBlock');
-    final shapes = scene.shapes;
     for (var s = 0; s < kMaxShapes; s++) {
       if (s >= shapes.length) {
         continue;
@@ -367,7 +418,6 @@ class GpuGeometryProducer implements GeometryProducer {
       ..setFloat32(profileOffset, request.profileCode, Endian.host)
       ..setFloat32(profileOffset + 4, request.thickness, Endian.host);
 
-    final hostBuffer = gpu.gpuContext.createHostBuffer();
     renderPass.bindUniform(slot, hostBuffer.emplace(bytes));
   }
 

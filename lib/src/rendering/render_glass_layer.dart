@@ -14,6 +14,7 @@ import 'package:glass_forge/src/geometry/geometry_producer.dart';
 import 'package:glass_forge/src/geometry/matte_generation.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/geometry/runtime_geometry_producer.dart';
+import 'package:glass_forge/src/geometry/shape_clusters.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/material/glass_profile.dart';
 import 'package:glass_forge/src/rendering/render_glass_shape.dart';
@@ -574,22 +575,6 @@ class RenderGlassLayer extends RenderProxyBox {
         record.geometry,
       );
     }
-
-    assert(() {
-      for (final pass in _passes.values) {
-        final count = pass.scene.shapes.length;
-        if (count > kMaxShapes && !_warnedShapeLimit) {
-          _warnedShapeLimit = true;
-          debugPrint(
-            'glass_forge: $count shapes share one material in this '
-            'GlassLayer, and a pass carries at most $kMaxShapes. Shapes past '
-            'the ${_ordinal(kMaxShapes)} are not drawn at all. Give some of '
-            'them a material of their own — each material is its own pass.',
-          );
-        }
-      }
-      return true;
-    }(), 'debug-only warning; always true');
 
     _passes.removeWhere((key, pass) {
       if (pass.scene.shapes.isNotEmpty) {
@@ -1280,6 +1265,59 @@ class RenderGlassLayer extends RenderProxyBox {
     _refreshMatte(pass);
   }
 
+  /// Warns, once per layer, when a cluster of [pass]'s shapes is larger
+  /// than one draw carries.
+  ///
+  /// Per cluster, not per pass: a pass bakes each cluster of nearby or
+  /// blended shapes as its own draw (see `shape_clusters.dart`), so only a
+  /// cluster -- never the pass as a whole -- runs into the uniform budget.
+  /// Clustered with the same request and padding the producer is about to
+  /// use, so it warns about exactly the shapes that bake drops.
+  ///
+  /// Here, at bake time, rather than where shapes are sorted into passes:
+  /// sorting runs at the top of paint, before the subtree paints and
+  /// registers where each shape really is. A shape that has not painted yet
+  /// sits at the layer origin with no extent, so every such shape looked
+  /// like one cluster there, and clusters change as shapes move without
+  /// any re-sort at all.
+  void _debugWarnOnShapeLimit(_GlassPass pass, MatteRequest request) {
+    if (_warnedShapeLimit || pass.scene.shapes.length <= kMaxShapes) {
+      return;
+    }
+    final clusters = clusterShapes(
+      pass.scene.shapes,
+      padding: clusterPadding(request),
+    );
+    for (final cluster in clusters) {
+      final count = cluster.shapes.length;
+      if (count > kMaxShapes) {
+        _warnedShapeLimit = true;
+        debugPrint(
+          'glass_forge: $count shapes of one material sit close enough '
+          'together in this GlassLayer to be drawn as one cluster, and a '
+          'cluster carries at most $kMaxShapes. Shapes past the '
+          '${_ordinal(kMaxShapes)} in it are not drawn at all. Space them '
+          'further apart, or give some of them a material of their own — '
+          'each material is its own pass.',
+        );
+        return;
+      }
+    }
+  }
+
+  /// What a pass of [material] asks its producer to bake.
+  MatteRequest _matteRequestFor(GlassMaterial material) => MatteRequest(
+    devicePixelRatio: _devicePixelRatio,
+    maxDisplacement: material.maxDisplacement * _devicePixelRatio,
+    edgeRefraction: material.edgeRefraction * _devicePixelRatio,
+    refractionSpread: material.refractionSpread,
+    antialiasWidth: 0.5,
+    profile: material.profile,
+    thickness: material.profile == GlassProfile.dome
+        ? material.thickness * _devicePixelRatio
+        : 0,
+  );
+
   void _refreshMatte(_GlassPass pass) {
     // Two independent reasons a fresh attempt might be worth making: the
     // pass's scene actually changed, or [_producer]'s own readiness changed
@@ -1294,23 +1332,16 @@ class RenderGlassLayer extends RenderProxyBox {
     // Per pass, not per layer, so that moving a shape of one material does
     // not re-bake every other material's matte. Each pass's scene is its
     // own registry and bumps its own revision only when its own shapes move.
-    final material = pass.material;
-    final request = MatteRequest(
-      devicePixelRatio: _devicePixelRatio,
-      maxDisplacement: material.maxDisplacement * _devicePixelRatio,
-      edgeRefraction: material.edgeRefraction * _devicePixelRatio,
-      refractionSpread: material.refractionSpread,
-      antialiasWidth: 0.5,
-      profile: material.profile,
-      thickness: material.profile == GlassProfile.dome
-          ? material.thickness * _devicePixelRatio
-          : 0,
-    );
+    final request = _matteRequestFor(pass.material);
     if (pass.refreshedRevision == pass.scene.revision &&
         pass.refreshedGeneration == _producerGeneration &&
         pass.refreshedRequest == request) {
       return;
     }
+    assert(() {
+      _debugWarnOnShapeLimit(pass, request);
+      return true;
+    }(), 'debug-only warning; always true');
     final existing = pass.matte;
     final next = _producer.produce(pass.scene, request);
     GlassRenderCounters.instance.recordMatteProduce();

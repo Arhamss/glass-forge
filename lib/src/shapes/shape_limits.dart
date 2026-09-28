@@ -1,4 +1,12 @@
-/// The maximum number of shapes a single geometry pass can carry.
+/// The maximum number of shapes a single geometry draw can carry.
+///
+/// A draw, not a pass. A pass -- every shape of one material in a layer --
+/// bakes each *cluster* of its shapes as a separate draw: shapes that blend
+/// into one another, or sit close enough for their mattes to meet, share a
+/// cluster, and everything else is drawn on its own (see
+/// `lib/src/geometry/shape_clusters.dart`). So a material can carry any
+/// number of shapes; only a cluster larger than this drops the shapes past
+/// it, and `RenderGlassLayer` says so in debug builds.
 ///
 /// This is derived from the uniform-buffer budget, not yet confirmed on
 /// device. Upstream's equivalent is 16, from six floats per shape hitting

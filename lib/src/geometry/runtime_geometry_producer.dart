@@ -5,8 +5,10 @@ import 'package:glass_forge/src/composition/pixel_buckets.dart';
 import 'package:glass_forge/src/geometry/geometry_producer.dart';
 import 'package:glass_forge/src/geometry/matte_codec.dart';
 import 'package:glass_forge/src/geometry/matte_generation.dart';
+import 'package:glass_forge/src/geometry/shape_clusters.dart';
 import 'package:glass_forge/src/scene/glass_scene.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
+import 'package:glass_forge/src/shapes/shape_geometry.dart';
 import 'package:glass_forge/src/shapes/shape_limits.dart';
 
 /// Bakes the matte with a runtime-effect fragment shader.
@@ -45,14 +47,58 @@ class RuntimeGeometryProducer implements GeometryProducer {
       return null;
     }
 
-    final shader = ShaderLibrary.instance.acquire(GlassShaderId.geometry);
-    try {
-      _setUniforms(shader, scene, request, allocation);
+    final clusters = clusterShapes(
+      scene.shapes,
+      padding: clusterPadding(request),
+    );
+    final shaders = <ui.FragmentShader>[];
+    ui.FragmentShader shaderFor(List<ShapeGeometry> shapes) {
+      // One shader per draw, never one re-written between draws: whether a
+      // draw snapshots its uniforms when it is recorded or reads them when
+      // the picture is rasterised is the engine's business, and the pool
+      // makes separate shaders free.
+      final shader = ShaderLibrary.instance.acquire(GlassShaderId.geometry);
+      shaders.add(shader);
+      _setUniforms(shader, shapes, request, allocation);
+      return shader;
+    }
 
+    try {
       final recorder = ui.PictureRecorder();
-      Canvas(recorder)
-        ..translate(-allocation.left, -allocation.top)
-        ..drawRect(allocation, Paint()..shader = shader);
+      final canvas = Canvas(recorder)
+        ..translate(-allocation.left, -allocation.top);
+      if (clusters.length == 1) {
+        // The common case, and exactly the single draw this always was.
+        canvas.drawRect(
+          allocation,
+          Paint()..shader = shaderFor(clusters.single.shapes),
+        );
+      } else {
+        // Clear to "outside" first: a texel no cluster draws would otherwise
+        // stay zeroed, and a zeroed texel decodes as the deep interior --
+        // solid glass everywhere between clusters. A draw with no shapes
+        // bakes exactly the encoding the shader writes far from any shape,
+        // which a Paint colour could not: its alpha is 0, and a colour with
+        // alpha 0 premultiplies to black.
+        //
+        // BlendMode.src throughout, because the matte is data, not colour:
+        // srcOver would mix a texel whose magnitude (alpha) is 0 with the
+        // clear beneath it. No antialiasing, because a partially covered
+        // edge texel would be a blend of two encodings -- and the clip is
+        // whole pixels anyway (ShapeCluster.bounds).
+        Paint matte(List<ShapeGeometry> shapes) => Paint()
+          ..shader = shaderFor(shapes)
+          ..blendMode = BlendMode.src
+          ..isAntiAlias = false;
+        canvas.drawRect(allocation, matte(const <ShapeGeometry>[]));
+        for (final cluster in clusters) {
+          final clip = cluster.bounds.intersect(allocation);
+          if (clip.isEmpty) {
+            continue;
+          }
+          canvas.drawRect(clip, matte(cluster.shapes));
+        }
+      }
       final picture = recorder.endRecording();
       try {
         final texture = picture.toImageSync(width, height);
@@ -67,13 +113,17 @@ class RuntimeGeometryProducer implements GeometryProducer {
         picture.dispose();
       }
     } finally {
-      ShaderLibrary.instance.release(shader);
+      shaders.forEach(ShaderLibrary.instance.release);
     }
   }
 
+  /// Writes one draw's uniforms: the first `kMaxShapes` of [shapes].
+  ///
+  /// A cluster larger than that is the one case left that drops shapes;
+  /// the layer's debug warning names it (see `RenderGlassLayer`).
   void _setUniforms(
     ui.FragmentShader shader,
-    GlassScene scene,
+    List<ShapeGeometry> shapes,
     MatteRequest request,
     Rect allocation,
   ) {
@@ -88,7 +138,6 @@ class RuntimeGeometryProducer implements GeometryProducer {
       ..setFloat(i++, request.refractionSpread)
       ..setFloat(i++, request.antialiasWidth);
 
-    final shapes = scene.shapes;
     for (var s = 0; s < kMaxShapes; s++) {
       if (s < shapes.length) {
         final g = shapes[s];
