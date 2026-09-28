@@ -14,16 +14,9 @@ import 'package:glass_forge_example/src/ui.dart';
 /// The toggles are the package's own [GlassButton]; the switch and the
 /// sliders are [GlassSwitch] and [GlassSlider], sitting on tiles that are
 /// glass, so they paint rather than stack a second refraction on the first.
-/// Eleven glass shapes in all, three past the eight one draw carries.
-/// Settled, that is fine: the layer draws shapes that sit apart as separate
-/// clusters, and at 12 apart these are. But each row fades in through
-/// [Arrive], and a `Glass` under a fully transparent `Opacity` does not
-/// paint, so on the first frames it has not been placed yet — every such
-/// shape sits at the layer's origin and all eleven read as one cluster,
-/// which the layer warns about. So the buttons keep the layer's pass and
-/// the modules — media, switch and sliders — take a second one through
-/// [_Module]: the same tuned material, two passes of seven and four, and
-/// no cluster past eight even before anything has been placed.
+/// Eleven glass shapes in all, three past the eight one draw carries. That
+/// is fine: the layer draws shapes that sit apart as separate clusters, and
+/// at 12 apart these are.
 class KitScene extends StatelessWidget {
   const KitScene({super.key});
 
@@ -63,7 +56,7 @@ class KitScene extends StatelessWidget {
                 SizedBox(
                   width: 128,
                   height: _tile * 2 + _gap,
-                  child: _Module(child: _NowPlaying()),
+                  child: _NowPlaying(),
                 ),
               ],
             ),
@@ -100,57 +93,33 @@ class KitScene extends StatelessWidget {
                 SizedBox(width: _gap),
                 _RoundToggle(icon: Glyphs.timer, label: 'Timer'),
                 SizedBox(width: _gap),
-                Expanded(child: _Module(child: _SwitchTile())),
+                Expanded(child: _SwitchTile()),
               ],
             ),
           ),
           SizedBox(height: _gap),
           Arrive(
             delay: Duration(milliseconds: 120),
-            child: _Module(
-              child: _SliderTile(
-                title: 'Display',
-                low: Glyphs.sun,
-                high: Glyphs.sunBold,
-                initial: 0.55,
-              ),
+            child: _SliderTile(
+              title: 'Display',
+              low: Glyphs.sun,
+              high: Glyphs.sunBold,
+              initial: 0.55,
             ),
           ),
           SizedBox(height: _gap),
           Arrive(
             delay: Duration(milliseconds: 180),
-            child: _Module(
-              child: _SliderTile(
-                title: 'Sound',
-                low: Glyphs.volumeLow,
-                high: Glyphs.volumeHigh,
-                initial: 0.7,
-              ),
+            child: _SliderTile(
+              title: 'Sound',
+              low: Glyphs.volumeLow,
+              high: Glyphs.volumeHigh,
+              initial: 0.7,
             ),
           ),
         ],
       ),
     );
-  }
-}
-
-/// Held by identity: every [_Module] shares this one object, and so one
-/// backdrop pass of their own.
-const Animation<double> _modulePass = AlwaysStoppedAnimation<double>(1);
-
-/// Puts [child]'s glass in the modules' pass rather than the layer's.
-///
-/// Passes are keyed by material *and* presence, so a presence that never
-/// moves is a second pass wearing the same material — the tuner still
-/// reaches it, and the buttons' pass is left with seven shapes.
-class _Module extends StatelessWidget {
-  const _Module({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassPresence(presence: _modulePass, child: child);
   }
 }
 
