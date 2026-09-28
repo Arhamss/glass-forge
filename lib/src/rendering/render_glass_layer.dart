@@ -410,6 +410,12 @@ class RenderGlassLayer extends RenderProxyBox {
   /// is enough: it would otherwise repeat on every reassignment.
   bool _warnedShapeLimit = false;
 
+  /// The pairs of passes whose overlap has already been reported, as
+  /// `(a, b)` in the order they were found. The check runs every paint, and
+  /// an overlap that persists would otherwise print sixty times a second —
+  /// burying the one line that matters under a thousand copies of itself.
+  final Set<(_PassKey, _PassKey)> _warnedOverlaps = <(_PassKey, _PassKey)>{};
+
   static String _ordinal(int n) => switch (n % 10) {
     1 when n % 100 != 11 => '${n}st',
     2 when n % 100 != 12 => '${n}nd',
@@ -675,6 +681,10 @@ class RenderGlassLayer extends RenderProxyBox {
           }
           final boundsB = b.geometry.layerBounds;
           if (!boundsA.overlaps(boundsB)) {
+            continue;
+          }
+          if (_warnedOverlaps.contains((assignedB, assignedA)) ||
+              !_warnedOverlaps.add((assignedA, assignedB))) {
             continue;
           }
           debugPrint(

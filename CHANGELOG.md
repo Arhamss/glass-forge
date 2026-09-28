@@ -16,6 +16,9 @@
   longest side, 48 to 320) instead of a fixed 320. The glow is one light
   per layer, so a fixed 320 washed a whole screen of tiles white for a
   press on any one of them.
+- The debug warning for glass shapes overlapping across backdrop passes
+  prints once per pair of passes instead of on every frame. An overlap that
+  lasted printed about sixty times a second and buried the rest of the log.
 - A debug warning when more shapes share one material in a `GlassLayer`
   than a pass can carry (`kMaxShapes`, 8). The extras were silently not
   drawn.
