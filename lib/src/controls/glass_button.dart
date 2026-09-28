@@ -40,6 +40,7 @@ class GlassButton extends StatelessWidget {
     this.semanticLabel,
     this.focusNode,
     this.autofocus = false,
+    this.toggled,
     super.key,
   }) : _padding = _labelPadding;
 
@@ -59,6 +60,7 @@ class GlassButton extends StatelessWidget {
     this.backdrop,
     this.focusNode,
     this.autofocus = false,
+    this.toggled,
     super.key,
   }) : child = icon,
        shape = null,
@@ -109,6 +111,17 @@ class GlassButton extends StatelessWidget {
   /// Whether this button requests focus as soon as it is inserted.
   final bool autofocus;
 
+  /// Whether this button is on, for a button that toggles something —
+  /// mute, bold, favourite — rather than running a one-off action.
+  ///
+  /// Null — the default — reports no toggle state at all, which is right
+  /// for an ordinary button. A non-null value is handed to
+  /// [GlassControlFrame.toggled], so a screen reader announces the button
+  /// as on or off rather than leaving the state to its looks alone. This
+  /// only reports the state: flipping it on press, and drawing it, stay
+  /// with the caller, which owns the value.
+  final bool? toggled;
+
   final EdgeInsetsGeometry _padding;
 
   static const EdgeInsetsGeometry _labelPadding = EdgeInsets.symmetric(
@@ -129,6 +142,7 @@ class GlassButton extends StatelessWidget {
       semanticLabel: semanticLabel,
       focusNode: focusNode,
       autofocus: autofocus,
+      toggled: toggled,
       child: LayoutBuilder(
         builder: (context, constraints) {
           return _body(context, constraints.biggest, enabled: enabled);

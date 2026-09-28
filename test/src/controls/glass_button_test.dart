@@ -138,6 +138,70 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('a toggled button reports its state, on and off', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    for (final on in [true, false]) {
+      await tester.pumpWidget(
+        _harness(
+          child: GlassButton(
+            onPressed: () {},
+            toggled: on,
+            child: const Text('Mute'),
+          ),
+        ),
+      );
+      expect(
+        tester.getSemantics(find.byType(GlassButton)),
+        isSemantics(
+          isButton: true,
+          hasToggledState: true,
+          isToggled: on,
+        ),
+      );
+    }
+
+    await tester.pumpWidget(
+      _harness(
+        child: GlassButton.icon(
+          onPressed: () {},
+          semanticLabel: 'Favourite',
+          toggled: true,
+          icon: const SizedBox(width: 20, height: 20),
+        ),
+      ),
+    );
+    expect(
+      tester.getSemantics(find.byType(GlassButton)),
+      isSemantics(
+        label: 'Favourite',
+        hasToggledState: true,
+        isToggled: true,
+      ),
+    );
+    handle.dispose();
+  });
+
+  testWidgets('a button with no toggled value reports no toggle state', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _harness(
+        child: GlassButton(onPressed: () {}, child: const Text('Go')),
+      ),
+    );
+    // A tristate: `none` — no toggle state at all — is what null must
+    // produce, where `false` would announce a button that is off.
+    final toggled = tester
+        .getSemantics(find.byType(GlassButton))
+        .flagsCollection
+        .isToggled;
+    expect(toggled.toBoolOrNull(), isNull);
+    handle.dispose();
+  });
+
   testWidgets('Enter and Space activate a focused button', (tester) async {
     var taps = 0;
     final focusNode = FocusNode();
