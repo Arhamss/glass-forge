@@ -264,4 +264,70 @@ void main() {
     final screenBottom = tester.getBottomLeft(find.byType(GlassLayer)).dy;
     expect(tester.getBottomLeft(glass).dy, screenBottom - 34);
   });
+
+  testWidgets("a passed material reaches the bar's Glass", (tester) async {
+    const material = GlassMaterial(frost: 2, tintOpacity: 0.3);
+    await tester.pumpWidget(
+      _harness(
+        bar: GlassTabBar(
+          tabs: _tabs,
+          currentIndex: 0,
+          onTap: (_) {},
+          material: material,
+        ),
+      ),
+    );
+
+    final glass = tester.widget<Glass>(
+      find
+          .descendant(
+            of: find.byType(GlassSurface),
+            matching: find.byType(Glass),
+          )
+          .first,
+    );
+    expect(glass.material, material);
+  });
+
+  testWidgets("no material passed keeps the role's own", (tester) async {
+    late GlassSurfaceStyle role;
+    await tester.pumpWidget(
+      _harness(
+        bar: Builder(
+          builder: (context) {
+            role = GlassTheme.surfaceOf(
+              context,
+              GlassSurfaceRole.navigationBar,
+              size: const Size(300, GlassTabBar.height),
+            );
+            return GlassTabBar(tabs: _tabs, currentIndex: 0, onTap: (_) {});
+          },
+        ),
+      ),
+    );
+
+    final glass = tester.widget<Glass>(
+      find
+          .descendant(
+            of: find.byType(GlassSurface),
+            matching: find.byType(Glass),
+          )
+          .first,
+    );
+    expect(glass.material, role.material);
+  });
+
+  testWidgets("the bar's height is public, and matches the built bar", (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        bar: GlassTabBar(tabs: _tabs, currentIndex: 0, onTap: (_) {}),
+      ),
+    );
+
+    expect(GlassTabBar.height, 62);
+    final surface = find.byType(GlassSurface);
+    expect(tester.getSize(surface).height, GlassTabBar.height);
+  });
 }

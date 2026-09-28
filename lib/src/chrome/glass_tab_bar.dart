@@ -10,6 +10,7 @@ import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surface.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
+import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_presence.dart';
@@ -82,6 +83,7 @@ class GlassTabBar extends StatefulWidget {
     required this.currentIndex,
     required this.onTap,
     this.backdrop,
+    this.material,
     super.key,
   });
   // `tabs` being non-empty and `currentIndex` being inside it are asserted
@@ -102,6 +104,19 @@ class GlassTabBar extends StatefulWidget {
 
   /// What is behind the bar, for the adaptation `GlassSurface` offers.
   final Color? backdrop;
+
+  /// The bar's material, in place of the one the navigationBar role
+  /// resolves to.
+  ///
+  /// Null keeps the role's — Apple's fitted regular material at the role's
+  /// blur and tint steps, which is right for a bar of app chrome. An app
+  /// with a look of its own names one here; the label colour and motion
+  /// still come from the role.
+  final GlassMaterial? material;
+
+  /// The bar's total height, not counting the safe-area inset below it —
+  /// what a layout hard-coding the bar's height should read instead.
+  static const double height = _barHeight;
 
   @override
   State<GlassTabBar> createState() => _GlassTabBarState();
@@ -423,6 +438,7 @@ class _GlassTabBarState extends State<GlassTabBar>
             Positioned.fill(
               child: GlassSurface.navigationBar(
                 backdrop: widget.backdrop,
+                material: widget.material,
                 child: content,
               ),
             ),

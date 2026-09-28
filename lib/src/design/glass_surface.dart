@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
+import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 
@@ -25,6 +26,7 @@ class GlassSurface extends StatelessWidget {
     this.child,
     this.backdrop,
     this.clipBehavior = Clip.antiAlias,
+    this.material,
     super.key,
   });
 
@@ -33,12 +35,14 @@ class GlassSurface extends StatelessWidget {
     Widget? child,
     Color? backdrop,
     Clip clipBehavior = Clip.antiAlias,
+    GlassMaterial? material,
     Key? key,
   }) : this(
          role: GlassSurfaceRole.navigationBar,
          child: child,
          backdrop: backdrop,
          clipBehavior: clipBehavior,
+         material: material,
          key: key,
        );
 
@@ -116,6 +120,12 @@ class GlassSurface extends StatelessWidget {
   /// How [child] is clipped to the resolved shape.
   final Clip clipBehavior;
 
+  /// This surface's material, in place of the one [role] resolves to.
+  ///
+  /// Null keeps the role's. An app with a look of its own names one here;
+  /// the label colour, shadows, shape and motion still come from the role.
+  final GlassMaterial? material;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -144,7 +154,7 @@ class GlassSurface extends StatelessWidget {
 
         final glass = Glass(
           shape: style.shape,
-          material: style.material,
+          material: material ?? style.material,
           clipBehavior: clipBehavior,
           child: content,
         );

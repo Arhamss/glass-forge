@@ -157,6 +157,52 @@ void main() {
     );
   });
 
+  testWidgets("a passed material replaces the role's on the Glass", (
+    tester,
+  ) async {
+    const material = GlassMaterial(frost: 2, tintOpacity: 0.3);
+    await _pump(
+      tester,
+      const SizedBox(
+        width: 300,
+        height: 62,
+        child: GlassSurface.navigationBar(
+          material: material,
+          child: SizedBox.shrink(),
+        ),
+      ),
+    );
+    expect(tester.widget<Glass>(find.byType(Glass)).material, material);
+  });
+
+  testWidgets("no material passed keeps the role's", (tester) async {
+    // The expected value comes from the theme, not from the surface under
+    // test, so a surface that dropped the role's material would not match.
+    late GlassSurfaceStyle role;
+    await _pump(
+      tester,
+      SizedBox(
+        width: 300,
+        height: 62,
+        child: Builder(
+          builder: (context) {
+            role = GlassTheme.surfaceOf(
+              context,
+              GlassSurfaceRole.navigationBar,
+              size: const Size(300, 62),
+            );
+            return const GlassSurface.navigationBar(
+              child: SizedBox.shrink(),
+            );
+          },
+        ),
+      ),
+    );
+    final glass = tester.widget<Glass>(find.byType(Glass));
+    expect(glass.material, role.material);
+    expect(glass.material, isNot(const GlassMaterial()));
+  });
+
   testWidgets('a flush role skips the shadow pass entirely', (tester) async {
     // An empty shadow list is meant to cost nothing, not to paint a
     // transparent shadow. The absence of the painter is the observable form
