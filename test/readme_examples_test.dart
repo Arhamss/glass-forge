@@ -376,4 +376,31 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('the GlassTabBar example builds', (tester) async {
+    var index = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassScaffold(
+          body: const SizedBox.expand(),
+          bottomBar: StatefulBuilder(
+            builder: (context, setState) {
+              return GlassTabBar(
+                tabs: const [
+                  GlassTab(icon: Icon(Icons.home_outlined), label: 'Home'),
+                  GlassTab(icon: Icon(Icons.search), label: 'Search'),
+                  GlassTab(icon: Icon(Icons.person_outline), label: 'Profile'),
+                ],
+                currentIndex: index,
+                onTap: (next) => setState(() => index = next),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Search'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 }

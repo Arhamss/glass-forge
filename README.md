@@ -275,6 +275,27 @@ while nothing covers the screen, ramping to none as a sheet or another route
 arrives over it, so the two are never both a backdrop filter over the same
 pixels.
 
+`GlassTabBar` is the bottom bar to put in it: a floating capsule with the
+bottom safe area built in, one selectable button per tab.
+
+```dart
+GlassTabBar(
+  tabs: const [
+    GlassTab(icon: Icon(Icons.home_outlined), label: 'Home'),
+    GlassTab(icon: Icon(Icons.search), label: 'Search'),
+    GlassTab(icon: Icon(Icons.person_outline), label: 'Profile'),
+  ],
+  currentIndex: index,
+  onTap: (next) => setState(() => index = next),
+)
+```
+
+At rest the selection is a painted pill on the bar's glass. While it moves
+— a tap, or a drag along the bar that it chases under your finger — a glass
+lens rises out of the pill, swells a little past the bar's edges, and sinks
+back as it lands, so there is never glass on glass at rest. It fades with
+the bar, and Reduce Motion replaces it with an instant pill.
+
 ## Presets
 
 `GlassMaterial.regular(brightness:)` and `GlassMaterial.clear()` are fitted
