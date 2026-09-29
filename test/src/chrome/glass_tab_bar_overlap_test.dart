@@ -88,4 +88,89 @@ void main() {
     expect(index, 2);
     expect(printed.where((line) => line.contains('187820')), isEmpty);
   });
+
+  testWidgets(
+    'the lens swelling over other glass next to the bar still warns: the '
+    'handoff exemption is for the bar alone',
+    (tester) async {
+      final printed = <String>[];
+      final previous = debugPrint;
+      debugPrint = (message, {wrapWidth}) {
+        if (message != null) {
+          printed.add(message);
+        }
+      };
+      var sawLens = false;
+      try {
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(),
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: GlassLayer(
+                tier: GeometryTier.portable,
+                child: Stack(
+                  children: [
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: GlassTabBar(
+                        tabs: _tabs,
+                        currentIndex: 0,
+                        onTap: (_) {},
+                      ),
+                    ),
+                    // Beside the bar, past its right edge: the bar never
+                    // meets it, but the lens, swollen by a held finger over
+                    // the last tab, reaches past the bar's edge onto it.
+                    const Positioned(
+                      right: 0,
+                      bottom: 10,
+                      width: 12,
+                      height: 60,
+                      child: Glass(
+                        shape: GlassOval(),
+                        material: GlassMaterial(frost: 20),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          printed.where((line) => line.contains('187820')),
+          isEmpty,
+          reason: 'at rest the bar and the side glass do not meet',
+        );
+
+        // Drag from Home onto Profile and hold: the held finger keeps the
+        // lens fully swollen while the selection travels.
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.text('Home')),
+        );
+        await gesture.moveTo(tester.getCenter(find.text('Profile')));
+        for (var i = 0; i < 60; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          final lens = tester
+              .widgetList<GlassPresence>(
+                find.descendant(
+                  of: find.byType(GlassTabBar),
+                  matching: find.byType(GlassPresence),
+                ),
+              )
+              .single;
+          sawLens = sawLens || lens.presence.value > 0;
+        }
+        await gesture.up();
+        await tester.pumpAndSettle();
+      } finally {
+        debugPrint = previous;
+      }
+
+      expect(sawLens, isTrue, reason: 'the lens must fly for this to count');
+      expect(printed.where((line) => line.contains('187820')), isNotEmpty);
+    },
+  );
 }

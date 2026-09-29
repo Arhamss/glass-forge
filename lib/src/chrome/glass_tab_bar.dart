@@ -210,8 +210,17 @@ class _GlassTabBarState extends State<GlassTabBar>
   late final AnimationController _flight;
 
   /// The bar's presence, from the enclosing [GlassPresence] — a
-  /// `GlassScaffold`'s, usually — or full presence without one.
-  Animation<double> _barPresence = kAlwaysCompleteAnimation;
+  /// `GlassScaffold`'s, usually — or [_ownPresence] without one.
+  late Animation<double> _barPresence;
+
+  /// Full presence, as an object of this bar's own.
+  ///
+  /// The bar's glass always carries a presence whose identity is this
+  /// bar's, so the lens can declare it hands off over exactly that glass
+  /// (see [DeclaredGlassHandoff]). Without one, the bar's glass and any
+  /// other glass in the layer with no presence would look the same to the
+  /// overlap check, and the lens would be exempt against all of them.
+  final Animation<double> _ownPresence = _FullPresence();
 
   /// The lens's presence: the bar's, times [_flight]. Rebuilt only when the
   /// bar's presence object changes, because [GlassPresence] holds its
@@ -270,18 +279,20 @@ class _GlassTabBarState extends State<GlassTabBar>
       duration: _rise,
       reverseDuration: _sink,
     );
-    _lensPresence = _Product(_barPresence, _flight);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final bar = GlassPresenceScope.maybeOf(context) ?? kAlwaysCompleteAnimation;
-    if (!identical(bar, _barPresence)) {
+    final bar = GlassPresenceScope.maybeOf(context) ?? _ownPresence;
+    if (!_lensPresenceBuilt || !identical(bar, _barPresence)) {
+      _lensPresenceBuilt = true;
       _barPresence = bar;
-      _lensPresence = _Product(bar, _flight);
+      _lensPresence = _Product(bar, _flight, handsOffWith: bar);
     }
   }
+
+  bool _lensPresenceBuilt = false;
 
   @override
   void didUpdateWidget(GlassTabBar oldWidget) {
@@ -572,10 +583,15 @@ class _GlassTabBarState extends State<GlassTabBar>
           clipBehavior: Clip.none,
           children: [
             Positioned.fill(
-              child: GlassSurface.navigationBar(
-                backdrop: widget.backdrop,
-                material: widget.material,
-                child: content,
+              // The bar's glass, under its own presence; see
+              // [_ownPresence].
+              child: GlassPresenceScope(
+                presence: _barPresence,
+                child: GlassSurface.navigationBar(
+                  backdrop: widget.backdrop,
+                  material: widget.material,
+                  child: content,
+                ),
               ),
             ),
             // A sibling of the bar's glass, never inside it: a `Glass`
@@ -744,8 +760,14 @@ class _TabButton extends StatelessWidget {
 /// it out. Its bound is the settle spring plus the 280 ms sink.
 class _Product extends CompoundAnimation<double>
     implements DeclaredGlassHandoff {
-  _Product(Animation<double> first, Animation<double> next)
-    : super(first: first, next: next);
+  _Product(
+    Animation<double> first,
+    Animation<double> next, {
+    required this.handsOffWith,
+  }) : super(first: first, next: next);
+
+  @override
+  final Object? handsOffWith;
 
   @override
   double get value => first.value * next.value;
@@ -827,4 +849,10 @@ class _Lens extends ChangeNotifier {
     _ticker.dispose();
     super.dispose();
   }
+}
+
+/// Full presence, as a distinct object: see
+/// `_GlassTabBarState._ownPresence`.
+class _FullPresence extends AlwaysStoppedAnimation<double> {
+  _FullPresence() : super(1);
 }

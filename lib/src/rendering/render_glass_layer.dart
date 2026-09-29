@@ -756,8 +756,10 @@ class RenderGlassLayer extends RenderProxyBox {
   /// transient: a sheet rising over a tab bar overlaps it for exactly as
   /// long as the handoff takes, and an assert would throw on the very
   /// frame that was in the middle of fixing it. A shape whose presence is a
-  /// [DeclaredGlassHandoff] is left out entirely: it is this package's own
-  /// bounded overlap, declared as such. Shapes inside one pass are
+  /// [DeclaredGlassHandoff] is left out against the one glass it declares
+  /// it hands off over, and against nothing else: that pair is this
+  /// package's own bounded overlap, declared as such. Shapes inside one
+  /// pass are
   /// fine: they share a matte and fold into one surface via smooth-min,
   /// which is the supported way to overlap.
   ///
@@ -787,6 +789,11 @@ class RenderGlassLayer extends RenderProxyBox {
   /// reached the screen, since the matte and the filter are themselves
   /// built from the corrected, post-paint values. Reading after matches
   /// what actually renders.
+  /// Whether glass driven by [scope] declares a bounded handoff over glass
+  /// driven by [other]: see [DeclaredGlassHandoff].
+  static bool _declaredHandoff(Object? scope, Object? other) =>
+      scope is DeclaredGlassHandoff && identical(scope.handsOffWith, other);
+
   void _debugWarnOnCrossPassOverlap() {
     assert(() {
       final live = _passes.values.toSet();
@@ -801,9 +808,7 @@ class RenderGlassLayer extends RenderProxyBox {
         // by _reassignPasses before the presence fold above runs -- but
         // skipped rather than forced, since this is a diagnostic and
         // should never be what crashes a debug build.
-        if (assignedA == null ||
-            !a.placed ||
-            a.presenceScope is DeclaredGlassHandoff) {
+        if (assignedA == null || !a.placed) {
           continue;
         }
         if (!GlassComposition.willRender(assignedA.material, a.presence)) {
@@ -816,7 +821,8 @@ class RenderGlassLayer extends RenderProxyBox {
           if (assignedB == null ||
               !b.placed ||
               assignedA == assignedB ||
-              b.presenceScope is DeclaredGlassHandoff) {
+              _declaredHandoff(a.presenceScope, b.presenceScope) ||
+              _declaredHandoff(b.presenceScope, a.presenceScope)) {
             continue;
           }
           if (!GlassComposition.willRender(assignedB.material, b.presence)) {
