@@ -488,4 +488,40 @@ void main() {
     expect(picked, 'done');
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('the GlassBackdropSampler example builds', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: GlassBackdropSampler(
+          child: Stack(
+            children: [
+              // `Image.asset('photo.jpg')` in the README.
+              GlassBackdropSource(child: ColoredBox(color: Colors.teal)),
+              GlassLayer(child: GlassSurface.card(child: Text('Hello'))),
+            ],
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the GlassBackdropBuilder doc example builds', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassBackdropBuilder(
+          builder: (context, backdrop) {
+            final style = GlassTheme.surfaceOf(
+              context,
+              GlassSurfaceRole.card,
+              size: const Size(200, 120),
+              backdrop: backdrop,
+            );
+            return ColoredBox(color: style.material.tint);
+          },
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
 }

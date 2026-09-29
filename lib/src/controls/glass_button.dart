@@ -4,6 +4,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/disabled_glass.dart';
+import 'package:glass_forge/src/design/glass_backdrop_sampler.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/motion/glass_press_stretch.dart';
@@ -146,14 +147,25 @@ class GlassButton extends StatelessWidget {
       focusNode: focusNode,
       autofocus: autofocus,
       toggled: toggled,
-      child: _MeasuredBody(
-        measure: backdrop != null,
-        builder: (context, size) => _body(context, size, enabled: enabled),
+      child: GlassBackdropBuilder(
+        backdrop: backdrop,
+        builder: (context, backdrop) => _MeasuredBody(
+          // Keyed on whether a backdrop *can* arrive rather than whether one
+          // has: a sample that lands later must not change the tree shape.
+          measure: backdrop != null || GlassBackdropSampler.isActive(context),
+          builder: (context, size) =>
+              _body(context, size, backdrop, enabled: enabled),
+        ),
       ),
     );
   }
 
-  Widget _body(BuildContext context, Size size, {required bool enabled}) {
+  Widget _body(
+    BuildContext context,
+    Size size,
+    Color? backdrop, {
+    required bool enabled,
+  }) {
     final style = GlassTheme.surfaceOf(
       context,
       GlassSurfaceRole.control,

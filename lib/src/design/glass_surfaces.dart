@@ -222,12 +222,12 @@ class GlassSurfaceSpec {
 
   /// Resolves this role against a real size, scheme and backdrop.
   ///
-  /// [backdrop] is what is actually behind the surface. Supply it when the
-  /// app knows — a fixed page background, a known artwork colour — and
-  /// leave it null otherwise: nothing in this package samples the backdrop
-  /// yet, so a guess here would be worse than the honest baseline. Without
-  /// it the role's own [tint] step is used unchanged, and that step is
-  /// already the smallest one that keeps its promise against the worst
+  /// [backdrop] is what is actually behind the surface: one the app knows
+  /// — a fixed page background, a known artwork colour — or one a
+  /// `GlassBackdropSampler` measured. Leave it null when neither is
+  /// available, since a guess here would be worse than the honest baseline.
+  /// Without it the role's own [tint] step is used unchanged, and that step
+  /// is already the smallest one that keeps its promise against the worst
   /// case.
   GlassSurfaceStyle resolve({
     required Size size,

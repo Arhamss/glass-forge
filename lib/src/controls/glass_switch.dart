@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/disabled_glass.dart';
+import 'package:glass_forge/src/design/glass_backdrop_sampler.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
@@ -295,17 +296,25 @@ class _GlassSwitchState extends State<GlassSwitch>
         onHorizontalDragUpdate: enabled ? _onDragUpdate : null,
         onHorizontalDragEnd: enabled ? _onDragEnd : null,
         onHorizontalDragCancel: enabled ? _onDragCancel : null,
-        child: _body(context, enabled: enabled),
+        child: GlassBackdropBuilder(
+          backdrop: widget.backdrop,
+          builder: (context, backdrop) =>
+              _body(context, backdrop, enabled: enabled),
+        ),
       ),
     );
   }
 
-  Widget _body(BuildContext context, {required bool enabled}) {
+  Widget _body(
+    BuildContext context,
+    Color? backdrop, {
+    required bool enabled,
+  }) {
     final style = GlassTheme.surfaceOf(
       context,
       GlassSurfaceRole.control,
       size: const Size(_trackWidth, _trackHeight),
-      backdrop: widget.backdrop,
+      backdrop: backdrop,
     );
     final onGlass = GlassHostScope.isOnGlass(context);
     final offColor = style.material.tint.withValues(

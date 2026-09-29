@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:glass_forge/src/design/glass_backdrop_sampler.dart';
 import 'package:glass_forge/src/design/glass_shadow_painter.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
@@ -130,9 +131,9 @@ class GlassSurface extends StatelessWidget {
   ///
   /// Supplying it is what turns the role's adaptation on: a flipping surface
   /// can choose its scheme, and an adapting one can thicken its tint until
-  /// labels clear the role's contrast target. Nothing samples this
-  /// automatically yet, so leaving it null is the honest default rather than
-  /// a missing feature.
+  /// labels clear the role's contrast target. Left null, it is measured
+  /// when a `GlassBackdropSampler` is above this surface, and unknown
+  /// otherwise. Given, it wins over any measurement.
   final Color? backdrop;
 
   /// How [child] is clipped to the resolved shape.
@@ -152,72 +153,75 @@ class GlassSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // `biggest` is already infinite on an unbounded axis, and that is
-        // the right answer rather than a fallback: a surface that may grow
-        // without limit is not a small element, so the size gate demotes it
-        // to `adapt`. On a bounded axis this over-estimates — the child may
-        // render narrower than its constraint — which errs in the same safe
-        // direction. A caller that knows the real size can call
-        // `GlassTheme.surfaceOf` with it and do better.
-        final style = GlassTheme.surfaceOf(
-          context,
-          role,
-          size: constraints.biggest,
-          backdrop: backdrop,
-        );
+    return GlassBackdropBuilder(
+      backdrop: backdrop,
+      builder: (context, backdrop) => LayoutBuilder(
+        builder: (context, constraints) {
+          // `biggest` is already infinite on an unbounded axis, and that is
+          // the right answer rather than a fallback: a surface that may grow
+          // without limit is not a small element, so the size gate demotes it
+          // to `adapt`. On a bounded axis this over-estimates — the child may
+          // render narrower than its constraint — which errs in the same safe
+          // direction. A caller that knows the real size can call
+          // `GlassTheme.surfaceOf` with it and do better.
+          final style = GlassTheme.surfaceOf(
+            context,
+            role,
+            size: constraints.biggest,
+            backdrop: backdrop,
+          );
 
-        var content = DefaultTextStyle.merge(
-          style: TextStyle(color: style.labelColor),
-          child: IconTheme.merge(
-            data: IconThemeData(color: style.labelColor),
-            child: child ?? const SizedBox.shrink(),
-          ),
-        );
-        // Presence reaches only the refraction. Content left drawn on glass
-        // that has faded out would float over whatever now covers it, so it
-        // fades with the same animation.
-        final presence = GlassPresenceScope.maybeOf(context);
-        if (presence != null) {
-          content = FadeTransition(opacity: presence, child: content);
-        }
+          var content = DefaultTextStyle.merge(
+            style: TextStyle(color: style.labelColor),
+            child: IconTheme.merge(
+              data: IconThemeData(color: style.labelColor),
+              child: child ?? const SizedBox.shrink(),
+            ),
+          );
+          // Presence reaches only the refraction. Content left drawn on glass
+          // that has faded out would float over whatever now covers it, so it
+          // fades with the same animation.
+          final presence = GlassPresenceScope.maybeOf(context);
+          if (presence != null) {
+            content = FadeTransition(opacity: presence, child: content);
+          }
 
-        final resolved = material ?? style.material;
-        // Already on glass — a bar inside a sheet, say — this surface paints
-        // a flat tint of its material rather than stacking a second glass
-        // on the first, the same stand-in every control uses there.
-        final glass = GlassHostScope.isOnGlass(context)
-            ? ClipPath(
-                clipper: GlassShapeClipper(style.shape),
-                clipBehavior: clipBehavior,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: resolved.tint.withValues(
-                      alpha: resolved.tintOpacity,
+          final resolved = material ?? style.material;
+          // Already on glass — a bar inside a sheet, say — this surface paints
+          // a flat tint of its material rather than stacking a second glass
+          // on the first, the same stand-in every control uses there.
+          final glass = GlassHostScope.isOnGlass(context)
+              ? ClipPath(
+                  clipper: GlassShapeClipper(style.shape),
+                  clipBehavior: clipBehavior,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: resolved.tint.withValues(
+                        alpha: resolved.tintOpacity,
+                      ),
                     ),
+                    child: content,
                   ),
+                )
+              : Glass(
+                  shape: style.shape,
+                  material: resolved,
+                  clipBehavior: clipBehavior,
                   child: content,
-                ),
-              )
-            : Glass(
-                shape: style.shape,
-                material: resolved,
-                clipBehavior: clipBehavior,
-                child: content,
-              );
+                );
 
-        if (style.shadows.isEmpty) {
-          return glass;
-        }
-        return CustomPaint(
-          painter: GlassShadowPainter(
-            shape: style.shape,
-            shadows: style.shadows,
-          ),
-          child: glass,
-        );
-      },
+          if (style.shadows.isEmpty) {
+            return glass;
+          }
+          return CustomPaint(
+            painter: GlassShadowPainter(
+              shape: style.shape,
+              shadows: style.shadows,
+            ),
+            child: glass,
+          );
+        },
+      ),
     );
   }
 }

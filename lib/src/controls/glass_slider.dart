@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/disabled_glass.dart';
+import 'package:glass_forge/src/design/glass_backdrop_sampler.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/motion/glass_jiggle.dart';
@@ -485,19 +486,32 @@ class _GlassSliderState extends State<GlassSlider>
             onHorizontalDragUpdate: enabled ? _onDragUpdate : null,
             onHorizontalDragEnd: enabled ? _onDragEnd : null,
             onHorizontalDragCancel: enabled ? _onDragCancel : null,
-            child: _body(context, constraints.maxWidth, enabled: enabled),
+            child: GlassBackdropBuilder(
+              backdrop: widget.backdrop,
+              builder: (context, backdrop) => _body(
+                context,
+                constraints.maxWidth,
+                backdrop,
+                enabled: enabled,
+              ),
+            ),
           );
         },
       ),
     );
   }
 
-  Widget _body(BuildContext context, double width, {required bool enabled}) {
+  Widget _body(
+    BuildContext context,
+    double width,
+    Color? backdrop, {
+    required bool enabled,
+  }) {
     final style = GlassTheme.surfaceOf(
       context,
       GlassSurfaceRole.control,
       size: Size(width, _thumbSize),
-      backdrop: widget.backdrop,
+      backdrop: backdrop,
     );
     final onGlass = GlassHostScope.isOnGlass(context);
     final trackColor = style.material.tint.withValues(

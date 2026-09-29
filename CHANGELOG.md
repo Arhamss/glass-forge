@@ -35,6 +35,19 @@
   it bends. Put content you want refracted behind the layer, as
   `GlassScaffold` does with its body.
 
+### Backdrop sampling
+
+- `GlassBackdropSampler`, `GlassBackdropSource` and `GlassBackdropBuilder`
+  measure what is behind a surface, so adaptation no longer needs a
+  caller-supplied `backdrop`. The source is snapshotted at low resolution
+  (1/8 scale, at most 96 px on its long side), asynchronously, at most
+  every 200 ms and only after it repainted; each surface takes the mean
+  colour under its own rect, with a luminance band so it does not flicker
+  between schemes. `GlassSurface`, `GlassAppBar`, `GlassTabBar`,
+  `GlassDetentSheet` and every control use it when no `backdrop` is given.
+  An explicit `backdrop` still wins. Nothing is sampled where the tier
+  renders no glass, under Reduce Transparency, or on glass.
+
 ### Changed
 
 - The controls' own colours come from the theme: `GlassTokens.controls`,

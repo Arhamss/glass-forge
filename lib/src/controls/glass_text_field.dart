@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/composition/glass_composition.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/disabled_glass.dart';
+import 'package:glass_forge/src/design/glass_backdrop_sampler.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
@@ -462,51 +463,54 @@ class _GlassTextFieldState extends State<GlassTextField>
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        GlassControlFrame.debugAssertBoundedWidth(
-          constraints,
-          'GlassTextField',
-        );
-        final style = GlassTheme.surfaceOf(
-          context,
-          GlassSurfaceRole.control,
-          size: Size(constraints.maxWidth, _height),
-          backdrop: widget.backdrop,
-        );
-        final onGlass = GlassHostScope.isOnGlass(context);
-        final shape = widget.shape ?? style.shape;
+    return GlassBackdropBuilder(
+      backdrop: widget.backdrop,
+      builder: (context, backdrop) => LayoutBuilder(
+        builder: (context, constraints) {
+          GlassControlFrame.debugAssertBoundedWidth(
+            constraints,
+            'GlassTextField',
+          );
+          final style = GlassTheme.surfaceOf(
+            context,
+            GlassSurfaceRole.control,
+            size: Size(constraints.maxWidth, _height),
+            backdrop: backdrop,
+          );
+          final onGlass = GlassHostScope.isOnGlass(context);
+          final shape = widget.shape ?? style.shape;
 
-        // At least [_height] high, and taller when the reader's text size
-        // needs it: a field grows with Dynamic Type on iOS rather than
-        // cutting its own text off.
-        return SizedBox(
-          width: constraints.maxWidth,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: _height),
-            child: Stack(
-              alignment: AlignmentDirectional.centerStart,
-              children: [
-                Positioned.fill(
-                  child: onGlass
-                      ? _paintedBody(shape: shape, material: style.material)
-                      : GlassLiftScope(
-                          lift: _lit ? _lift : null,
-                          child: DisabledGlassPresence(
-                            disabled: !widget.enabled,
-                            child: Glass(
-                              shape: shape,
-                              material: style.material,
+          // At least [_height] high, and taller when the reader's text size
+          // needs it: a field grows with Dynamic Type on iOS rather than
+          // cutting its own text off.
+          return SizedBox(
+            width: constraints.maxWidth,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: _height),
+              child: Stack(
+                alignment: AlignmentDirectional.centerStart,
+                children: [
+                  Positioned.fill(
+                    child: onGlass
+                        ? _paintedBody(shape: shape, material: style.material)
+                        : GlassLiftScope(
+                            lift: _lit ? _lift : null,
+                            child: DisabledGlassPresence(
+                              disabled: !widget.enabled,
+                              child: Glass(
+                                shape: shape,
+                                material: style.material,
+                              ),
                             ),
                           ),
-                        ),
-                ),
-                _foreground(style),
-              ],
+                  ),
+                  _foreground(style),
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 

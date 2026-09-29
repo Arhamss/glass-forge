@@ -7,6 +7,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
+import 'package:glass_forge/src/design/glass_backdrop_sampler.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_shadow_painter.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
@@ -541,7 +542,11 @@ class _GlassTabBarState extends State<GlassTabBar>
                 if (kDebugMode) {
                   _debugCheckTabWidth();
                 }
-                return _bar(context, Size(width, _barHeight));
+                return GlassBackdropBuilder(
+                  backdrop: widget.backdrop,
+                  builder: (context, backdrop) =>
+                      _bar(context, Size(width, _barHeight), backdrop),
+                );
               },
             ),
           ),
@@ -550,20 +555,20 @@ class _GlassTabBarState extends State<GlassTabBar>
     );
   }
 
-  Widget _bar(BuildContext context, Size size) {
+  Widget _bar(BuildContext context, Size size, Color? backdrop) {
     final onGlass = GlassHostScope.isOnGlass(context);
     final bar = GlassTheme.surfaceOf(
       context,
       GlassSurfaceRole.navigationBar,
       size: size,
-      backdrop: widget.backdrop,
+      backdrop: backdrop,
     );
     final lensSize = Size(_slot, _barHeight - 2 * _inset);
     final lensShape = GlassTheme.surfaceOf(
       context,
       GlassSurfaceRole.control,
       size: lensSize,
-      backdrop: widget.backdrop,
+      backdrop: backdrop,
     ).shape;
     final lit = _hover ?? widget.currentIndex;
     final ramp = GlassTheme.of(context).tokens.tint.of(bar.brightness);

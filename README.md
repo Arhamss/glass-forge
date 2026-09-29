@@ -283,6 +283,30 @@ Surfaces adapt by size, following Apple: small elements like a control flip
 light/dark against their background, large ones like a sheet adapt without
 flipping. The gate is thinness, not area.
 
+What a surface adapts to is its `backdrop` colour. Pass one when you know
+it; otherwise put a `GlassBackdropSampler` above the screen and mark the
+content the glass sits on with `GlassBackdropSource`, and every surface,
+control and bar beneath it is measured instead:
+
+```dart
+GlassBackdropSampler(
+  child: Stack(
+    children: [
+      GlassBackdropSource(child: Image.asset('photo.jpg')),
+      GlassLayer(child: GlassSurface.card(child: Text('Hello'))),
+    ],
+  ),
+)
+```
+
+A backdrop filter cannot be read back, so the sampler snapshots the source
+instead: at an eighth of its size, never more than 96 px on its long side,
+at most every 200 ms and only after it repainted or something scrolled.
+Both steps are asynchronous, so no frame waits. A reading has to move by
+0.06 in luminance before a surface takes it up, so content scrolling past
+the light/dark crossover does not make a bar flicker. An explicit
+`backdrop` always wins.
+
 The controls take their own colours from the theme too: the switch's
 on-track (`accent`), the knob, thumb and pill painted on glass (`knob`),
 the slider's fill and the focus ring (`fill`, `focus`, which default to the
@@ -450,8 +474,9 @@ harness marks such a run untrustworthy rather than letting it quietly pass.
 - `GlassSwitch` and `GlassSegmentedControl` dimensions are not yet measured
   against an iOS capture. The controls pick some of their own colours,
   such as the switch's green track and white knob.
-- Backdrop luminance for surface adaptation is caller-supplied; nothing
-  samples it automatically yet.
+- `GlassBackdropSampler` sees a source repaint only when it reaches the
+  source's own paint. An animation behind a repaint boundary of its own —
+  a video, a platform view — needs `GlassBackdropSampler.markNeedsSample`.
 - Where two materials' shapes overlap, the later pass samples the earlier
   one's glass. Apple's own guidance is not to stack glass on glass; put
   overlapping surfaces in one material or one blend group.

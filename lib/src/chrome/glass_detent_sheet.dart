@@ -5,6 +5,7 @@ import 'package:glass_forge/src/chrome/glass_detent.dart';
 import 'package:glass_forge/src/chrome/glass_detent_sheet_controller.dart';
 import 'package:glass_forge/src/chrome/glass_sheet_handle.dart';
 import 'package:glass_forge/src/chrome/glass_sheet_scroll_physics.dart';
+import 'package:glass_forge/src/design/glass_backdrop_sampler.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
@@ -415,12 +416,16 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
                 ),
                 child: SizedBox(
                   height: metrics.height,
-                  child: _buildSheet(
-                    context,
-                    constraints,
-                    metrics,
-                    padding,
-                    content,
+                  child: GlassBackdropBuilder(
+                    backdrop: widget.backdrop,
+                    builder: (context, backdrop) => _buildSheet(
+                      context,
+                      constraints,
+                      metrics,
+                      padding,
+                      content,
+                      backdrop,
+                    ),
                   ),
                 ),
               ),
@@ -493,6 +498,7 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
     GlassDetentSheetMetrics metrics,
     EdgeInsets padding,
     Widget content,
+    Color? backdrop,
   ) {
     // The role's style, but not the role's shape: the radius morphs
     // continuously, and the ladder has steps. Everything else — material,
@@ -507,7 +513,7 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
       context,
       GlassSurfaceRole.sheet,
       size: Size(constraints.maxWidth - metrics.gap * 2, metrics.height),
-      backdrop: widget.backdrop,
+      backdrop: backdrop,
     );
 
     return Semantics(
