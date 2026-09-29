@@ -8,6 +8,7 @@ import 'package:glass_forge/src/chrome/glass_sheet_scroll_physics.dart';
 import 'package:glass_forge/src/design/glass_backdrop_sampler.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
+import 'package:glass_forge/src/design/glass_text.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/design/glass_tokens.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
@@ -546,37 +547,37 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
           onVerticalDragUpdate: _onDragUpdate,
           onVerticalDragEnd: _onDragEnd,
           onVerticalDragCancel: _controller.endDrag,
-          child: DefaultTextStyle.merge(
-            style: TextStyle(color: style.labelColor),
-            child: IconTheme.merge(
-              data: IconThemeData(color: style.labelColor),
-              child: Column(
-                children: <Widget>[
-                  if (widget.showHandle)
-                    GlassSheetHandle(
-                      color:
-                          GlassTheme.chromeColorsOf(context).handle ??
-                          style.labelColor,
-                    ),
-                  Expanded(
-                    child: MediaQuery.removePadding(
-                      context: context,
-                      removeTop: true,
-                      child: Padding(
-                        // The other half of the bottom safe-area inset. The
-                        // sheet's own offset carries `1 - progress` of it
-                        // while it floats clear of the home indicator; this
-                        // takes over the rest as it settles flush and the
-                        // sheet's box reaches the screen's edge.
-                        padding: EdgeInsets.only(
-                          bottom: padding.bottom * metrics.progress,
-                        ),
-                        child: content,
+          // A whole text style, not a colour merged onto the ambient one:
+          // nothing above a sheet is guaranteed to have set one, and
+          // merging onto `WidgetsApp`'s debug fallback keeps its underline.
+          child: GlassTextDefaults(
+            color: style.labelColor,
+            child: Column(
+              children: <Widget>[
+                if (widget.showHandle)
+                  GlassSheetHandle(
+                    color:
+                        GlassTheme.chromeColorsOf(context).handle ??
+                        style.labelColor,
+                  ),
+                Expanded(
+                  child: MediaQuery.removePadding(
+                    context: context,
+                    removeTop: true,
+                    child: Padding(
+                      // The other half of the bottom safe-area inset. The
+                      // sheet's own offset carries `1 - progress` of it
+                      // while it floats clear of the home indicator; this
+                      // takes over the rest as it settles flush and the
+                      // sheet's box reaches the screen's edge.
+                      padding: EdgeInsets.only(
+                        bottom: padding.bottom * metrics.progress,
                       ),
+                      child: content,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

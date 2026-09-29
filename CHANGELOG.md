@@ -35,6 +35,15 @@
   it bends. Put content you want refracted behind the layer, as
   `GlassScaffold` does with its body.
 
+### Fixed
+
+- `GlassScaffold`, `showGlassSheet` and `GlassDetentSheet` now give their
+  content a text style and icon colour of their own, iOS's 17-point body
+  in the theme's label colour, the way Material's `Scaffold` does. With no
+  `Material` above a glass page, its text used to draw in `WidgetsApp`'s
+  debug fallback: 48-point red monospace with a yellow double underline.
+  `GlassAppBar`'s title is 17-point semibold.
+
 ### Backdrop sampling
 
 - `GlassBackdropSampler`, `GlassBackdropSource` and `GlassBackdropBuilder`

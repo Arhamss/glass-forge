@@ -6,6 +6,7 @@ import 'package:glass_forge/src/chrome/glass_sheet_handle.dart';
 import 'package:glass_forge/src/design/glass_chrome_colors.dart';
 import 'package:glass_forge/src/design/glass_surface.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
+import 'package:glass_forge/src/design/glass_text.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
@@ -323,37 +324,41 @@ class _GlassSheet extends StatelessWidget {
       explicitChildNodes: true,
       child: GlassPresence(
         presence: route._presence,
-        // The surface fades its content with this presence.
-        child: GlassSurface.sheet(
-          material: route.material,
-          child: MediaQuery.removePadding(
-            context: context,
-            removeTop: true,
-            removeBottom: true,
-            removeLeft: true,
-            removeRight: true,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (route.isDismissible)
-                  Builder(
-                    // The surface sets its label colour on the ambient
-                    // text style; the role's own is a fallback that the
-                    // surface above always makes unreachable.
-                    builder: (context) => GlassSheetHandle(
-                      color:
-                          route.chrome.handle ??
-                          DefaultTextStyle.of(context).style.color ??
-                          GlassTheme.surfaceOf(
-                            context,
-                            GlassSurfaceRole.sheet,
-                            size: MediaQuery.sizeOf(context),
-                          ).labelColor,
+        // The surface fades its content with this presence. The text style
+        // is the page's: a route's content has no other above it, and the
+        // surface sets its own label colour on it.
+        child: GlassTextDefaults(
+          child: GlassSurface.sheet(
+            material: route.material,
+            child: MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
+              removeBottom: true,
+              removeLeft: true,
+              removeRight: true,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (route.isDismissible)
+                    Builder(
+                      // The surface sets its label colour on the ambient
+                      // text style; the role's own is a fallback that the
+                      // surface above always makes unreachable.
+                      builder: (context) => GlassSheetHandle(
+                        color:
+                            route.chrome.handle ??
+                            DefaultTextStyle.of(context).style.color ??
+                            GlassTheme.surfaceOf(
+                              context,
+                              GlassSurfaceRole.sheet,
+                              size: MediaQuery.sizeOf(context),
+                            ).labelColor,
+                      ),
                     ),
-                  ),
-                Flexible(child: Builder(builder: route.builder)),
-              ],
+                  Flexible(child: Builder(builder: route.builder)),
+                ],
+              ),
             ),
           ),
         ),

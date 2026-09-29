@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/chrome/glass_handoff.dart';
+import 'package:glass_forge/src/design/glass_text.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/widgets/glass_layer.dart';
 import 'package:glass_forge/src/widgets/glass_presence.dart';
@@ -42,6 +43,12 @@ import 'package:glass_forge/src/widgets/glass_presence.dart';
 /// the chrome beneath a sheet must reach presence 0 before the sheet's own
 /// glass rises, or the two are a stacked backdrop filter over the same
 /// pixels.
+///
+/// Like Material's `Scaffold` and `CupertinoPageScaffold`, it gives the
+/// page a text style of its own — iOS's 17-point body in the theme's label
+/// colour, undecorated — rather than leaving text to `WidgetsApp`'s
+/// debug fallback when no Material is above it. Put a [DefaultTextStyle]
+/// inside [body] for type of your own.
 ///
 /// Both bars fade for any covering route, a short sheet included, though
 /// such a sheet only covers the bottom of the screen. That is deliberate:
@@ -105,12 +112,17 @@ class GlassScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _GlassScaffoldBody(
-      background: background,
-      body: body,
-      topBar: topBar,
-      bottomBar: bottomBar,
-      material: material,
+    // A real text style for the whole page, bars included: nothing above
+    // a glass page is guaranteed to have set one, and without it text
+    // draws in `WidgetsApp`'s underlined debug fallback.
+    return GlassTextDefaults(
+      child: _GlassScaffoldBody(
+        background: background,
+        body: body,
+        topBar: topBar,
+        bottomBar: bottomBar,
+        material: material,
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/design/glass_surface.dart';
+import 'package:glass_forge/src/design/glass_text.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 import 'package:glass_forge/src/widgets/glass_presence.dart';
@@ -45,12 +46,12 @@ const double _horizontalPadding = 16;
 /// `GlassButton.icon` action renders as paint rather than a second glass
 /// stacked on this bar's — "always avoid glass on glass."
 ///
-/// Its label colour and text style come from the resolved navigation-bar
-/// surface's [DefaultTextStyle], never a hard-coded colour. Like every
-/// [GlassSurface], it fades with the enclosing [GlassPresence] — a
-/// `GlassScaffold`'s bar presence, usually — so covering the bar with a
-/// route fades its title, leading and actions along with the glass beneath
-/// them.
+/// Its label colour comes from the resolved navigation-bar surface's
+/// [DefaultTextStyle], never a hard-coded colour; [title] is set in iOS's
+/// 17-point semibold in that colour. Like every [GlassSurface], it fades
+/// with the enclosing [GlassPresence] — a `GlassScaffold`'s bar presence,
+/// usually — so covering the bar with a route fades its title, leading and
+/// actions along with the glass beneath them.
 class GlassAppBar extends StatelessWidget {
   /// Creates an app bar.
   const GlassAppBar({
@@ -92,7 +93,28 @@ class GlassAppBar extends StatelessWidget {
       leading: leading,
       // A header to a screen reader, so it can jump between the headings
       // of a screen the way it does on iOS.
-      middle: title == null ? null : Semantics(header: true, child: title),
+      middle: title == null
+          ? null
+          : Semantics(
+              header: true,
+              // iOS's navigation title: the body size, semibold, in the
+              // label colour the surface around it has just set. Size and
+              // decoration are named too, so a bar with no page above it
+              // never takes them from `WidgetsApp`'s debug fallback.
+              child: Builder(
+                builder: (context) => DefaultTextStyle.merge(
+                  style: glassTextStyle(
+                    inherit: true,
+                    color:
+                        DefaultTextStyle.of(context).style.color ??
+                        glassLabelColorOf(context),
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: glassBodyLetterSpacing,
+                  ),
+                  child: title,
+                ),
+              ),
+            ),
       trailing: actions.isEmpty
           ? null
           : Row(mainAxisSize: MainAxisSize.min, children: actions),
