@@ -93,7 +93,15 @@ class GlassScaffold extends StatelessWidget {
   /// Glass pinned to the bottom edge, inside the same layer.
   final Widget? bottomBar;
 
-  /// Both layers' material. Null takes [GlassLayer]'s own default.
+  /// The material glass in either layer inherits: [GlassLayer.material]
+  /// for the body's layer and the bars'. Null takes [GlassLayer]'s own
+  /// default.
+  ///
+  /// Not a surface override, as `GlassSurface.material` and
+  /// `GlassTabBar.material` are: most glass here names its own material
+  /// (every `GlassSurface` resolves its role's, every control the control
+  /// role's), and only a bare `Glass` with no material of its own reads
+  /// this one.
   final GlassMaterial? material;
 
   @override

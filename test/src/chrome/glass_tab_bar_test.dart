@@ -381,6 +381,11 @@ void main() {
     expect(GlassTabBar.height, 62);
     final surface = find.byType(GlassSurface);
     expect(tester.getSize(surface).height, GlassTabBar.height);
+    // With no safe area, the widget is the bar plus its public margin.
+    expect(
+      tester.getSize(find.byType(GlassTabBar)).height,
+      GlassTabBar.height + GlassTabBar.margin.vertical,
+    );
   });
 
   group('large text', () {

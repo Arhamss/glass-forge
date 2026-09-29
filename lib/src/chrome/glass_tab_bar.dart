@@ -150,13 +150,20 @@ class GlassTabBar extends StatefulWidget {
   /// still come from the role.
   final GlassMaterial? material;
 
-  /// The bar's total height, not counting the safe-area inset below it —
-  /// what a layout hard-coding the bar's height should read instead.
+  /// The bar's own height, not counting the safe-area inset below it or
+  /// the clear space around it — what a layout hard-coding the bar's height
+  /// should read instead. The widget as laid out is taller by [margin]'s
+  /// vertical total where the safe area asks for less, and by the bottom
+  /// safe-area inset where it asks for more.
   ///
   /// It does not change with the text size: tab labels follow the reader's
   /// text scale up to 1.5× and stop there, and a label too long for its
   /// tab ends in an ellipsis.
   static const double height = _barHeight;
+
+  /// The clear space kept between the bar and the screen's edges, where
+  /// the safe area asks for less: 16 points either side and 8 below.
+  static const EdgeInsets margin = _margin;
 
   @override
   State<GlassTabBar> createState() => _GlassTabBarState();

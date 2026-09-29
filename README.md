@@ -275,7 +275,7 @@ off at the bar's edge, never stacked under the bar's glass.
 ```dart
 GlassScaffold(
   background: const ColoredBox(color: Color(0xFF101820)),
-  topBar: GlassAppBar(title: const Text('Messages')),
+  topBar: const GlassAppBar(title: Text('Messages')),
   body: ListView(children: rows),
 )
 ```
