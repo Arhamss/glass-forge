@@ -154,13 +154,6 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
   /// The gap between the pill and the edges of the segment slot it fills.
   static const double _pillInset = 3;
 
-  /// The pill's own colour, painted under [GlassHostScope]. Always white —
-  /// the same reasoning, and the same lack of a capture to confirm against,
-  /// as `GlassSwitch._knobColor` and `GlassSlider._thumbColor`.
-  static const Color _pillColor = Color(0xFFFFFFFF);
-
-  static const double _disabledOpacity = 0.4;
-
   /// The pill's position as a fraction of its total travel, 0 to 1, across
   /// [_lastIndex] index steps — the same domain `GlassSlider._position`
   /// uses for its own continuous value, reused here for a discrete index so
@@ -474,7 +467,9 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
       ),
     );
 
-    return enabled ? visual : Opacity(opacity: _disabledOpacity, child: visual);
+    return enabled
+        ? visual
+        : Opacity(opacity: GlassControlFrame.disabledOpacity, child: visual);
   }
 
   Widget _segment(
@@ -516,14 +511,15 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
   /// exactly what `style.labelColor` was chosen to clear — the package-wide
   /// promise `glass_surfaces_test.dart` proves for every role. The selected
   /// segment sits on the pill instead, and the pill is not always that same
-  /// surface: off a glass host it is a real [Glass] drawn in the ambient
-  /// material, so `style.labelColor` is still the right label; on a glass
-  /// host — where a second backdrop pass is refused (flutter#187820) — the
-  /// pill in [_pill] paints flat instead, and always white, the same
-  /// deliberate choice `GlassSwitch._knobColor` and `GlassSlider._thumbColor`
-  /// make. That fixed white surface is decoupled from whichever material
-  /// `style.labelColor` was tuned against, so a dark scheme's white label
-  /// would land on it invisibly. The selected label on that one surface
+  /// surface: off a glass host it is a real [Glass] drawn in the control
+  /// role's material, so `style.labelColor` is still the right label; on a
+  /// glass host — where a second backdrop pass is refused (flutter#187820)
+  /// — the pill in [_pill] paints flat instead, in
+  /// [GlassControlFrame.paintedElementColor], always white, the same
+  /// deliberate choice the switch knob and slider thumb make. That fixed
+  /// white surface is decoupled from whichever material `style.labelColor`
+  /// was tuned against, so a dark scheme's white label would land on it
+  /// invisibly. The selected label on that one surface
   /// takes the light scheme's own label colour instead — pure black, the ink
   /// [GlassTintRamp.appleLight] already guarantees reads against a light
   /// surface, and the painted pill is exactly that.
@@ -557,7 +553,9 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
       return ClipPath(
         clipper: GlassShapeClipper(style.shape),
         child: const DecoratedBox(
-          decoration: BoxDecoration(color: _pillColor),
+          decoration: BoxDecoration(
+            color: GlassControlFrame.paintedElementColor,
+          ),
           child: SizedBox.expand(),
         ),
       );

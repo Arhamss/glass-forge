@@ -121,12 +121,6 @@ class _GlassSwitchState extends State<GlassSwitch>
   static const Color _activeTrackColorLight = Color(0xFF34C759);
   static const Color _activeTrackColorDark = Color(0xFF30D158);
 
-  /// The knob's own colour, painted under [GlassHostScope]. Always white,
-  /// in both schemes — the one part of a real iOS switch that never flips.
-  static const Color _knobColor = Color(0xFFFFFFFF);
-
-  static const double _disabledOpacity = 0.4;
-
   /// The knob's left-edge offset from [_knobInset], in logical pixels: the
   /// spring's own domain, chosen so `GlassMotion`'s pixel-stated tolerance
   /// (`GlassMotion.settleDistance`, `GlassMotion.settleVelocity`) means what
@@ -373,7 +367,9 @@ class _GlassSwitchState extends State<GlassSwitch>
       child: knob,
     );
 
-    return enabled ? visual : Opacity(opacity: _disabledOpacity, child: visual);
+    return enabled
+        ? visual
+        : Opacity(opacity: GlassControlFrame.disabledOpacity, child: visual);
   }
 
   Widget _knob({required GlassSurfaceStyle style, required bool onGlass}) {
@@ -381,7 +377,9 @@ class _GlassSwitchState extends State<GlassSwitch>
       return ClipPath(
         clipper: GlassShapeClipper(style.shape),
         child: const DecoratedBox(
-          decoration: BoxDecoration(color: _knobColor),
+          decoration: BoxDecoration(
+            color: GlassControlFrame.paintedElementColor,
+          ),
           child: SizedBox(width: _knobWidth, height: _knobHeight),
         ),
       );

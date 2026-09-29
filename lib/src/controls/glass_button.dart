@@ -133,9 +133,6 @@ class GlassButton extends StatelessWidget {
 
   static const EdgeInsetsGeometry _iconPadding = EdgeInsets.all(6);
 
-  /// The label opacity a disabled button draws at.
-  static const double _disabledOpacity = 0.4;
-
   @override
   Widget build(BuildContext context) {
     final enabled = onPressed != null;
@@ -162,7 +159,7 @@ class GlassButton extends StatelessWidget {
     );
     final resolvedShape = shape ?? style.shape;
     final labelColor = style.labelColor.withValues(
-      alpha: enabled ? 1 : _disabledOpacity,
+      alpha: enabled ? 1 : GlassControlFrame.disabledOpacity,
     );
 
     final label = Padding(

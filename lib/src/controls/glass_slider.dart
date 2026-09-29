@@ -132,13 +132,6 @@ class _GlassSliderState extends State<GlassSlider>
   static const double _trackHeight = 6;
   static const double _thumbSize = 28;
 
-  /// The thumb's own colour, painted under [GlassHostScope]. Always white,
-  /// the same reasoning — and the same lack of a capture to confirm against
-  /// — as `GlassSwitch._knobColor`.
-  static const Color _thumbColor = Color(0xFFFFFFFF);
-
-  static const double _disabledOpacity = 0.4;
-
   static const GlassJiggle _jiggle = GlassJiggle();
 
   /// The thumb's position as a fraction of the track's travel, 0 to 1.
@@ -572,7 +565,9 @@ class _GlassSliderState extends State<GlassSlider>
       ),
     );
 
-    return enabled ? visual : Opacity(opacity: _disabledOpacity, child: visual);
+    return enabled
+        ? visual
+        : Opacity(opacity: GlassControlFrame.disabledOpacity, child: visual);
   }
 
   Widget _thumb({required GlassSurfaceStyle style, required bool onGlass}) {
@@ -581,7 +576,9 @@ class _GlassSliderState extends State<GlassSlider>
       return ClipPath(
         clipper: GlassShapeClipper(style.shape),
         child: const DecoratedBox(
-          decoration: BoxDecoration(color: _thumbColor),
+          decoration: BoxDecoration(
+            color: GlassControlFrame.paintedElementColor,
+          ),
           child: size,
         ),
       );
