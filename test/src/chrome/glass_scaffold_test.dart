@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
+import 'package:glass_forge/src/rendering/render_glass_layer.dart';
 
 const ValueKey<String> _topBarKey = ValueKey('topBar');
 const ValueKey<String> _bottomBarKey = ValueKey('bottomBar');
@@ -133,14 +134,45 @@ void main() {
         ),
       ),
     );
-    // `_MeasureSize` defers its report to the end of the frame it measured
-    // in — reporting straight from `performLayout` would call `setState`
-    // while a layout is still in progress — so the body only sees the real
-    // bar heights one frame later.
-    await tester.pump();
 
     expect(bodyMediaQuery!.padding.top, 70);
     expect(bodyMediaQuery!.padding.bottom, 40);
+  });
+
+  testWidgets('the body band and padding are right on the first frame', (
+    tester,
+  ) async {
+    const bodyKey = ValueKey<String>('body');
+    MediaQueryData? bodyMediaQuery;
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(size: Size(800, 600)),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: GlassScaffold(
+            topBar: const SizedBox(height: 50),
+            bottomBar: const SizedBox(height: 30),
+            body: Builder(
+              key: bodyKey,
+              builder: (context) {
+                bodyMediaQuery = MediaQuery.of(context);
+                return const SizedBox.expand();
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // No second pump: this is the first frame.
+    final layer = tester.renderObject<RenderGlassLayer>(
+      find.ancestor(of: find.byKey(bodyKey), matching: find.byType(GlassLayer)),
+    );
+    final band = layer.glassClip!;
+    expect(band.top, 50);
+    expect(band.bottom, 570);
+    expect(bodyMediaQuery!.padding.top, 50);
+    expect(bodyMediaQuery!.padding.bottom, 30);
   });
 
   testWidgets('a pushed route drives bar presence to 0', (tester) async {

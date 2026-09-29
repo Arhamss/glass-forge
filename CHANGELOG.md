@@ -148,7 +148,9 @@ stop there. The text field grows instead.
 - `GlassScaffold` puts the composition rules in place for you. Each bar
   sits in a layer of its own, the size of the bar, whose glass is clipped
   to the bar, so a bar's filter never reaches over body glass. The body
-  gets one layer, which draws glass only between the bars. The body is padded to clear the bars, and its
+  gets one layer, which draws glass only between the bars. The bars are
+  laid out before the body, so the body's padding and its glass band are
+  right from the first frame. The body is padded to clear the bars, and its
   `viewInsets.bottom` is 0 under a bottom bar that rides the keyboard. Each
   bar fades out over the first 40% of any route that covers the page, so
   the bar and the covering glass are never two backdrop filters over the

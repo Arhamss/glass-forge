@@ -1,4 +1,3 @@
-import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/chrome/glass_handoff.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
@@ -146,8 +145,8 @@ class _GlassScaffoldBodyState extends State<_GlassScaffoldBody> {
 
   Animation<double> _presence = const AlwaysStoppedAnimation<double>(1);
 
-  double _topBarHeight = 0;
-  double _bottomBarHeight = 0;
+  /// Stateless, so one instance serves every scaffold.
+  static final _ScaffoldLayout _layout = _ScaffoldLayout();
 
   @override
   void didChangeDependencies() {
@@ -181,18 +180,6 @@ class _GlassScaffoldBodyState extends State<_GlassScaffoldBody> {
           );
   }
 
-  void _handleTopBarSize(Size size) {
-    if (mounted && size.height != _topBarHeight) {
-      setState(() => _topBarHeight = size.height);
-    }
-  }
-
-  void _handleBottomBarSize(Size size) {
-    if (mounted && size.height != _bottomBarHeight) {
-      setState(() => _bottomBarHeight = size.height);
-    }
-  }
-
   /// One bar's own layer, its glass clipped to the layer's exact bounds and
   /// fading through the scaffold's presence.
   Widget _barLayer(GlassMaterial material, Widget bar) {
@@ -209,14 +196,89 @@ class _GlassScaffoldBodyState extends State<_GlassScaffoldBody> {
     final media = MediaQuery.of(context);
     final topBar = widget.topBar;
     final bottomBar = widget.bottomBar;
+    final material = widget.material ?? const GlassMaterial();
 
+    return CustomMultiChildLayout(
+      delegate: _layout,
+      children: [
+        if (widget.background != null)
+          LayoutId(id: _Slot.background, child: widget.background!),
+        // Built during layout, once both bars have been measured: the
+        // body's padding and its glass band come from the bars' heights in
+        // the same frame, the first one included, rather than a frame late.
+        LayoutId(
+          id: _Slot.body,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final bars = constraints is _BodyConstraints ? constraints : null;
+              return _buildBody(
+                media: media,
+                material: material,
+                height: constraints.maxHeight,
+                topBarHeight: bars?.topBarHeight ?? 0,
+                bottomBarHeight: bars?.bottomBarHeight ?? 0,
+              );
+            },
+          ),
+        ),
+        // Each bar in a layer of its own, the size of the bar, whose
+        // passes are clipped to exactly that: a bar's filter never reaches
+        // over the body's band, where body glass draws. One layer for both
+        // bars would be one pass whose clip spans the screen between them,
+        // over every piece of body glass.
+        if (topBar != null)
+          LayoutId(
+            id: _Slot.topBar,
+            child: _barLayer(
+              material,
+              SafeArea(
+                bottom: false,
+                left: false,
+                right: false,
+                child: topBar,
+              ),
+            ),
+          ),
+        if (bottomBar != null)
+          LayoutId(
+            id: _Slot.bottomBar,
+            child: _barLayer(
+              material,
+              // Rides the keyboard: as `viewInsets.bottom` grows this bar
+              // lifts by the same amount, clear of it, rather than being
+              // covered the way a bar fixed to the screen's edge would be.
+              Padding(
+                padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+                child: SafeArea(
+                  top: false,
+                  left: false,
+                  right: false,
+                  child: bottomBar,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// The body, in its own layer, given the bars' measured heights.
+  Widget _buildBody({
+    required MediaQueryData media,
+    required GlassMaterial material,
+    required double height,
+    required double topBarHeight,
+    required double bottomBarHeight,
+  }) {
+    final hasTop = widget.topBar != null;
+    final hasBottom = widget.bottomBar != null;
     // The body's own copy of `MediaQuery`, telling it how much of the top
     // and bottom a bar is covering — exactly what Material's `Scaffold`
     // does for a `ListView` under its app bar. A bar's measured height
-    // already includes the safe-area inset the `SafeArea` below adds
-    // around it, so this replaces the ambient inset rather than adding to
-    // it; with no bar the ambient safe-area inset is left alone, so content
-    // still clears a notch with nothing here to clear it for.
+    // already includes the safe-area inset the `SafeArea` around it adds,
+    // so this replaces the ambient inset rather than adding to it; with no
+    // bar the ambient safe-area inset is left alone, so content still
+    // clears a notch with nothing here to clear it for.
     //
     // A bottom bar rides the keyboard, so its measured height already
     // counts the keyboard. The body's `viewInsets.bottom` goes to zero with
@@ -228,132 +290,105 @@ class _GlassScaffoldBodyState extends State<_GlassScaffoldBody> {
         padding: EdgeInsets.only(
           left: media.padding.left,
           right: media.padding.right,
-          top: topBar == null ? media.padding.top : _topBarHeight,
-          bottom: bottomBar == null ? media.padding.bottom : _bottomBarHeight,
+          top: hasTop ? topBarHeight : media.padding.top,
+          bottom: hasBottom ? bottomBarHeight : media.padding.bottom,
         ),
-        viewInsets: bottomBar == null
-            ? media.viewInsets
-            : media.viewInsets.copyWith(bottom: 0),
+        viewInsets: hasBottom
+            ? media.viewInsets.copyWith(bottom: 0)
+            : media.viewInsets,
       ),
       child: widget.body,
     );
 
-    final material = widget.material ?? const GlassMaterial();
-    return LayoutBuilder(
-      builder: (context, constraints) => Stack(
-        fit: StackFit.expand,
-        children: [
-          if (widget.background != null) widget.background!,
-          // The body's own layer, for any glass inside it — a switch in a
-          // settings list — so that glass shares one layer instead of each
-          // control building an implicit one. Its passes are clipped to
-          // the band between the bars: body glass scrolled under a bar is
-          // cut away there, never a second backdrop filter under the
-          // bar's. The body's content itself is not clipped and keeps
-          // painting under the bars for them to refract.
-          GlassLayerClip(
-            rect: Rect.fromLTRB(
-              Rect.largest.left,
-              topBar == null ? Rect.largest.top : _topBarHeight,
-              Rect.largest.right,
-              bottomBar == null
-                  ? Rect.largest.bottom
-                  : constraints.maxHeight - _bottomBarHeight,
-            ),
-            child: GlassLayer(material: material, child: body),
-          ),
-          // Each bar in a layer of its own, the size of the bar, whose
-          // passes are clipped to exactly that: a bar's filter never
-          // reaches over the body's band, where body glass draws. One
-          // layer for both bars would be one pass whose clip spans the
-          // screen between them, over every piece of body glass.
-          if (topBar != null)
-            Align(
-              alignment: Alignment.topCenter,
-              child: _barLayer(
-                material,
-                _MeasureSize(
-                  onChange: _handleTopBarSize,
-                  child: SafeArea(
-                    bottom: false,
-                    left: false,
-                    right: false,
-                    child: topBar,
-                  ),
-                ),
-              ),
-            ),
-          if (bottomBar != null)
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: _barLayer(
-                material,
-                _MeasureSize(
-                  onChange: _handleBottomBarSize,
-                  // Rides the keyboard: as `viewInsets.bottom` grows this
-                  // bar lifts by the same amount, clear of it, rather than
-                  // being covered the way a bar fixed to the screen's edge
-                  // would be.
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-                    child: SafeArea(
-                      top: false,
-                      left: false,
-                      right: false,
-                      child: bottomBar,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
+    // The body's own layer, for any glass inside it — a switch in a
+    // settings list — so that glass shares one layer instead of each
+    // control building an implicit one. Its passes are clipped to the band
+    // between the bars: body glass scrolled under a bar is cut away there,
+    // never a second backdrop filter under the bar's. The body's content
+    // itself is not clipped and keeps painting under the bars for them to
+    // refract.
+    return GlassLayerClip(
+      rect: Rect.fromLTRB(
+        Rect.largest.left,
+        hasTop ? topBarHeight : Rect.largest.top,
+        Rect.largest.right,
+        hasBottom ? height - bottomBarHeight : Rect.largest.bottom,
       ),
+      child: GlassLayer(material: material, child: body),
     );
   }
 }
 
-/// Reports [child]'s laid-out size to [onChange] after every layout that
-/// changes it.
+enum _Slot { background, body, topBar, bottomBar }
+
+/// The constraints the body is laid out with: tight to the scaffold, and
+/// carrying the heights of the bars laid out just before it.
 ///
-/// Deferred to the end of the frame rather than called from
-/// [RenderObject.performLayout] directly: layout is still in progress at
-/// that point, and triggering a rebuild (which a bar's measured height
-/// eventually does, through [State.setState]) from inside someone else's
-/// layout throws. A frame late is invisible here — a bar's size settles
-/// long before its own entrance animation does, if it animates at all — and
-/// the callback runs only when the size actually changed, so a settled
-/// layout schedules nothing.
-class _MeasureSize extends SingleChildRenderObjectWidget {
-  const _MeasureSize({required this.onChange, required Widget super.child});
+/// How the heights reach the body's `LayoutBuilder` within the same layout
+/// pass — the way Material's `Scaffold` hands its body the app bar's
+/// height. Equality counts the heights, so a bar that changes height
+/// rebuilds the body, and one that does not rebuilds nothing.
+class _BodyConstraints extends BoxConstraints {
+  _BodyConstraints.tight(
+    super.size, {
+    required this.topBarHeight,
+    required this.bottomBarHeight,
+  }) : super.tight();
 
-  final ValueChanged<Size> onChange;
+  final double topBarHeight;
+  final double bottomBarHeight;
 
   @override
-  RenderObject createRenderObject(BuildContext context) {
-    return _RenderMeasureSize(onChange);
+  bool operator ==(Object other) {
+    return super == other &&
+        other is _BodyConstraints &&
+        other.topBarHeight == topBarHeight &&
+        other.bottomBarHeight == bottomBarHeight;
   }
 
   @override
-  void updateRenderObject(BuildContext context, RenderObject renderObject) {
-    (renderObject as _RenderMeasureSize).onChange = onChange;
-  }
+  int get hashCode =>
+      Object.hash(super.hashCode, topBarHeight, bottomBarHeight);
 }
 
-class _RenderMeasureSize extends RenderProxyBox {
-  _RenderMeasureSize(this.onChange);
-
-  ValueChanged<Size> onChange;
-
-  Size? _reported;
+/// Lays the bars out first, at their own heights, then the body and the
+/// background across the whole scaffold.
+class _ScaffoldLayout extends MultiChildLayoutDelegate {
+  _ScaffoldLayout();
 
   @override
-  void performLayout() {
-    super.performLayout();
-    final newSize = size;
-    if (_reported == newSize) {
-      return;
+  void performLayout(Size size) {
+    final loose = BoxConstraints.loose(size);
+    var topBarHeight = 0.0;
+    var bottomBarHeight = 0.0;
+    if (hasChild(_Slot.topBar)) {
+      final bar = layoutChild(_Slot.topBar, loose);
+      topBarHeight = bar.height;
+      positionChild(_Slot.topBar, Offset((size.width - bar.width) / 2, 0));
     }
-    _reported = newSize;
-    WidgetsBinding.instance.addPostFrameCallback((_) => onChange(newSize));
+    if (hasChild(_Slot.bottomBar)) {
+      final bar = layoutChild(_Slot.bottomBar, loose);
+      bottomBarHeight = bar.height;
+      positionChild(
+        _Slot.bottomBar,
+        Offset((size.width - bar.width) / 2, size.height - bar.height),
+      );
+    }
+    layoutChild(
+      _Slot.body,
+      _BodyConstraints.tight(
+        size,
+        topBarHeight: topBarHeight,
+        bottomBarHeight: bottomBarHeight,
+      ),
+    );
+    positionChild(_Slot.body, Offset.zero);
+    if (hasChild(_Slot.background)) {
+      layoutChild(_Slot.background, BoxConstraints.tight(size));
+      positionChild(_Slot.background, Offset.zero);
+    }
   }
+
+  @override
+  bool shouldRelayout(_ScaffoldLayout oldDelegate) => false;
 }

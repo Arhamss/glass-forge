@@ -89,9 +89,6 @@ void main() {
             ),
           ),
         );
-        // The bar's height is measured a frame late; see `_MeasureSize`.
-        await tester.pump();
-        await tester.pump();
 
         // At rest in the band: the knob's pass is there, and below the bar.
         clipsInBand.addAll(_knobLayer(tester).debugPassClips);
