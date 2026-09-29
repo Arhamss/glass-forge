@@ -302,4 +302,120 @@ void main() {
     expect(chrome.value, 0);
     expect(sheet.value, 1);
   });
+
+  group('sheet options', () {
+    const sheetKey = ValueKey<String>('sheet');
+    const rootKey = GlobalObjectKey<NavigatorState>('root');
+
+    /// A page whose [open] presents a 200 px sheet with [show]'s options,
+    /// inside a nested navigator of its own.
+    Future<void> pumpNested(
+      WidgetTester tester, {
+      required Future<void> Function(BuildContext context) show,
+    }) async {
+      await tester.pumpWidget(
+        GlassTierScope(
+          requested: GlassTier.off,
+          child: MaterialApp(
+            navigatorKey: rootKey,
+            home: Navigator(
+              onGenerateRoute: (settings) => MaterialPageRoute<void>(
+                builder: (context) => Center(
+                  child: GestureDetector(
+                    key: _openKey,
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => show(context),
+                    child: const SizedBox(width: 100, height: 100),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget sheetBody(BuildContext context) =>
+        const SizedBox(key: sheetKey, height: 200);
+
+    testWidgets('the sheet rises clear of the keyboard', (tester) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await pumpNested(
+        tester,
+        show: (context) => showGlassSheet<void>(
+          context: context,
+          builder: sheetBody,
+        ),
+      );
+      await tester.tap(find.byKey(_openKey));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getBottomLeft(find.byKey(sheetKey)).dy,
+        lessThanOrEqualTo(800 - 300),
+      );
+    });
+
+    testWidgets('barrierLabel names the scrim', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpNested(
+        tester,
+        show: (context) => showGlassSheet<void>(
+          context: context,
+          barrierLabel: 'Cerrar',
+          builder: sheetBody,
+        ),
+      );
+      await tester.tap(find.byKey(_openKey));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Cerrar'), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('useRootNavigator and routeSettings reach the route', (
+      tester,
+    ) async {
+      await pumpNested(
+        tester,
+        show: (context) => showGlassSheet<void>(
+          context: context,
+          useRootNavigator: true,
+          routeSettings: const RouteSettings(name: 'picker'),
+          builder: sheetBody,
+        ),
+      );
+      await tester.tap(find.byKey(_openKey));
+      await tester.pumpAndSettle();
+      final sheet = tester.element(find.byKey(sheetKey));
+      expect(Navigator.of(sheet), same(rootKey.currentState));
+      expect(ModalRoute.of(sheet)!.settings.name, 'picker');
+    });
+
+    testWidgets('Reduce Motion turned on mid-rise lands the sheet at once', (
+      tester,
+    ) async {
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await pumpNested(
+        tester,
+        show: (context) => showGlassSheet<void>(
+          context: context,
+          builder: sheetBody,
+        ),
+      );
+      await tester.tap(find.byKey(_openKey));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      final route = ModalRoute.of(tester.element(find.byKey(sheetKey)))!;
+      expect(route.animation!.value, lessThan(1));
+
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(reduceMotion: true);
+      await tester.pump();
+      expect(route.animation!.value, 1);
+    });
+  });
 }

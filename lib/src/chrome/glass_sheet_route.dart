@@ -34,6 +34,18 @@ import 'package:glass_forge/src/widgets/glass_presence.dart';
 /// [material] replaces the sheet role's material, as
 /// `GlassSurface.material` does; null keeps the role's.
 ///
+/// [barrierLabel] is what a screen reader reads for the scrim. It is
+/// English by default: this package has no localizations of its own, so
+/// pass a translated label from an app that has them.
+///
+/// [useRootNavigator] pushes onto the outermost `Navigator` rather than
+/// the nearest — for a sheet that must cover a tab scaffold's nested
+/// navigator, bars and all. [routeSettings] names the route, as for any
+/// other push.
+///
+/// The sheet rises clear of the keyboard: with the keyboard up, its bottom
+/// edge sits above it, so a `GlassTextField` in the sheet stays in view.
+///
 /// The page beneath follows the handoff only when its route lets this one
 /// drive its `secondaryAnimation`: any `PageRoute` does, including
 /// `MaterialPageRoute`, `CupertinoPageRoute` and `PageRouteBuilder`, as long
@@ -55,17 +67,22 @@ Future<T?> showGlassSheet<T>({
   required WidgetBuilder builder,
   bool isDismissible = true,
   GlassMaterial? material,
+  String barrierLabel = 'Dismiss',
+  bool useRootNavigator = false,
+  RouteSettings? routeSettings,
 }) {
   final theme = GlassTheme.of(context);
   final duration = theme.motion
       .of(theme.surfaces.of(GlassSurfaceRole.sheet).motion)
       .duration;
-  return Navigator.of(context).push<T>(
+  return Navigator.of(context, rootNavigator: useRootNavigator).push<T>(
     _GlassSheetRoute<T>(
       builder: builder,
       isDismissible: isDismissible,
       duration: duration,
       material: material,
+      scrimLabel: barrierLabel,
+      settings: routeSettings,
     ),
   );
 }
@@ -97,12 +114,15 @@ class _GlassSheetRoute<T> extends PageRoute<T> {
     required this.isDismissible,
     required this.duration,
     required this.material,
+    required this.scrimLabel,
+    super.settings,
   });
 
   final WidgetBuilder builder;
   final bool isDismissible;
   final Duration duration;
   final GlassMaterial? material;
+  final String scrimLabel;
 
   /// The sheet's rise through the second part of [animation]: position and
   /// glass both ride it.
@@ -118,11 +138,9 @@ class _GlassSheetRoute<T> extends PageRoute<T> {
   @override
   void install() {
     super.install();
-    _rise = animation!.drive(
-      CurveTween(
-        curve: const Interval(glassHandoffPoint, 1, curve: _riseCurve),
-      ),
-    );
+    _rise = animation!
+        .drive(CurveTween(curve: coveringGlassInterval))
+        .drive(CurveTween(curve: _riseCurve));
     final uncovered = secondaryAnimation!.drive(
       Tween<double>(
         begin: 1,
@@ -130,6 +148,25 @@ class _GlassSheetRoute<T> extends PageRoute<T> {
       ).chain(CurveTween(curve: coveredChromeInterval)),
     );
     _presence = AnimationMin<double>(_rise, uncovered);
+    GlassReduceMotion.instance.addListener(_onReduceMotion);
+  }
+
+  @override
+  void dispose() {
+    GlassReduceMotion.instance.removeListener(_onReduceMotion);
+    super.dispose();
+  }
+
+  /// Reduce Motion turned on while the sheet is still rising or falling
+  /// lands it now, rather than letting the rest of the animation play.
+  void _onReduceMotion() {
+    final controller = this.controller;
+    if (!GlassReduceMotion.instance.value ||
+        controller == null ||
+        !controller.isAnimating) {
+      return;
+    }
+    controller.value = controller.status == AnimationStatus.reverse ? 0 : 1;
   }
 
   @override
@@ -145,7 +182,7 @@ class _GlassSheetRoute<T> extends PageRoute<T> {
   Color get barrierColor => _scrimColor;
 
   @override
-  String get barrierLabel => 'Dismiss';
+  String get barrierLabel => scrimLabel;
 
   @override
   Duration get transitionDuration =>
@@ -226,6 +263,12 @@ class _GlassSheetPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final padding = MediaQuery.paddingOf(context);
+    // The keyboard covers the bottom safe area too, so the sheet clears
+    // whichever reaches higher.
+    final bottom = math.max(
+      padding.bottom,
+      MediaQuery.viewInsetsOf(context).bottom,
+    );
     // The sheet's own layer. It is a separate overlay entry above the page,
     // so the page's layer cannot hold it; its backdrop pass reads whatever
     // is painted beneath it in the scene — the page, dimmed by the scrim
@@ -245,7 +288,7 @@ class _GlassSheetPage extends StatelessWidget {
                 _sheetMargin + padding.left,
                 _sheetMargin + padding.top,
                 _sheetMargin + padding.right,
-                _sheetMargin + padding.bottom,
+                _sheetMargin + bottom,
               ),
               child: GestureDetector(
                 onVerticalDragUpdate: (details) => route._drag(

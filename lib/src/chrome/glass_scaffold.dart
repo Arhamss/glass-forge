@@ -44,6 +44,13 @@ import 'package:glass_forge/src/widgets/glass_presence.dart';
 /// glass rises, or the two are a stacked backdrop filter over the same
 /// pixels.
 ///
+/// Both bars fade for any covering route, a short sheet included, though
+/// such a sheet only covers the bottom of the screen. That is deliberate:
+/// a sheet's height is its content's and can grow to the top safe area,
+/// and nothing tells the page beneath how far up a covering route reaches,
+/// so fading only the bottom bar would leave a tall sheet's glass over a
+/// top bar's.
+///
 /// ```dart
 /// GlassScaffold(
 ///   background: const ColoredBox(color: Color(0xFF101820)),
