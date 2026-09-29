@@ -52,6 +52,10 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 /// )
 /// ```
 ///
+/// Under [TextDirection.rtl] the switch mirrors, as `Switch` and
+/// `CupertinoSwitch` do: "on" is the left side, and a drag toward it is a
+/// drag to the left.
+///
 /// `onChanged: null` disables it: no tap, no drag, and the callback never
 /// runs — see [GlassControlFrame], which every control in this package
 /// shares for semantics, keyboard activation and the 44 × 44 minimum hit
@@ -138,6 +142,16 @@ class _GlassSwitchState extends State<GlassSwitch>
   /// would fight the finger.
   bool _dragging = false;
 
+  /// The most recent build's reading direction, read by the drag handlers,
+  /// which run outside `build`. [_position] always counts toward "on"; under
+  /// [TextDirection.rtl] "on" is the left side, so both the knob and a drag
+  /// run the other way.
+  TextDirection _textDirection = TextDirection.ltr;
+
+  /// +1 when "on" is to the right, -1 when it is to the left — what a
+  /// horizontal pixel delta is multiplied by to move [_position].
+  double get _direction => _textDirection == TextDirection.rtl ? -1 : 1;
+
   @override
   void initState() {
     super.initState();
@@ -210,10 +224,11 @@ class _GlassSwitchState extends State<GlassSwitch>
   }
 
   void _onDragUpdate(DragUpdateDetails details) {
-    _position.value = (_position.value + (details.primaryDelta ?? 0)).clamp(
-      0,
-      _travel,
-    );
+    _position.value =
+        (_position.value + _direction * (details.primaryDelta ?? 0)).clamp(
+          0,
+          _travel,
+        );
   }
 
   void _onDragEnd(DragEndDetails details) {
@@ -221,7 +236,7 @@ class _GlassSwitchState extends State<GlassSwitch>
     final settledOn = _position.value > _travel / 2;
     _animateTo(
       settledOn ? _travel : 0,
-      velocity: details.velocity.pixelsPerSecond.dx,
+      velocity: _direction * details.velocity.pixelsPerSecond.dx,
     );
     final onChanged = widget.onChanged;
     if (onChanged != null && settledOn != widget.value) {
@@ -238,6 +253,7 @@ class _GlassSwitchState extends State<GlassSwitch>
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onChanged != null;
+    _textDirection = Directionality.of(context);
     return GlassControlFrame(
       onActivate: enabled ? _toggle : null,
       semanticLabel: widget.semanticLabel,
@@ -290,7 +306,12 @@ class _GlassSwitchState extends State<GlassSwitch>
           onColor,
           _position.value / _travel,
         )!;
-        final knobLeft = _knobInset + _position.value;
+        // How far the knob sits from its leftmost place: [_position]
+        // itself, or its mirror under RTL, where "on" is on the left.
+        final offset = _textDirection == TextDirection.rtl
+            ? _travel - _position.value
+            : _position.value;
+        final knobLeft = _knobInset + offset;
         return SizedBox(
           width: _trackWidth,
           height: _trackHeight,
@@ -322,7 +343,7 @@ class _GlassSwitchState extends State<GlassSwitch>
                 left: _knobInset,
                 top: _knobInset,
                 child: Transform.translate(
-                  offset: Offset(_position.value, 0),
+                  offset: Offset(offset, 0),
                   child: child,
                 ),
               ),

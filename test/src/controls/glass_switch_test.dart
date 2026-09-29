@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/controls/glass_switch.dart';
+import 'package:glass_forge/src/controls/track_cutout.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
@@ -19,7 +20,11 @@ const GlassMaterial _inert = GlassMaterial(
 
 /// [child] in a layer, either on content or, with [onGlass], nested inside a
 /// real `Glass` so `GlassHostScope.isOnGlass` reads true for it.
-Widget _harness({required Widget child, bool onGlass = false}) {
+Widget _harness({
+  required Widget child,
+  bool onGlass = false,
+  TextDirection textDirection = TextDirection.ltr,
+}) {
   final content = onGlass
       ? Glass(
           shape: const GlassOval(),
@@ -27,7 +32,7 @@ Widget _harness({required Widget child, bool onGlass = false}) {
         )
       : Center(child: child);
   return Directionality(
-    textDirection: TextDirection.ltr,
+    textDirection: textDirection,
     child: GlassLayer(
       tier: GeometryTier.none,
       material: _inert,
@@ -297,4 +302,80 @@ void main() {
       expect(settledTransform.transform.getTranslation().x, 22);
     },
   );
+
+  group('right to left', () {
+    Widget rtl({required bool value, ValueChanged<bool>? onChanged}) =>
+        _harness(
+          textDirection: TextDirection.rtl,
+          child: GlassSwitch(value: value, onChanged: onChanged ?? (_) {}),
+        );
+
+    Rect knobOf(WidgetTester tester) => tester.getRect(
+      find.descendant(
+        of: find.byType(GlassSwitch),
+        matching: find.byType(Glass),
+      ),
+    );
+
+    /// The painted-track hole, in global coordinates.
+    Rect holeOf(WidgetTester tester) {
+      final clip = find.descendant(
+        of: find.byType(GlassSwitch),
+        matching: find.byWidgetPredicate(
+          (w) => w is ClipPath && w.clipper is TrackCutoutClipper,
+        ),
+      );
+      final clipper =
+          tester.widget<ClipPath>(clip).clipper! as TrackCutoutClipper;
+      return clipper.hole!.shift(tester.getTopLeft(clip));
+    }
+
+    testWidgets('on puts the knob, and its hole, on the left', (
+      tester,
+    ) async {
+      await tester.pumpWidget(rtl(value: true));
+      final centre = tester.getCenter(find.byType(GlassSwitch)).dx;
+      expect(knobOf(tester).center.dx, lessThan(centre));
+      expect(holeOf(tester), knobOf(tester));
+    });
+
+    testWidgets('off puts the knob, and its hole, on the right', (
+      tester,
+    ) async {
+      await tester.pumpWidget(rtl(value: false));
+      final centre = tester.getCenter(find.byType(GlassSwitch)).dx;
+      expect(knobOf(tester).center.dx, greaterThan(centre));
+      expect(holeOf(tester), knobOf(tester));
+    });
+
+    testWidgets('a drag left past half turns it on', (tester) async {
+      bool? value;
+      await tester.pumpWidget(
+        rtl(value: false, onChanged: (next) => value = next),
+      );
+      await _dragBy(tester, find.byType(GlassSwitch), -15);
+      await tester.pumpAndSettle();
+      expect(value, isTrue);
+    });
+
+    testWidgets('a drag right leaves it off', (tester) async {
+      bool? value;
+      await tester.pumpWidget(
+        rtl(value: false, onChanged: (next) => value = next),
+      );
+      await _dragBy(tester, find.byType(GlassSwitch), 15);
+      await tester.pumpAndSettle();
+      expect(value, isNull);
+    });
+
+    testWidgets('a drag right past half turns it off', (tester) async {
+      bool? value;
+      await tester.pumpWidget(
+        rtl(value: true, onChanged: (next) => value = next),
+      );
+      await _dragBy(tester, find.byType(GlassSwitch), 15);
+      await tester.pumpAndSettle();
+      expect(value, isFalse);
+    });
+  });
 }
