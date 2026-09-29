@@ -139,6 +139,56 @@ void main() {
     expect(_lensPresence(tester).value, 0);
   });
 
+  testWidgets(
+    'a finger resting on the bar without moving never raises the lens',
+    (tester) async {
+      await tester.pumpWidget(_harness(bar: _followingBar(<int>[])));
+
+      // On the current tab and on another one: neither is travel until the
+      // finger lifts.
+      for (final label in ['Home', 'Search']) {
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.text(label)),
+        );
+        for (var i = 0; i < 60; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(
+            _lensPresence(tester).value,
+            0,
+            reason: 'a resting finger on $label raised the lens',
+          );
+        }
+        await gesture.cancel();
+        await tester.pumpAndSettle();
+      }
+    },
+  );
+
+  testWidgets(
+    'a drag that stops keeps the lens only until the selection catches up',
+    (tester) async {
+      await tester.pumpWidget(_harness(bar: _followingBar(<int>[])));
+
+      final start = tester.getCenter(find.text('Home'));
+      final gesture = await tester.startGesture(start);
+      await gesture.moveBy(const Offset(40, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(_lensPresence(tester).value, greaterThan(0));
+
+      // Finger still, still down: the spring settles on the finger and the
+      // lens sinks. One second is generous for a settle spring plus the
+      // 280 ms sink.
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(_lensPresence(tester).value, 0);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets('a drag carries the selection to where it is released', (
     tester,
   ) async {

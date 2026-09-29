@@ -12,6 +12,7 @@ import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
+import 'package:glass_forge/src/rendering/declared_glass_handoff.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_presence.dart';
 
@@ -53,11 +54,15 @@ class GlassTab {
 /// inset built in. The selection is a painted pill at rest — it sits on the
 /// bar's glass, and glass on glass is the stacked backdrop filter this
 /// package exists to avoid (flutter#187820). While the selection travels,
-/// or while a finger holds it, a glass lens in a material of its own rises
-/// out of the pill through a [GlassPresence], swelling a little past the
-/// bar's edges, and fades back into the pill as it lands. At rest that
-/// presence is 0, which drops the lens's backdrop pass entirely: the bar is
-/// the only glass there.
+/// and only then, a glass lens in a material of its own rises out of the
+/// pill through a [GlassPresence], swelling a little past the bar's edges,
+/// and fades back into the pill as it lands. A finger resting on the bar
+/// without moving swells the painted pill instead, and the lens sinks
+/// within 280 ms of the selection catching up with a finger that stops
+/// mid-drag. At rest the lens's presence is 0, which drops its backdrop
+/// pass entirely: the bar is the only glass there. The lens is the one
+/// place this package puts glass over glass, as a bounded handoff, and it
+/// is exempt from the layer's debug overlap warning for that reason.
 ///
 /// One spring — the theme's [GlassMotionRole.settle] — moves the selection.
 /// A tap aims it at the new tab. A drag anywhere along the bar keeps
@@ -258,13 +263,20 @@ class _GlassTabBarState extends State<GlassTabBar>
     _lens.aim(target, motion.spring);
   }
 
-  /// Raises the lens while the selection moves or is held, and lets it sink
-  /// once it has landed and been let go.
+  /// Raises the lens while the selection is travelling, and lets it sink
+  /// once it has caught up with its target.
+  ///
+  /// Only travel, never a press: the lens is a second backdrop pass over
+  /// the bar's (flutter#187820), declared as a bounded handoff (see
+  /// [_Product]), and a finger resting on the bar has no bound. A still
+  /// finger, before or during a drag, shows the painted pill swelling
+  /// under it instead; the lens sinks within [_sink] of the spring
+  /// settling on the finger.
   void _syncFlight() {
     if (_reduceMotion) {
       return;
     }
-    final up = _lens.isMoving || _pressed;
+    final up = _lens.isMoving;
     final status = _flight.status;
     if (up) {
       if (status != AnimationStatus.forward &&
@@ -371,13 +383,20 @@ class _GlassTabBarState extends State<GlassTabBar>
       child: Stack(
         children: [
           AnimatedBuilder(
-            animation: Listenable.merge([_lens, _flight]),
+            animation: Listenable.merge([_lens, _flight, _hold]),
             builder: (context, child) => Positioned(
               left: _inset + _lens.position * _slot,
               top: _inset,
               width: lensSize.width,
               height: lensSize.height,
-              child: Opacity(opacity: 1 - _flight.value, child: child),
+              // A held finger swells the painted pill, never the lens: see
+              // [_syncFlight]. Kept inside the bar, a quarter of the lens's
+              // swell.
+              child: Transform.scale(
+                scale:
+                    1 + _maxSwell / 4 * Curves.easeOut.transform(_hold.value),
+                child: Opacity(opacity: 1 - _flight.value, child: child),
+              ),
             ),
             child: ClipPath(
               clipper: GlassShapeClipper(lensStyle.shape),
@@ -585,7 +604,13 @@ class _TabButton extends StatelessWidget {
 }
 
 /// [first] times [next].
-class _Product extends CompoundAnimation<double> {
+///
+/// The lens's presence, and a [DeclaredGlassHandoff]: the lens overlaps the
+/// bar's glass on purpose, only while the selection travels (see
+/// `_GlassTabBarState._syncFlight`), so the layer's overlap warning leaves
+/// it out. Its bound is the settle spring plus the 280 ms sink.
+class _Product extends CompoundAnimation<double>
+    implements DeclaredGlassHandoff {
   _Product(Animation<double> first, Animation<double> next)
     : super(first: first, next: next);
 
