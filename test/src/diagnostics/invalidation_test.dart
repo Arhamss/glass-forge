@@ -233,6 +233,97 @@ void main() {
     expect(GlassRenderCounters.instance.matteProduceCount, greaterThan(0));
   });
 
+  testWidgets(
+    'a shading-only material change rebakes no matte; a matte-shaping one '
+    'does',
+    (tester) async {
+      const base = GlassMaterial();
+      Widget build(GlassMaterial material) => MaterialApp(
+        home: GlassLayer(
+          tier: GeometryTier.portable,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 120,
+              height: 60,
+              child: Glass(shape: const GlassOval(), material: material),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(build(base));
+      GlassRenderCounters.instance.reset();
+
+      // Tint, tint opacity, highlight, frost: none of it is in the matte,
+      // which only encodes where the surface is and how it bends light.
+      await tester.pumpWidget(
+        build(
+          base.copyWith(
+            tint: const Color(0xFF3060FF),
+            tintOpacity: 0.5,
+            highlight: base.highlight * 1.5,
+            frost: base.frost + 4,
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(GlassRenderCounters.instance.matteProduceCount, 0);
+
+      // How far the edge bends light is in the matte, so this one bakes.
+      await tester.pumpWidget(
+        build(base.copyWith(edgeRefraction: base.edgeRefraction * 2)),
+      );
+      await tester.pump();
+      expect(GlassRenderCounters.instance.matteProduceCount, 1);
+    },
+  );
+
+  testWidgets(
+    "a GlassTextField's focus and blur each bake at most two mattes",
+    (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: GlassLayer(
+            tier: GeometryTier.portable,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(width: 300, child: GlassTextField()),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Frame by frame for two seconds, as a device would run it:
+      // `pumpAndSettle`'s 100 ms steps would see only a handful of the
+      // animation's frames, and a focused field's blinking cursor never
+      // lets it settle anyway.
+      Future<void> run() async {
+        for (var i = 0; i < 120; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+      }
+
+      GlassRenderCounters.instance.reset();
+      await tester.tap(find.byType(GlassTextField));
+      await run();
+      expect(
+        GlassRenderCounters.instance.matteProduceCount,
+        lessThanOrEqualTo(2),
+        reason: 'focusing only brightens the glass; its shape never changes',
+      );
+
+      GlassRenderCounters.instance.reset();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await run();
+      expect(
+        GlassRenderCounters.instance.matteProduceCount,
+        lessThanOrEqualTo(2),
+      );
+    },
+  );
+
   testWidgets('an idle material pushes no backdrop at all', (tester) async {
     // Checked straight after pumpWidget, for the same reason as the
     // backdrop-per-frame test above: a static tree does not repaint on a

@@ -76,7 +76,11 @@ class _GlassPass {
   _GlassPass(this.key);
 
   /// What this pass is keyed by.
-  final _PassKey key;
+  ///
+  /// Mutable only so [RenderGlassLayer._carryOverMovedPasses] can re-key a
+  /// pass whose every shape moved to the same new material together,
+  /// keeping its scene and matte instead of rebuilding both.
+  _PassKey key;
 
   /// The material every shape in [scene] renders with.
   GlassMaterial get material => key.material;
@@ -609,6 +613,7 @@ class RenderGlassLayer extends RenderProxyBox {
       }
     }
 
+    final targets = <Object, _PassKey>{};
     for (final entry in _records.entries) {
       final record = entry.value;
       final group = record.group;
@@ -627,7 +632,14 @@ class RenderGlassLayer extends RenderProxyBox {
         }
         return true;
       }(), 'debug-only warning; always true');
-      final target = _PassKey(material, record.presenceScope);
+      targets[entry.key] = _PassKey(material, record.presenceScope);
+    }
+
+    _carryOverMovedPasses(targets);
+
+    for (final entry in _records.entries) {
+      final record = entry.value;
+      final target = targets[entry.key]!;
       final assigned = record.assigned;
       if (assigned != null && assigned != target) {
         _passes[assigned]?.scene.unregister(entry.key);
@@ -649,6 +661,65 @@ class RenderGlassLayer extends RenderProxyBox {
       _retirePass(pass);
       return true;
     });
+  }
+
+  /// Re-keys, rather than retires, a pass whose shapes all moved to one
+  /// new key together.
+  ///
+  /// A material that animates -- `GlassTextField` brightening on focus, a
+  /// preset cross-fading -- is a new [_PassKey] on every frame, because the
+  /// key compares materials by value. Retiring the old pass and building a
+  /// new one each frame threw away a matte that was still exactly right and
+  /// baked it again: seventeen bakes for one focus. The matte depends only
+  /// on the scene and on [_matteRequestFor], which reads the few material
+  /// fields that shape the surface (profile, thickness, edge refraction,
+  /// refraction spread, maximum displacement); tint, frost, highlight and
+  /// the rest are applied later, by the filter. So a pass carried over
+  /// keeps its scene, whose revision does not move, and [_refreshMatte]
+  /// rebakes only if the new material asks for a different matte.
+  ///
+  /// Only a whole pass moving to a key no pass has yet is carried over. A
+  /// pass that splits, or merges into a pass that already exists, goes
+  /// through the ordinary path: its destination's scene really does change.
+  void _carryOverMovedPasses(Map<Object, _PassKey> targets) {
+    final targeted = targets.values.toSet();
+    final moves = <_PassKey, _PassKey>{};
+    final destinations = <_PassKey>{};
+    for (final from in _passes.keys) {
+      if (targeted.contains(from)) {
+        continue;
+      }
+      _PassKey? to;
+      var together = true;
+      for (final entry in _records.entries) {
+        if (entry.value.assigned != from) {
+          continue;
+        }
+        final target = targets[entry.key];
+        if (to == null) {
+          to = target;
+        } else if (to != target) {
+          together = false;
+          break;
+        }
+      }
+      if (!together ||
+          to == null ||
+          _passes.containsKey(to) ||
+          !destinations.add(to)) {
+        continue;
+      }
+      moves[from] = to;
+    }
+    for (final MapEntry(key: from, value: to) in moves.entries) {
+      final pass = _passes.remove(from)!..key = to;
+      _passes[to] = pass;
+      for (final record in _records.values) {
+        if (record.assigned == from) {
+          record.assigned = to;
+        }
+      }
+    }
   }
 
   void _retirePass(_GlassPass pass) {
