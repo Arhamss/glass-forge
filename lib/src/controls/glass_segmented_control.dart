@@ -220,6 +220,16 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
   @override
   void didUpdateWidget(GlassSegmentedControl<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_dragging && widget.onChanged == null) {
+      // Disabled under the finger. The drag recognizer is dropped without
+      // an end or a cancel, so the drag is over here: the pill goes back
+      // to [GlassSegmentedControl.selected], and nothing is reported.
+      _dragging = false;
+      final index = _indexOf(widget.selected);
+      if (index != -1) {
+        _animateTo(index);
+      }
+    }
     if (!_dragging && oldWidget.segments.length != widget.segments.length) {
       // [_position] is a fraction of [_lastIndex], so a new segment count
       // moves every index under it: 0.5 is index 1 of three but index 2 of

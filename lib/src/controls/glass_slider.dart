@@ -179,6 +179,15 @@ class _GlassSliderState extends State<GlassSlider>
   @override
   void didUpdateWidget(GlassSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_dragging && widget.onChanged == null) {
+      // Disabled under the finger. The drag recognizer is dropped without
+      // an end or a cancel, so the drag is over here: the thumb goes back
+      // to [GlassSlider.value] and relaxes. `onChangeEnd` is not called —
+      // this runs during the owner's build, which a callback that sets
+      // state would throw from.
+      _dragging = false;
+      _animateStretchTo(1);
+    }
     _followValue();
   }
 

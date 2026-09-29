@@ -175,6 +175,13 @@ class _GlassSwitchState extends State<GlassSwitch>
   @override
   void didUpdateWidget(GlassSwitch oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_dragging && widget.onChanged == null) {
+      // Disabled under the finger. The drag recognizer is dropped without
+      // an end or a cancel, so the drag is over here: the knob goes back
+      // to [GlassSwitch.value], and nothing is reported.
+      _dragging = false;
+      _animateTo(widget.value ? _travel : 0);
+    }
     _followValue();
   }
 

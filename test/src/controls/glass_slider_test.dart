@@ -398,6 +398,61 @@ void main() {
     await tester.pump();
   });
 
+  testWidgets(
+    'disabled mid-drag, the thumb goes back and follows value afterwards',
+    (tester) async {
+      var value = 0.25;
+      var enabled = true;
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return _harness(
+              child: GlassSlider(
+                value: value,
+                onChanged: enabled ? (_) {} : null,
+              ),
+            );
+          },
+        ),
+      );
+      double thumbX() =>
+          tester
+              .getRect(
+                find.descendant(
+                  of: find.byType(GlassSlider),
+                  matching: find.byType(Glass),
+                ),
+              )
+              .center
+              .dx -
+          tester.getRect(find.byType(GlassSlider)).left;
+
+      final anchor = _anchor(tester, find.byType(GlassSlider));
+      final gesture = await tester.startGesture(
+        anchor + Offset(_xFor(0.25), 0),
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.moveTo(anchor + Offset(_xFor(0.8), 0));
+      await tester.pump();
+      expect(thumbX(), closeTo(_xFor(0.8), 0.001));
+
+      rebuild(() => enabled = false);
+      await tester.pumpAndSettle();
+      expect(thumbX(), closeTo(_xFor(0.25), 0.001));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      rebuild(() {
+        enabled = true;
+        value = 0.5;
+      });
+      await tester.pumpAndSettle();
+      expect(thumbX(), closeTo(_xFor(0.5), 0.001));
+    },
+  );
+
   group('the owner rejects the change', () {
     // An `onChanged` that neither rebuilds nor stores. The thumb may follow
     // the finger while it is down, but once the gesture is over the slider

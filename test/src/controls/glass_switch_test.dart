@@ -316,6 +316,51 @@ void main() {
     },
   );
 
+  testWidgets(
+    'disabled mid-drag, the knob goes home and follows value afterwards',
+    (tester) async {
+      var value = false;
+      var enabled = true;
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return _harness(
+              child: GlassSwitch(
+                value: value,
+                onChanged: enabled ? (next) => value = next : null,
+              ),
+            );
+          },
+        ),
+      );
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(GlassSwitch)),
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.moveBy(const Offset(8, 0));
+      await tester.pump();
+      expect(_knobX(tester), greaterThan(0));
+
+      // A form going busy disables the switch under the finger.
+      rebuild(() => enabled = false);
+      await tester.pumpAndSettle();
+      expect(_knobX(tester), 0);
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      // The form comes back with the value set elsewhere.
+      rebuild(() {
+        enabled = true;
+        value = true;
+      });
+      await tester.pumpAndSettle();
+      expect(_knobX(tester), 22);
+    },
+  );
+
   group('the owner rejects the change', () {
     // An `onChanged` that neither rebuilds nor stores: a confirm dialog, a
     // save that fails, a placeholder. The switch must go on showing

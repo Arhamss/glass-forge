@@ -601,6 +601,61 @@ void main() {
     }
   });
 
+  testWidgets(
+    'disabled mid-drag, the pill goes back and follows selected afterwards',
+    (tester) async {
+      var selected = 0;
+      var enabled = true;
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return _harness(
+              child: GlassSegmentedControl<int>(
+                segments: _threeSegments,
+                selected: selected,
+                onChanged: enabled ? (next) => selected = next : null,
+              ),
+            );
+          },
+        ),
+      );
+      double pillCentre() => tester
+          .getRect(
+            find.descendant(
+              of: find.byType(GlassSegmentedControl<int>),
+              matching: find.byType(Glass),
+            ),
+          )
+          .center
+          .dx;
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('Day')),
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.moveBy(const Offset(60, 0));
+      await tester.pump();
+
+      rebuild(() => enabled = false);
+      await tester.pumpAndSettle();
+      expect(pillCentre(), closeTo(tester.getCenter(find.text('Day')).dx, 1));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      rebuild(() {
+        enabled = true;
+        selected = 2;
+      });
+      await tester.pumpAndSettle();
+      expect(
+        pillCentre(),
+        closeTo(tester.getCenter(find.text('Month')).dx, 1),
+      );
+    },
+  );
+
   testWidgets('a tap springs the pill all the way onto the segment', (
     tester,
   ) async {
