@@ -755,11 +755,10 @@ class _Lens extends ChangeNotifier {
 
   late final Ticker _ticker;
   Duration _last = Duration.zero;
-  SpringDescription _spring = const SpringDescription(
-    mass: 1,
-    stiffness: 158,
-    damping: 17.6,
-  );
+
+  /// The spring [aim] last set. The ticker only ever starts from [aim],
+  /// so it is always assigned before [_tick] reads it.
+  late SpringDescription _spring;
 
   /// Where the selection is, in tabs.
   double position;
