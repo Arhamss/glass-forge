@@ -73,6 +73,8 @@ class GlassSwitch extends StatefulWidget {
     this.activeTrackColor,
     this.backdrop,
     this.semanticLabel,
+    this.focusNode,
+    this.autofocus = false,
     super.key,
   });
 
@@ -97,6 +99,13 @@ class GlassSwitch extends StatefulWidget {
 
   /// The accessible name read for this switch.
   final String? semanticLabel;
+
+  /// Where keyboard focus for this control is tracked. Null owns one for
+  /// this control's own lifetime.
+  final FocusNode? focusNode;
+
+  /// Whether this control takes keyboard focus as soon as it is inserted.
+  final bool autofocus;
 
   @override
   State<GlassSwitch> createState() => _GlassSwitchState();
@@ -270,6 +279,8 @@ class _GlassSwitchState extends State<GlassSwitch>
     return GlassControlFrame(
       onActivate: enabled ? _toggle : null,
       semanticLabel: widget.semanticLabel,
+      focusNode: widget.focusNode,
+      autofocus: widget.autofocus,
       toggled: widget.value,
       button: false,
       child: GestureDetector(

@@ -535,7 +535,7 @@ class _SliderTileState extends State<_SliderTile> {
                     child: GlassSlider(
                       value: _value,
                       semanticLabel: widget.title,
-                      semanticValue: (v) => '${(v * 100).round()}%',
+                      semanticValueFormatter: (v) => '${(v * 100).round()}%',
                       onChanged: (v) => setState(() => _value = v),
                     ),
                   ),

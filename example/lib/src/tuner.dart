@@ -258,7 +258,7 @@ class _Knob extends StatelessWidget {
           min: min,
           max: max,
           semanticLabel: label,
-          semanticValue: format,
+          semanticValueFormatter: format,
           onChanged: onChanged,
         ),
       ],

@@ -36,6 +36,7 @@ class GlassControlFrame extends StatelessWidget {
     this.button = true,
     this.toggled,
     this.selected,
+    this.inMutuallyExclusiveGroup = false,
     this.slider = false,
     this.value,
     this.increasedValue,
@@ -90,6 +91,11 @@ class GlassControlFrame extends StatelessWidget {
   /// currently chosen — a distinct flag from [toggled], which a screen
   /// reader announces differently (a switch or checkbox, not a tab).
   final bool? selected;
+
+  /// Whether semantics reports this as one of a set of choices only one of
+  /// which can be selected — a segment of `GlassSegmentedControl` — so a
+  /// screen reader announces its place in the set.
+  final bool inMutuallyExclusiveGroup;
 
   /// Whether semantics reports this as a slider — `GlassSlider`'s only use
   /// of this frame beyond the shared 44 × 44 hit target and focus handling.
@@ -199,6 +205,7 @@ class GlassControlFrame extends StatelessWidget {
       slider: slider,
       toggled: toggled,
       selected: selected,
+      inMutuallyExclusiveGroup: inMutuallyExclusiveGroup ? true : null,
       enabled: enabled,
       label: semanticLabel,
       value: value,

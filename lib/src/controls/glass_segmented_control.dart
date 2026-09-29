@@ -100,6 +100,8 @@ class GlassSegmentedControl<T> extends StatefulWidget {
     required this.selected,
     required this.onChanged,
     this.backdrop,
+    this.semanticLabel,
+    this.autofocus = false,
     super.key,
   });
   // Both `segments` non-empty and `selected` being one of their values are
@@ -127,6 +129,15 @@ class GlassSegmentedControl<T> extends StatefulWidget {
   /// What is behind this control, for the same adaptation `GlassSurface`
   /// offers.
   final Color? backdrop;
+
+  /// The accessible name read for the whole group of segments — what they
+  /// choose between, such as 'Range'. Each segment keeps its own name.
+  final String? semanticLabel;
+
+  /// Whether the selected segment takes keyboard focus as soon as this
+  /// control is inserted. There is no single `focusNode` to pass: every
+  /// segment is focusable on its own.
+  final bool autofocus;
 
   @override
   State<GlassSegmentedControl<T>> createState() =>
@@ -449,18 +460,26 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
             child: pill,
           ),
           Positioned.fill(
-            child: Row(
-              children: [
-                for (var i = 0; i < _segmentCount; i++)
-                  Expanded(
-                    child: _segment(
-                      i,
-                      enabled: enabled,
-                      style: style,
-                      onGlass: onGlass,
+            // One node for the group, so a screen reader treats the
+            // segments as one set of choices, named by
+            // [GlassSegmentedControl.semanticLabel].
+            child: Semantics(
+              container: true,
+              explicitChildNodes: true,
+              label: widget.semanticLabel,
+              child: Row(
+                children: [
+                  for (var i = 0; i < _segmentCount; i++)
+                    Expanded(
+                      child: _segment(
+                        i,
+                        enabled: enabled,
+                        style: style,
+                        onGlass: onGlass,
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -485,6 +504,8 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
       onIncrease: enabled ? _selectNext : null,
       onDecrease: enabled ? _selectPrevious : null,
       selected: selected,
+      inMutuallyExclusiveGroup: true,
+      autofocus: widget.autofocus && selected,
       semanticLabel: segment.semanticLabel,
       child: DefaultTextStyle.merge(
         style: TextStyle(

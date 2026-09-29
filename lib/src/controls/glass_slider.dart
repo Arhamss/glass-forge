@@ -72,7 +72,9 @@ class GlassSlider extends StatefulWidget {
     this.onChangeEnd,
     this.backdrop,
     this.semanticLabel,
-    this.semanticValue,
+    this.semanticValueFormatter,
+    this.focusNode,
+    this.autofocus = false,
     super.key,
   }) : assert(min <= max, 'min must be less than or equal to max'),
        assert(
@@ -118,10 +120,19 @@ class GlassSlider extends StatefulWidget {
   /// The accessible name read for this slider.
   final String? semanticLabel;
 
-  /// Formats [value] for screen readers. Null resolves to a plain number,
-  /// whole when [value] lands on an integer and to two decimal places
-  /// otherwise.
-  final String Function(double value)? semanticValue;
+  /// Formats a value for screen readers — the current one, and what an
+  /// increase or decrease would make it. Null resolves to a plain number,
+  /// whole when the value lands on an integer and to two decimal places
+  /// otherwise. Named for what it is, a function, as `Slider`'s
+  /// `semanticFormatterCallback` is.
+  final String Function(double value)? semanticValueFormatter;
+
+  /// Where keyboard focus for this control is tracked. Null owns one for
+  /// this control's own lifetime.
+  final FocusNode? focusNode;
+
+  /// Whether this control takes keyboard focus as soon as it is inserted.
+  final bool autofocus;
 
   @override
   State<GlassSlider> createState() => _GlassSliderState();
@@ -272,7 +283,7 @@ class _GlassSliderState extends State<GlassSlider>
   }
 
   String _formatValue(double value) {
-    final formatter = widget.semanticValue;
+    final formatter = widget.semanticValueFormatter;
     if (formatter != null) {
       return formatter(value);
     }
@@ -438,6 +449,8 @@ class _GlassSliderState extends State<GlassSlider>
     return GlassControlFrame(
       onActivate: null,
       semanticLabel: widget.semanticLabel,
+      focusNode: widget.focusNode,
+      autofocus: widget.autofocus,
       button: false,
       slider: true,
       value: _formatValue(currentValue),
