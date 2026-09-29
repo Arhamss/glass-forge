@@ -8,13 +8,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
-import 'package:glass_forge/src/design/glass_surface.dart';
+import 'package:glass_forge/src/design/glass_shadow_painter.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
+import 'package:glass_forge/src/design/glass_tint.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
 import 'package:glass_forge/src/motion/settle_spring.dart';
-import 'package:glass_forge/src/rendering/declared_glass_handoff.dart';
 import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
@@ -48,8 +48,8 @@ class GlassTab {
   final String? semanticLabel;
 }
 
-/// A floating glass capsule of tabs whose selection is a clear glass lens
-/// that springs from tab to tab.
+/// A floating capsule of tabs whose selection is a clear glass lens that
+/// springs from tab to tab.
 ///
 /// ```dart
 /// GlassScaffold(
@@ -65,19 +65,13 @@ class GlassTab {
 /// )
 /// ```
 ///
-/// The bar is a [GlassSurface.navigationBar] with the bottom safe-area
-/// inset built in. The selection is always glass: a clear lens in a
-/// material of its own, [selectionMaterial], one tab wide, sitting in the
-/// bar and bending the bar's own glass through it.
-///
-/// That is glass on glass at rest, by design, and it is the one place this
-/// package does it. Two backdrop passes over the same pixels is
-/// flutter#187820: on a physical iPhone the upper pass can read the lower
-/// one's previous frame and white-wash progressively. The lens has not yet
-/// been checked on a physical device for it — verify there before
-/// shipping. It is exempt from the layer's debug overlap warning against
-/// this bar's glass alone; over any other glass it still warns. It costs a
-/// second backdrop pass for as long as the bar is shown.
+/// Only the selection is glass. The bar itself is painted: a semi-opaque
+/// capsule in the navigationBar role's shape and shadow, filled with
+/// [backgroundColor] or the role's tint, with a hairline rim and the bottom
+/// safe-area inset built in. It has no blur and reads no backdrop, so the
+/// lens — a clear glass in a material of its own, [selectionMaterial], one
+/// tab wide — bends the painted bar and whatever shows through it, and is
+/// never a second backdrop pass over other glass.
 ///
 /// A bouncy spring — the theme's [GlassMotionRole.settle], SwiftUI's
 /// `.bouncy` unless a theme retunes it — moves the lens, and the lens
@@ -93,16 +87,15 @@ class GlassTab {
 /// frame, gets the lens sent back, and only the tab at [currentIndex] ever
 /// reports itself selected.
 ///
-/// The lens shares the bar's presence, so a bar faded out by a covering
-/// route never leaves a lens behind. Presence only reaches glass, so the
-/// bar fades its own painted labels and icons with it too.
+/// The bar fades with the enclosing presence — a `GlassScaffold`'s, while
+/// a route covers it — and so does the lens, so a faded bar never leaves a
+/// lens behind.
 ///
 /// Under Reduce Motion the lens is still glass, but it moves instantly and
 /// never squashes.
 ///
-/// Inside other glass — a sheet, say — the bar paints (see
-/// [GlassSurface]) and so does its selection: a flat pill in place of the
-/// lens, since glass is never built inside glass.
+/// Inside other glass — a sheet, say — the selection paints too: a flat
+/// pill in place of the lens, since glass is never built inside glass.
 ///
 /// The arrow keys move keyboard focus from tab to tab, through the app's
 /// ordinary directional focus traversal; Enter or Space then selects the
@@ -124,9 +117,8 @@ class GlassTabBar extends StatefulWidget {
     required this.currentIndex,
     required this.onTap,
     this.backdrop,
-    this.material,
+    this.backgroundColor,
     this.selectionMaterial,
-    this.minimumTintOpacity,
     super.key,
   });
   // `tabs` being non-empty and `currentIndex` being inside it are asserted
@@ -172,42 +164,29 @@ class GlassTabBar extends StatefulWidget {
   /// but not when a drag is released on it.
   final ValueChanged<int> onTap;
 
-  /// What is behind the bar, for the adaptation `GlassSurface` offers.
+  /// What is behind the bar, if the app knows it: the navigationBar role
+  /// can flip to the scheme whose labels read better over it.
   final Color? backdrop;
 
-  /// The bar's material, in place of the one the navigationBar role
-  /// resolves to.
+  /// The bar's fill, in place of the role's.
   ///
-  /// Null keeps the role's — Apple's fitted regular material at the role's
-  /// blur and tint steps, which is right for a bar of app chrome. An app
-  /// with a look of its own names one here; the label colour and motion
-  /// still come from the role.
+  /// Null is the navigationBar role's tint colour for the scheme in effect
+  /// at its opaque step — `GlassTintStep.opaque`, about 59% white in light
+  /// mode and 84% grey in dark. The ramp's steps are solved against the
+  /// worst backdrop for each scheme with nothing blurred, which is exactly
+  /// what a painted bar is, so that step keeps the role's labels at 7:1 or
+  /// better over any photo, and a dimmed tab's label still clears 3:1.
   ///
-  /// A material tinted less than [minimumTintOpacity] is raised to it, in
-  /// the role's own tint colour, so the clear lens and the labels still
-  /// read against the bar: see [minimumTintOpacity].
-  final GlassMaterial? material;
+  /// The labels keep the role's colour whatever is passed here, so a
+  /// passed colour is the caller's to check against them. Give it some
+  /// transparency to let the backdrop through, as the default does.
+  final Color? backgroundColor;
 
   /// The selection lens's material. Null is [defaultSelectionMaterial].
   ///
-  /// Always a pass of its own, over the bar's: see the note on glass over
-  /// glass above.
+  /// The lens is the bar's only glass: it bends the painted bar and the
+  /// backdrop showing through it.
   final GlassMaterial? selectionMaterial;
-
-  /// The least tint a passed [material] is drawn with, from 0 to 1.
-  ///
-  /// A clear lens over a clear bar has nothing to read against: both bend
-  /// the same backdrop, and the labels sit on whatever is behind. So a
-  /// [material] whose [GlassMaterial.tintOpacity] is below this floor is
-  /// drawn with this opacity instead, and with the tint colour the
-  /// navigationBar role resolves to — the dark scheme's grey in dark mode —
-  /// because that is the colour the labels are chosen against. A material
-  /// already at or above the floor is used exactly as given.
-  ///
-  /// Null is the role's own tint opacity: a passed material is never
-  /// lighter than the bar the role would have drawn. 0 turns the floor off.
-  /// It has no effect when [material] is null.
-  final double? minimumTintOpacity;
 
   /// The bar's own height, not counting the safe-area inset below it or
   /// the clear space around it — what a layout hard-coding the bar's height
@@ -249,6 +228,9 @@ const EdgeInsets _margin = EdgeInsets.fromLTRB(16, 0, 16, 8);
 
 /// The painted pill's alpha over the bar's label colour, on glass only.
 const double _pillAlpha = 0.14;
+
+/// The bar's rim: a white hairline, as Kibu draws its painted bar.
+const BorderSide _rim = BorderSide(color: Color(0x24FFFFFF));
 
 /// The lens's squash, after Kibu's `_jellyTransform`.
 ///
@@ -301,25 +283,6 @@ class _GlassTabBarState extends State<GlassTabBar>
     with SingleTickerProviderStateMixin, ReduceMotionSnap {
   late final _Lens _lens;
 
-  /// The bar's presence, from the enclosing [GlassPresence] — a
-  /// `GlassScaffold`'s, usually — or [_ownPresence] without one.
-  late Animation<double> _barPresence;
-
-  /// Full presence, as an object of this bar's own.
-  ///
-  /// The bar's glass always carries a presence whose identity is this
-  /// bar's, so the lens can declare it hands off over exactly that glass
-  /// (see [DeclaredGlassHandoff]). Without one, the bar's glass and any
-  /// other glass in the layer with no presence would look the same to the
-  /// overlap check, and the lens would be exempt against all of them.
-  final Animation<double> _ownPresence = _FullPresence();
-
-  /// The lens's presence: the bar's, under an identity of the lens's own.
-  /// Rebuilt only when the bar's presence object changes, because
-  /// [GlassPresence] holds its animation by identity and a fresh one is a
-  /// fresh backdrop pass.
-  late Animation<double> _lensPresence;
-
   /// The tab under the finger while dragging, lit before it is committed.
   int? _hover;
 
@@ -344,19 +307,6 @@ class _GlassTabBarState extends State<GlassTabBar>
     _assertIndex();
     _lens = _Lens(this, widget.currentIndex.toDouble());
   }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final bar = GlassPresenceScope.maybeOf(context) ?? _ownPresence;
-    if (!_lensPresenceBuilt || !identical(bar, _barPresence)) {
-      _lensPresenceBuilt = true;
-      _barPresence = bar;
-      _lensPresence = _HandoffPresence(bar);
-    }
-  }
-
-  bool _lensPresenceBuilt = false;
 
   @override
   void didUpdateWidget(GlassTabBar oldWidget) {
@@ -522,20 +472,6 @@ class _GlassTabBarState extends State<GlassTabBar>
     );
   }
 
-  /// The bar's material: the passed one, raised to the tint floor, or null
-  /// for the role's own. See [GlassTabBar.minimumTintOpacity].
-  GlassMaterial? _barMaterial(GlassSurfaceStyle role) {
-    final material = widget.material;
-    if (material == null) {
-      return null;
-    }
-    final floor = widget.minimumTintOpacity ?? role.material.tintOpacity;
-    if (material.tintOpacity >= floor) {
-      return material;
-    }
-    return material.copyWith(tint: role.material.tint, tintOpacity: floor);
-  }
-
   Widget _bar(BuildContext context, Size size) {
     final onGlass = GlassHostScope.isOnGlass(context);
     final bar = GlassTheme.surfaceOf(
@@ -552,44 +488,66 @@ class _GlassTabBarState extends State<GlassTabBar>
       backdrop: widget.backdrop,
     ).shape;
     final lit = _hover ?? widget.currentIndex;
+    final ramp = GlassTheme.of(context).tokens.tint.of(bar.brightness);
+    final fill =
+        widget.backgroundColor ??
+        ramp.color.withValues(alpha: ramp.opacityFor(GlassTintStep.opaque));
+    final border = bar.shape.toBorder(size);
 
-    // The bar's [GlassSurface] fades this with the bar's presence.
-    final content = Stack(
-      children: [
-        // On glass already the bar paints, and so does its selection.
-        if (onGlass)
-          _Selection(
-            lens: _lens,
-            slot: _slot,
-            size: lensSize,
-            tabCount: widget.tabs.length,
-            child: ClipPath(
-              clipper: GlassShapeClipper(lensShape),
-              child: ColoredBox(
-                color: bar.labelColor.withValues(alpha: _pillAlpha),
-              ),
-            ),
-          ),
-        Padding(
-          padding: const EdgeInsets.all(_inset),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < widget.tabs.length; i++)
-                Expanded(
-                  child: _TabButton(
-                    tab: widget.tabs[i],
-                    lit: i == lit,
-                    selected: i == widget.currentIndex,
-                    color: bar.labelColor,
-                    onActivate: () => _onTabActivated(i),
+    // Painted, never glass: no blur and no backdrop read, so the lens over
+    // it is the bar's only backdrop pass.
+    Widget body = CustomPaint(
+      painter: GlassShadowPainter(shape: bar.shape, shadows: bar.shadows),
+      child: DecoratedBox(
+        decoration: ShapeDecoration(
+          color: fill,
+          shape: border is OutlinedBorder
+              ? border.copyWith(side: _rim)
+              : border,
+        ),
+        child: Stack(
+          children: [
+            // On glass already, the selection paints too.
+            if (onGlass)
+              _Selection(
+                lens: _lens,
+                slot: _slot,
+                size: lensSize,
+                tabCount: widget.tabs.length,
+                child: ClipPath(
+                  clipper: GlassShapeClipper(lensShape),
+                  child: ColoredBox(
+                    color: bar.labelColor.withValues(alpha: _pillAlpha),
                   ),
                 ),
-            ],
-          ),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(_inset),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < widget.tabs.length; i++)
+                    Expanded(
+                      child: _TabButton(
+                        tab: widget.tabs[i],
+                        lit: i == lit,
+                        selected: i == widget.currentIndex,
+                        color: bar.labelColor,
+                        onActivate: () => _onTabActivated(i),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
+    // Presence reaches only glass, so the painted bar fades with it here.
+    final presence = GlassPresenceScope.maybeOf(context);
+    if (presence != null) {
+      body = FadeTransition(opacity: presence, child: body);
+    }
 
     // The listener sees a pointer's cancel before the drag recognizer turns
     // it into an end: see [_pointerCancelled].
@@ -608,21 +566,10 @@ class _GlassTabBarState extends State<GlassTabBar>
         onHorizontalDragCancel: _onDragCancel,
         child: Stack(
           children: [
-            Positioned.fill(
-              // The bar's glass, under its own presence; see
-              // [_ownPresence].
-              child: GlassPresenceScope(
-                presence: _barPresence,
-                child: GlassSurface.navigationBar(
-                  backdrop: widget.backdrop,
-                  material: _barMaterial(bar),
-                  child: content,
-                ),
-              ),
-            ),
-            // A sibling of the bar's glass, never inside it: a `Glass` built
-            // in another's child is refused outright. It takes no pointers:
-            // the tabs and the drag under it do.
+            Positioned.fill(child: body),
+            // Over the painted bar and its labels, bending both. It takes
+            // no pointers: the tabs and the drag under it do. It fades with
+            // the enclosing presence, as all glass does.
             if (!onGlass)
               _Selection(
                 lens: _lens,
@@ -630,14 +577,11 @@ class _GlassTabBarState extends State<GlassTabBar>
                 size: lensSize,
                 tabCount: widget.tabs.length,
                 child: IgnorePointer(
-                  child: GlassPresence(
-                    presence: _lensPresence,
-                    child: Glass(
-                      shape: lensShape,
-                      material:
-                          widget.selectionMaterial ??
-                          GlassTabBar.defaultSelectionMaterial,
-                    ),
+                  child: Glass(
+                    shape: lensShape,
+                    material:
+                        widget.selectionMaterial ??
+                        GlassTabBar.defaultSelectionMaterial,
                   ),
                 ),
               ),
@@ -761,19 +705,6 @@ class _TabButton extends StatelessWidget {
   }
 }
 
-/// The bar's presence, under an identity of the lens's own, and a
-/// [DeclaredGlassHandoff]: the lens sits over the bar's glass on purpose,
-/// always, so the layer's overlap warning leaves that one pair out. Unlike
-/// the bounded handoffs the interface was written for, this one does not
-/// end: see the note on flutter#187820 on [GlassTabBar].
-class _HandoffPresence extends ProxyAnimation implements DeclaredGlassHandoff {
-  _HandoffPresence(Animation<double> super.animation)
-    : handsOffWith = animation;
-
-  @override
-  final Object? handsOffWith;
-}
-
 /// The selection's position, in tabs, moved by a spring stepped every
 /// frame.
 ///
@@ -848,10 +779,4 @@ class _Lens extends ChangeNotifier {
     _ticker.dispose();
     super.dispose();
   }
-}
-
-/// Full presence, as a distinct object: see
-/// `_GlassTabBarState._ownPresence`.
-class _FullPresence extends AlwaysStoppedAnimation<double> {
-  _FullPresence() : super(1);
 }

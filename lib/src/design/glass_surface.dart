@@ -1,9 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:glass_forge/src/design/glass_shadow_painter.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
-import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
@@ -212,7 +211,7 @@ class GlassSurface extends StatelessWidget {
           return glass;
         }
         return CustomPaint(
-          painter: _GlassShadowPainter(
+          painter: GlassShadowPainter(
             shape: style.shape,
             shadows: style.shadows,
           ),
@@ -221,59 +220,4 @@ class GlassSurface extends StatelessWidget {
       },
     );
   }
-}
-
-/// Paints a surface's shadows with the surface's own silhouette cut out.
-///
-/// A [BoxShadow] is drawn as a blurred, *filled* copy of the shape. Under an
-/// opaque surface that fill is invisible, which is why every Material
-/// elevation gets away with it. Glass is translucent, so the same fill shows
-/// straight through the surface it is meant to sit under and reads as a grey
-/// slab inside the glass. Clipping the silhouette out leaves only the
-/// penumbra, which is the part that was doing the work.
-class _GlassShadowPainter extends CustomPainter {
-  const _GlassShadowPainter({required this.shape, required this.shadows});
-
-  final GlassShape shape;
-  final List<BoxShadow> shadows;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = shape.toBorder(size).getOuterPath(Offset.zero & size);
-
-    // How far outside the surface any of these shadows can reach. A Gaussian
-    // mask filter is effectively dead by three sigma, and `blurSigma` is
-    // `blurRadius / 2`, so the reach is 1.5 blur radii plus however far the
-    // shadow was offset. Under-estimating here would clip a shadow's own
-    // tail off with a hard edge.
-    var reach = 0.0;
-    for (final shadow in shadows) {
-      final offset = shadow.offset.distance;
-      final extent = shadow.blurRadius * 1.5 + shadow.spreadRadius + offset;
-      if (extent > reach) {
-        reach = extent;
-      }
-    }
-
-    final outside = Path.combine(
-      PathOperation.difference,
-      Path()..addRect((Offset.zero & size).inflate(reach)),
-      path,
-    );
-
-    canvas
-      ..save()
-      ..clipPath(outside);
-    for (final shadow in shadows) {
-      canvas.drawPath(
-        path.shift(shadow.offset),
-        shadow.toPaint(),
-      );
-    }
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(_GlassShadowPainter oldDelegate) =>
-      oldDelegate.shape != shape || !listEquals(oldDelegate.shadows, shadows);
 }

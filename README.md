@@ -283,8 +283,8 @@ Surfaces adapt by size, following Apple: small elements like a control flip
 light/dark against their background, large ones like a sheet adapt without
 flipping. The gate is thinness, not area.
 
-Every `GlassSurface` constructor, `GlassAppBar`, `GlassTabBar`,
-`GlassDetentSheet` and `showGlassSheet` take a `material` for an app with a
+Every `GlassSurface` constructor, `GlassAppBar`, `GlassDetentSheet` and
+`showGlassSheet` take a `material` for an app with a
 look of its own; null keeps the role's. A surface placed on glass paints
 its tint instead of drawing a second glass.
 
@@ -337,7 +337,10 @@ stacked on the bar's — every control in this package knows it is drawn on
 glass through the same `GlassHostScope` this bar sets up for its children.
 
 `GlassTabBar` is the bottom bar to put in it: a floating capsule with the
-bottom safe area built in, one selectable button per tab.
+bottom safe area built in, one selectable button per tab. Only its
+selection is glass. The bar itself is painted, a semi-opaque capsule in
+the navigation-bar tint with a hairline rim and no blur, so labels read
+over any photo and the lens is never glass on glass.
 
 ```dart
 GlassTabBar(
@@ -348,6 +351,9 @@ GlassTabBar(
   ],
   currentIndex: index,
   onTap: (next) => setState(() => index = next),
+  // Optional: the bar's fill, and the lens's material.
+  // backgroundColor: const Color(0xD91C1C1E),
+  // selectionMaterial: GlassTabBar.defaultSelectionMaterial,
 )
 ```
 
@@ -356,9 +362,9 @@ The selection is always a clear glass lens in a material of its own
 squashes along its travel, narrower and taller the faster it goes. Drag
 along the bar and it follows your finger, with a click for each tab you
 cross; lift and the tab under your finger is selected. It fades with the
-bar, and under Reduce Motion it moves at once, still glass. A `material`
-you pass is tinted at least as much as the role's own bar
-(`minimumTintOpacity`), so the lens has something to read against.
+bar, and under Reduce Motion it moves at once, still glass. Pass
+`backgroundColor` to fill the bar yourself; the labels keep the role's
+colour, so check them against it.
 `GlassTabBar.height` and `GlassTabBar.margin` are public for laying out
 content around the bar.
 
@@ -416,10 +422,6 @@ harness marks such a run untrustworthy rather than letting it quietly pass.
   mattes could meet, and every shape in one blend group, share a cluster.
   Past eight in one cluster the extras are not drawn, and a debug warning
   says so.
-- The tab-bar lens is glass over the bar's glass, always, at rest too.
-  That is the one overlap this package makes on purpose, and it has not
-  yet been checked on a physical iPhone for [flutter#187820]. Check it on
-  a device before you ship the bar.
 - `GlassSwitch` and `GlassSegmentedControl` dimensions are not yet measured
   against an iOS capture. The controls pick some of their own colours,
   such as the switch's green track and white knob.

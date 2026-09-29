@@ -4,10 +4,9 @@
 // pushed, which needs `ui.ImageFilter.shader`. Run with
 // `flutter test --tags impeller --run-skipped --enable-impeller`.
 //
-// The lens is a second pass over the bar's, on purpose and always. It
-// declares itself a handoff (see `DeclaredGlassHandoff`), and the overlap
-// check leaves declared handoffs out against the bar, so nothing prints:
-// not at rest, not mid-flight, and not once it has landed.
+// The bar is painted and its lens is its only glass, so the lens never
+// sits over another pass: nothing prints at rest, across a tap, or across
+// a drag. Other glass put over the lens still warns, once.
 @Tags(<String>['impeller'])
 library;
 
@@ -28,8 +27,8 @@ void main() {
   setUpAll(ShaderLibrary.instance.warmUp);
   tearDownAll(ShaderLibrary.instance.disposeAll);
 
-  testWidgets('the bar and its lens print no overlap warning, at rest or '
-      'across a tap', (tester) async {
+  testWidgets('the bar and its lens print no overlap warning, at rest, '
+      'across a tap or across a drag', (tester) async {
     var index = 0;
     final printed = <String>[];
     final previous = debugPrint;
@@ -65,32 +64,42 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      final lens = find.descendant(
+        of: find.byType(GlassTabBar),
+        matching: find.byType(Glass),
+      );
       await tester.tap(find.text('Profile'));
       for (var i = 0; i < 90; i++) {
         await tester.pump(const Duration(milliseconds: 16));
-        final lens = tester
-            .widgetList<GlassPresence>(
-              find.descendant(
-                of: find.byType(GlassTabBar),
-                matching: find.byType(GlassPresence),
-              ),
-            )
-            .single;
-        sawLens = sawLens || lens.presence.value > 0;
+        sawLens = sawLens || lens.evaluate().isNotEmpty;
       }
+      await tester.pumpAndSettle();
+
+      // A drag back to Home, a frame per step, lens following the finger.
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('Profile')),
+      );
+      final home = tester.getCenter(find.text('Home'));
+      for (var i = 1; i <= 20; i++) {
+        await gesture.moveTo(
+          Offset.lerp(tester.getCenter(find.text('Profile')), home, i / 20)!,
+        );
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
       await tester.pumpAndSettle();
     } finally {
       debugPrint = previous;
     }
 
     expect(sawLens, isTrue, reason: 'the lens must be up for this to count');
-    expect(index, 2);
+    expect(index, 0);
     expect(printed.where((line) => line.contains('187820')), isEmpty);
   });
 
   testWidgets(
-    'other glass over the lens still warns against it: the handoff '
-    'exemption is for the bar alone',
+    'other glass over the lens still warns against it, and only it: the '
+    'bar under it is not glass',
     (tester) async {
       final printed = <String>[];
       final previous = debugPrint;
@@ -141,11 +150,10 @@ void main() {
         debugPrint = previous;
       }
 
-      // Once against the bar and once against the lens. A lens exempt
-      // against everything would leave only the bar's.
+      // Once, against the lens. A bar of glass would add a second.
       expect(
         printed.where((line) => line.contains('187820')),
-        hasLength(2),
+        hasLength(1),
       );
     },
   );

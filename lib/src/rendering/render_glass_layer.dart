@@ -17,7 +17,6 @@ import 'package:glass_forge/src/geometry/runtime_geometry_producer.dart';
 import 'package:glass_forge/src/geometry/shape_clusters.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/material/glass_profile.dart';
-import 'package:glass_forge/src/rendering/declared_glass_handoff.dart';
 import 'package:glass_forge/src/rendering/render_glass_shape.dart';
 import 'package:glass_forge/src/scene/glass_scene.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
@@ -819,10 +818,7 @@ class RenderGlassLayer extends RenderProxyBox {
   /// A warning, not an assert -- deliberately. Overlap is legitimately
   /// transient: a sheet rising over a tab bar overlaps it for exactly as
   /// long as the handoff takes, and an assert would throw on the very
-  /// frame that was in the middle of fixing it. A shape whose presence is a
-  /// [DeclaredGlassHandoff] is left out against the one glass it declares
-  /// it hands off over, and against nothing else: that pair is an overlap
-  /// this package makes on purpose, declared as such. Shapes inside one
+  /// frame that was in the middle of fixing it. Shapes inside one
   /// pass are fine: they share a matte and fold into one surface via
   /// smooth-min, which is the supported way to overlap.
   ///
@@ -852,11 +848,6 @@ class RenderGlassLayer extends RenderProxyBox {
   /// reached the screen, since the matte and the filter are themselves
   /// built from the corrected, post-paint values. Reading after matches
   /// what actually renders.
-  /// Whether glass driven by [scope] declares a bounded handoff over glass
-  /// driven by [other]: see [DeclaredGlassHandoff].
-  static bool _declaredHandoff(Object? scope, Object? other) =>
-      scope is DeclaredGlassHandoff && identical(scope.handsOffWith, other);
-
   void _debugWarnOnCrossPassOverlap() {
     assert(() {
       final live = _passes.values.toSet();
@@ -881,11 +872,7 @@ class RenderGlassLayer extends RenderProxyBox {
         for (var j = i + 1; j < entries.length; j++) {
           final b = entries[j];
           final assignedB = b.assigned;
-          if (assignedB == null ||
-              !b.placed ||
-              assignedA == assignedB ||
-              _declaredHandoff(a.presenceScope, b.presenceScope) ||
-              _declaredHandoff(b.presenceScope, a.presenceScope)) {
+          if (assignedB == null || !b.placed || assignedA == assignedB) {
             continue;
           }
           if (!GlassComposition.willRender(assignedB.material, b.presence)) {

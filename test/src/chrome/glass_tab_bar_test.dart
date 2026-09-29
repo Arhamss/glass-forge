@@ -50,40 +50,34 @@ Widget _followingBar(List<int> taps, {int initial = 0}) {
   );
 }
 
-/// The lens's own presence — the only [GlassPresence] the bar builds.
-Animation<double> _lensPresence(WidgetTester tester) {
-  return tester
-      .widget<GlassPresence>(
-        find.descendant(
-          of: find.byType(GlassTabBar),
-          matching: find.byType(GlassPresence),
-        ),
-      )
-      .presence;
-}
-
-/// The lens's glass: the one under the lens's own presence.
-final Finder _lens = find.descendant(
-  of: find.descendant(
-    of: find.byType(GlassTabBar),
-    matching: find.byType(GlassPresence),
-  ),
+/// Every glass the bar builds. The lens is the only one.
+final Finder _barGlass = find.descendant(
+  of: find.byType(GlassTabBar),
   matching: find.byType(Glass),
 );
+
+/// The lens's glass.
+final Finder _lens = _barGlass;
+
+/// The presence the lens renders at: the one it inherits, or full.
+double _lensPresence(WidgetTester tester) =>
+    GlassPresenceScope.maybeOf(tester.element(_lens))?.value ?? 1;
 
 /// The lens as drawn, squash included: [WidgetTester.getRect] puts the
 /// corners through every transform above it.
 Rect _lensRect(WidgetTester tester) => tester.getRect(_lens);
 
-/// The bar's own glass, inside its [GlassSurface].
-Glass _barGlass(WidgetTester tester) => tester.widget<Glass>(
-  find
-      .descendant(
-        of: find.byType(GlassSurface),
-        matching: find.byType(Glass),
-      )
-      .first,
+/// The bar's painted body: the one shape-decorated box in the bar.
+final Finder _body = find.descendant(
+  of: find.byType(GlassTabBar),
+  matching: find.byWidgetPredicate(
+    (widget) => widget is DecoratedBox && widget.decoration is ShapeDecoration,
+  ),
 );
+
+/// The fill the bar's body is painted in.
+Color? _bodyColor(WidgetTester tester) =>
+    (tester.widget<DecoratedBox>(_body).decoration as ShapeDecoration).color;
 
 /// Records every haptic the bar asks the platform for, by type.
 List<String> _recordHaptics(WidgetTester tester) {
@@ -190,10 +184,9 @@ void main() {
         'selected tab', (tester) async {
       await tester.pumpWidget(_harness(bar: _followingBar(<int>[])));
 
-      expect(_lensPresence(tester).value, 1);
+      expect(_lensPresence(tester), 1);
       final lens = tester.widget<Glass>(_lens);
       expect(lens.material, GlassTabBar.defaultSelectionMaterial);
-      expect(lens.material, isNot(_barGlass(tester).material));
       expectUnder(_lensRect(tester), tester.getCenter(find.text('Home')));
     });
 
@@ -204,7 +197,7 @@ void main() {
 
       await tester.tap(find.text('Profile'));
       await tester.pumpAndSettle();
-      expect(_lensPresence(tester).value, 1);
+      expect(_lensPresence(tester), 1);
       expectUnder(_lensRect(tester), tester.getCenter(find.text('Profile')));
     });
 
@@ -265,12 +258,12 @@ void main() {
           barPresence: const AlwaysStoppedAnimation<double>(0),
         ),
       );
-      expect(_lensPresence(tester).value, 0);
+      expect(_lensPresence(tester), 0);
 
       await tester.tap(find.text('Profile'), warnIfMissed: false);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 60));
-      expect(_lensPresence(tester).value, 0);
+      expect(_lensPresence(tester), 0);
     });
   });
 
@@ -361,15 +354,9 @@ void main() {
 
     await tester.pumpWidget(_harness(bar: _followingBar(<int>[])));
 
-    // The bar's glass and the lens's.
-    expect(
-      find.descendant(
-        of: find.byType(GlassTabBar),
-        matching: find.byType(Glass),
-      ),
-      findsNWidgets(2),
-    );
-    expect(_lensPresence(tester).value, 1);
+    // The lens, and nothing else.
+    expect(_barGlass, findsOneWidget);
+    expect(_lensPresence(tester), 1);
     final rest = _lensRect(tester);
 
     await tester.tap(find.text('Profile'));
@@ -383,7 +370,9 @@ void main() {
     expect(_lensRect(tester), landed);
   });
 
-  testWidgets('bar presence 0 hides the labels and icons', (tester) async {
+  testWidgets('bar presence 0 hides the painted bar, labels and icons', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       _harness(
         bar: _followingBar(<int>[]),
@@ -391,6 +380,7 @@ void main() {
       ),
     );
 
+    expect(_effectiveOpacity(tester, _body), 0);
     for (final label in ['Home', 'Search', 'Profile']) {
       expect(_effectiveOpacity(tester, find.text(label)), 0, reason: label);
     }
@@ -415,64 +405,62 @@ void main() {
       ),
     );
 
-    final glass = find.descendant(
-      of: find.byType(GlassTabBar),
-      matching: find.byType(GlassSurface),
-    );
     final screenBottom = tester.getBottomLeft(find.byType(GlassLayer)).dy;
-    expect(tester.getBottomLeft(glass).dy, screenBottom - 34);
+    expect(tester.getBottomLeft(_body).dy, screenBottom - 34);
   });
 
-  testWidgets("a passed material reaches the bar's Glass", (tester) async {
-    const material = GlassMaterial(frost: 2, tintOpacity: 0.9);
-    await tester.pumpWidget(
-      _harness(
-        bar: GlassTabBar(
-          tabs: _tabs,
-          currentIndex: 0,
-          onTap: (_) {},
-          material: material,
+  group('the body', () {
+    testWidgets('is painted: the lens is the only glass, and nothing in '
+        'the bar blurs', (tester) async {
+      await tester.pumpWidget(_harness(bar: _followingBar(<int>[])));
+      expect(_body, findsOneWidget);
+      expect(_barGlass, findsOneWidget);
+      expect(
+        find.descendant(of: _body, matching: find.byType(Glass)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(GlassTabBar),
+          matching: find.byType(BackdropFilter),
         ),
-      ),
-    );
+        findsNothing,
+      );
+    });
 
-    final glass = tester.widget<Glass>(
-      find
-          .descendant(
-            of: find.byType(GlassSurface),
-            matching: find.byType(Glass),
-          )
-          .first,
-    );
-    expect(glass.material, material);
-  });
-
-  testWidgets("no material passed keeps the role's own", (tester) async {
-    late GlassSurfaceStyle role;
-    await tester.pumpWidget(
-      _harness(
-        bar: Builder(
-          builder: (context) {
-            role = GlassTheme.surfaceOf(
-              context,
-              GlassSurfaceRole.navigationBar,
-              size: const Size(300, GlassTabBar.height),
-            );
-            return GlassTabBar(tabs: _tabs, currentIndex: 0, onTap: (_) {});
-          },
+    testWidgets('takes a backgroundColor', (tester) async {
+      const color = Color(0xCC20304A);
+      await tester.pumpWidget(
+        _harness(
+          bar: GlassTabBar(
+            tabs: _tabs,
+            currentIndex: 0,
+            onTap: (_) {},
+            backgroundColor: color,
+          ),
         ),
-      ),
-    );
+      );
+      expect(_bodyColor(tester), color);
+    });
 
-    final glass = tester.widget<Glass>(
-      find
-          .descendant(
-            of: find.byType(GlassSurface),
-            matching: find.byType(Glass),
-          )
-          .first,
-    );
-    expect(glass.material, role.material);
+    for (final brightness in Brightness.values) {
+      testWidgets("with none, is the role's ${brightness.name} tint at its "
+          'opaque step', (tester) async {
+        final ramp = const GlassTints().of(brightness);
+        await tester.pumpWidget(
+          GlassTheme(
+            data: GlassThemeData(brightness: brightness),
+            child: _harness(
+              bar: GlassTabBar(tabs: _tabs, currentIndex: 0, onTap: (_) {}),
+            ),
+          ),
+        );
+        expect(
+          _bodyColor(tester),
+          ramp.color.withValues(alpha: ramp.opacityFor(GlassTintStep.opaque)),
+        );
+      });
+    }
   });
 
   testWidgets("the bar's height is public, and matches the built bar", (
@@ -485,8 +473,7 @@ void main() {
     );
 
     expect(GlassTabBar.height, 62);
-    final surface = find.byType(GlassSurface);
-    expect(tester.getSize(surface).height, GlassTabBar.height);
+    expect(tester.getSize(_body).height, GlassTabBar.height);
     // With no safe area, the widget is the bar plus its public margin.
     expect(
       tester.getSize(find.byType(GlassTabBar)).height,
@@ -544,69 +531,6 @@ void main() {
         }
       });
     }
-  });
-
-  group('the body tint floor', () {
-    GlassSurfaceStyle roleOf(BuildContext context) => GlassTheme.surfaceOf(
-      context,
-      GlassSurfaceRole.navigationBar,
-      size: const Size(300, GlassTabBar.height),
-    );
-
-    Future<GlassSurfaceStyle> pump(
-      WidgetTester tester,
-      GlassMaterial material, {
-      double? minimumTintOpacity,
-    }) async {
-      late GlassSurfaceStyle role;
-      await tester.pumpWidget(
-        _harness(
-          bar: Builder(
-            builder: (context) {
-              role = roleOf(context);
-              return GlassTabBar(
-                tabs: _tabs,
-                currentIndex: 0,
-                onTap: (_) {},
-                material: material,
-                minimumTintOpacity: minimumTintOpacity,
-              );
-            },
-          ),
-        ),
-      );
-      return role;
-    }
-
-    testWidgets("raises a clear material to the role's tint", (
-      tester,
-    ) async {
-      const clear = GlassMaterial(frost: 2);
-      final role = await pump(tester, clear);
-      expect(role.material.tintOpacity, greaterThan(0));
-
-      final drawn = _barGlass(tester).material!;
-      expect(drawn.tintOpacity, role.material.tintOpacity);
-      expect(drawn.tint, role.material.tint);
-      // Only the tint is raised.
-      expect(drawn.frost, 2);
-    });
-
-    testWidgets('leaves an already-tinted material as it is', (tester) async {
-      const tinted = GlassMaterial(
-        frost: 2,
-        tint: Color(0xFF4A2A55),
-        tintOpacity: 0.9,
-      );
-      await pump(tester, tinted);
-      expect(_barGlass(tester).material, tinted);
-    });
-
-    testWidgets('is turned off by a floor of 0', (tester) async {
-      const clear = GlassMaterial(frost: 2);
-      await pump(tester, clear, minimumTintOpacity: 0);
-      expect(_barGlass(tester).material, clear);
-    });
   });
 
   group('the owner rejects the change', () {
@@ -828,6 +752,7 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     expect(find.byType(Glass), findsOneWidget);
+    expect(_body, findsOneWidget);
 
     await tester.tap(find.text('Profile'));
     for (var i = 0; i < 30; i++) {

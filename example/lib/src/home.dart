@@ -207,19 +207,20 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                 padding: EdgeInsets.only(bottom: padding.bottom > 0 ? 8 : 0),
                 // Fades out before the rising sheet reaches it: two
                 // backdrop passes over the same pixels is the one thing
-                // glass must not do (flutter#187820). The bar reads its
-                // presence from here and hands it to its lens as well.
+                // glass must not do (flutter#187820). The bar fades its
+                // paint with this presence, and its lens inherits it.
                 child: GlassPresence(
                   presence: _barPresence,
                   child: Arrive(
                     delay: const Duration(milliseconds: 200),
-                    // The tuned material, read live from the layer so the
-                    // bar morphs with every preset. It still fades on its
-                    // own: a pass is keyed by material *and* presence
-                    // scope, and the bar sits under its own presence.
+                    // The bar is painted; only its selection is glass. The
+                    // tuned material, read live from the layer, drives that
+                    // lens, so it morphs with every preset.
                     child: Builder(
                       builder: (context) => GlassTabBar(
-                        material: GlassLayerScope.maybeOf(context)?.material,
+                        selectionMaterial: GlassLayerScope.maybeOf(
+                          context,
+                        )?.material,
                         tabs: _tabs,
                         currentIndex: _scene,
                         onTap: (i) {

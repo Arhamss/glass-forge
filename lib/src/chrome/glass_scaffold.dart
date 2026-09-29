@@ -98,10 +98,10 @@ class GlassScaffold extends StatelessWidget {
   /// default.
   ///
   /// Not a surface override, as `GlassSurface.material` and
-  /// `GlassTabBar.material` are: most glass here names its own material
-  /// (every `GlassSurface` resolves its role's, every control the control
-  /// role's), and only a bare `Glass` with no material of its own reads
-  /// this one.
+  /// `GlassTabBar.selectionMaterial` are: most glass here names its own
+  /// material (every `GlassSurface` resolves its role's, every control the
+  /// control role's), and only a bare `Glass` with no material of its own
+  /// reads this one.
   final GlassMaterial? material;
 
   @override

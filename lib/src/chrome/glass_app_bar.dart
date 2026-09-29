@@ -82,8 +82,7 @@ class GlassAppBar extends StatelessWidget {
   final Color? backdrop;
 
   /// The bar's material, in place of the navigation-bar role's. Null keeps
-  /// the role's; see [GlassSurface.material]. Pass the same material as a
-  /// `GlassTabBar.material` for a top and bottom bar that match.
+  /// the role's; see [GlassSurface.material].
   final GlassMaterial? material;
 
   @override
