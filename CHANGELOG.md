@@ -22,7 +22,7 @@
   this release, so this only affects code written against this branch.
 
 - `InteractiveGlass.pressScale` is now `double?` and defaults to null, which
-  grows the surface by the new `pressGrowth` (17 pt). Passing a ratio still
+  grows the surface by the new `pressGrowth` (6 pt). Passing a ratio still
   works as before and wins over `pressGrowth`; code that reads the field as
   a `double` needs a null check.
 - `GlassMotionState.pressAnchor` is now `pressDrag` and
@@ -54,8 +54,8 @@
   - `GlassPressStretch` defaults are now intensity 0.05, squash 1 (area
     kept) and travel 0.05 of the drag, capped at 4 pt: at most 5 % of
     elongation, where the old 0.5 / 0.3 / 0.15 reached 1.5×.
-  - A press **grows** the surface by 17 pt on its longest side
-    (`pressGrowth`), held to a ratio of 1.04 to 1.3, instead of shrinking
+  - A press **grows** the surface by 6 pt on its longest side
+    (`pressGrowth`), held to a ratio of 1.02 to 1.10, instead of shrinking
     it to 0.96.
   - The press runs on snappy 250 ms / bounce 0.25 and lets go on its own
     spring, bouncy 280 ms / bounce 0.45 (`pressReleaseMotion`, new).

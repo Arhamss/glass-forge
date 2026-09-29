@@ -95,7 +95,7 @@ class InteractiveGlass extends StatefulWidget {
   const InteractiveGlass({
     required this.child,
     this.pressScale,
-    this.pressGrowth = 17,
+    this.pressGrowth = 6,
     this.pressStretch = const GlassPressStretch(),
     this.drag = const GlassDrag.none(),
     this.jiggle = const GlassJiggle(),
@@ -134,10 +134,10 @@ class InteractiveGlass extends StatefulWidget {
   /// longest side. `0` turns the growth off.
   ///
   /// Apple's interactive glass grows on press rather than shrinking, by a
-  /// roughly constant 17 pt: 1.3× on a 56 pt circle, about 1.13× on a
-  /// 132 pt pill. The ratio this produces is held between 1.04 and 1.3, so
-  /// a small glyph does not balloon and a full-width card still answers.
-  /// Ignored when [pressScale] is set.
+  /// subtle 6 pt: about 1.10× on a 56 pt circle, about 1.05× on a 132 pt
+  /// pill. The ratio this produces is held between 1.02 and 1.10, a quiet
+  /// lift that keeps a small glyph readable and a full-width card still
+  /// answering. Ignored when [pressScale] is set.
   final double pressGrowth;
 
   /// How far the surface gives while a pressing finger drags across it.

@@ -234,11 +234,11 @@ const double _resistance = 100;
 /// [pressScale], when given, is used as it is — the old fixed ratio, and
 /// the way to ask for a shrink. Otherwise the surface grows by
 /// [pressGrowth] logical pixels along its longest side, which is how
-/// Apple's interactive glass behaves: about 17 pt whatever the size, so a
-/// 56 pt circle reaches 1.3 and a 132 pt pill about 1.13. The ratio is
-/// held between [minPressGrowthScale] and [maxPressGrowthScale], so a
-/// 20 pt glyph does not balloon to twice its size and a full-width card
-/// still visibly answers the finger.
+/// Apple's interactive glass behaves: about 6 pt as a subtle lift, so a
+/// 56 pt circle reaches about 1.10 and a 132 pt pill about 1.05. The ratio
+/// is held between [minPressGrowthScale] and [maxPressGrowthScale], so a
+/// small glyph stays legible and a full-width card still visibly answers.
+/// (The earlier +17 pt was one third-party measurement of larger controls.)
 double glassPressScaleFor(
   Size size, {
   required double pressGrowth,
@@ -258,7 +258,7 @@ double glassPressScaleFor(
 }
 
 /// The smallest ratio a growing press reaches, on a very large surface.
-const double minPressGrowthScale = 1.04;
+const double minPressGrowthScale = 1.02;
 
 /// The largest ratio a growing press reaches, on a very small surface.
-const double maxPressGrowthScale = 1.3;
+const double maxPressGrowthScale = 1.10;

@@ -156,21 +156,27 @@ void main() {
       return major;
     }
 
-    testWidgets('+17 pt on a 132 pt pill', (tester) async {
+    testWidgets('+6 pt on a 132 pt pill', (tester) async {
       final scale = await pressedScale(tester, const Size(132, 44));
-      expect(scale * 132 - 132, closeTo(17, 0.05));
+      expect(scale * 132 - 132, closeTo(6, 0.05));
     });
 
-    testWidgets('a tiny surface is clamped to 1.3', (tester) async {
+    testWidgets('a tiny surface is clamped to 1.10', (tester) async {
       expect(
         await pressedScale(tester, const Size(24, 24)),
-        closeTo(1.3, 1e-6),
+        closeTo(1.10, 1e-6),
       );
     });
 
-    testWidgets('a huge surface is clamped to 1.04', (tester) async {
+    testWidgets('a huge surface is clamped to 1.02', (tester) async {
       final scale = await pressedScale(tester, const Size(700, 200));
-      expect(scale, closeTo(1.04, 1e-6));
+      expect(scale, closeTo(1.02, 1e-6));
+    });
+
+    testWidgets('a 50 pt circle at max clamp is ≤ 1.10', (tester) async {
+      final scale = await pressedScale(tester, const Size(50, 50));
+      expect(scale, lessThanOrEqualTo(1.10 + 1e-9));
+      expect(scale, greaterThan(1.0));
     });
   });
 

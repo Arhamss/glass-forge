@@ -90,7 +90,7 @@ InteractiveGlass(
 )
 ```
 
-A press grows the surface by 17 pt and lifts it with a soft glow; only a
+A press grows the surface by 6 pt and lifts it with a soft glow; only a
 finger that moves while pressing flexes it, by at most 5 %. Set
 `pressScale` for a fixed ratio instead, or `GlassPressStretch.none()` to
 keep the shape still.
