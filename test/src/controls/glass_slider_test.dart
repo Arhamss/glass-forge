@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/controls/glass_slider.dart';
+import 'package:glass_forge/src/controls/track_cutout.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
@@ -31,7 +32,11 @@ double _xFor(double fraction) => _thumbSize / 2 + fraction * _travel;
 /// [child] in a layer, either on content or, with [onGlass], nested inside a
 /// real `Glass` so `GlassHostScope.isOnGlass` reads true for it. Always
 /// [_width] wide, the geometry every drag and tap offset below assumes.
-Widget _harness({required Widget child, bool onGlass = false}) {
+Widget _harness({
+  required Widget child,
+  bool onGlass = false,
+  TextDirection textDirection = TextDirection.ltr,
+}) {
   final sized = SizedBox(width: _width, child: child);
   final content = onGlass
       ? Glass(
@@ -40,7 +45,7 @@ Widget _harness({required Widget child, bool onGlass = false}) {
         )
       : Center(child: sized);
   return Directionality(
-    textDirection: TextDirection.ltr,
+    textDirection: textDirection,
     child: GlassLayer(
       tier: GeometryTier.none,
       material: _inert,
@@ -351,5 +356,129 @@ void main() {
 
     await gesture.up();
     await tester.pump();
+  });
+
+  group('right to left', () {
+    Widget rtl({required double value, ValueChanged<double>? onChanged}) =>
+        _harness(
+          textDirection: TextDirection.rtl,
+          child: GlassSlider(value: value, onChanged: onChanged ?? (_) {}),
+        );
+
+    /// The slider's right edge — where [GlassSlider.min] is under RTL — at
+    /// its vertical centre. Every `_xFor` offset below is measured leftward
+    /// from here.
+    Offset rightAnchor(WidgetTester tester) {
+      final rect = tester.getRect(find.byType(GlassSlider));
+      return Offset(rect.right, rect.center.dy);
+    }
+
+    Rect thumbOf(WidgetTester tester) => tester.getRect(
+      find.descendant(
+        of: find.byType(GlassSlider),
+        matching: find.byType(Glass),
+      ),
+    );
+
+    /// The fill: the one painted box on the 6-point track narrower than it.
+    Rect fillOf(WidgetTester tester) => tester
+        .renderObjectList<RenderBox>(
+          find.descendant(
+            of: find.byType(GlassSlider),
+            matching: find.byType(DecoratedBox),
+          ),
+        )
+        .map((box) => box.localToGlobal(Offset.zero) & box.size)
+        .singleWhere((rect) => rect.height == 6 && rect.width < _width);
+
+    /// The painted-track hole, in global coordinates.
+    Rect holeOf(WidgetTester tester) {
+      final clip = find.descendant(
+        of: find.byType(GlassSlider),
+        matching: find.byWidgetPredicate(
+          (w) => w is ClipPath && w.clipper is TrackCutoutClipper,
+        ),
+      );
+      final clipper =
+          tester.widget<ClipPath>(clip).clipper! as TrackCutoutClipper;
+      return clipper.hole!.shift(tester.getTopLeft(clip));
+    }
+
+    testWidgets('min puts the thumb, and its hole, at the right end', (
+      tester,
+    ) async {
+      await tester.pumpWidget(rtl(value: 0));
+      final slider = tester.getRect(find.byType(GlassSlider));
+      expect(thumbOf(tester).right, slider.right);
+      expect(holeOf(tester), thumbOf(tester));
+    });
+
+    testWidgets('the fill grows leftward from the right end', (tester) async {
+      await tester.pumpWidget(rtl(value: 0.25));
+      final slider = tester.getRect(find.byType(GlassSlider));
+      final fill = fillOf(tester);
+      expect(fill.right, slider.right);
+      expect(fill.width, closeTo(_xFor(0.25), 0.001));
+      expect(thumbOf(tester).center.dx, closeTo(fill.left, 0.001));
+      expect(holeOf(tester), thumbOf(tester));
+    });
+
+    testWidgets('a drag measures from the right edge', (tester) async {
+      double? reported;
+      await tester.pumpWidget(
+        rtl(value: 0, onChanged: (next) => reported = next),
+      );
+      final anchor = rightAnchor(tester);
+      final gesture = await tester.startGesture(
+        anchor - Offset(_xFor(0), 0),
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.moveTo(anchor - Offset(_xFor(0.25), 0));
+      await gesture.up();
+      await tester.pump();
+
+      expect(reported, closeTo(0.25, 0.001));
+    });
+
+    testWidgets('a tap sets the value measured from the right edge', (
+      tester,
+    ) async {
+      double? reported;
+      await tester.pumpWidget(
+        rtl(value: 0, onChanged: (next) => reported = next),
+      );
+      final gesture = await tester.startGesture(
+        rightAnchor(tester) - Offset(_xFor(0.75), 0),
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.up();
+      await tester.pump();
+
+      expect(reported, closeTo(0.75, 0.001));
+    });
+
+    testWidgets('the left arrow increases the value', (tester) async {
+      var value = 0.5;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) => rtl(
+            value: value,
+            onChanged: (next) => setState(() => value = next),
+          ),
+        ),
+      );
+      FocusManager.instance.rootScope.descendants
+          .firstWhere((node) => node.canRequestFocus)
+          .requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      expect(value, closeTo(0.6, 0.001));
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      expect(value, closeTo(0.5, 0.001));
+    });
   });
 }

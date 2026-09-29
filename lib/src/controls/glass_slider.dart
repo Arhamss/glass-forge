@@ -44,6 +44,10 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 /// callback never runs. Focus and the increase/decrease semantics actions
 /// come from [GlassControlFrame] — the left/right (or down/up) arrow keys
 /// step by one [divisions] or, without divisions, by a tenth of the range.
+///
+/// Under [TextDirection.rtl] the slider mirrors, as `Slider` does: [min] is
+/// on the right, the fill grows leftward from it, a drag or tap measures
+/// from the right edge, and the left arrow key increases the value.
 class GlassSlider extends StatefulWidget {
   /// Creates a slider.
   const GlassSlider({
@@ -140,6 +144,11 @@ class _GlassSliderState extends State<GlassSlider>
   /// The most recent build's track width, read by the drag handlers, which
   /// run outside `build` and have no constraints of their own to ask.
   double _trackWidth = 0;
+
+  /// The most recent build's reading direction, read by the drag handlers
+  /// for the same reason as [_trackWidth]. [_position] always counts from
+  /// [GlassSlider.min]; under [TextDirection.rtl] that end is on the right.
+  TextDirection _textDirection = TextDirection.ltr;
 
   Duration? _lastTimestamp;
   double _lastX = 0;
@@ -291,9 +300,13 @@ class _GlassSliderState extends State<GlassSlider>
       return;
     }
     final travel = (_trackWidth - _thumbSize).clamp(0.0, double.infinity);
+    // Distance from the [GlassSlider.min] end: the right edge under RTL.
+    final fromStart = _textDirection == TextDirection.rtl
+        ? _trackWidth - dx
+        : dx;
     final rawFraction = travel == 0
         ? 0.0
-        : (dx - _thumbSize / 2).clamp(0.0, travel) / travel;
+        : (fromStart - _thumbSize / 2).clamp(0.0, travel) / travel;
     _position.value = _snap(rawFraction);
     widget.onChanged?.call(_currentValue);
   }
@@ -342,6 +355,7 @@ class _GlassSliderState extends State<GlassSlider>
   Widget build(BuildContext context) {
     final enabled = widget.onChanged != null;
     final currentValue = _currentValue;
+    _textDirection = Directionality.of(context);
     return GlassControlFrame(
       onActivate: null,
       semanticLabel: widget.semanticLabel,
@@ -402,8 +416,13 @@ class _GlassSliderState extends State<GlassSlider>
         animation: Listenable.merge([_position, _stretch]),
         builder: (context, child) {
           final travel = (width - _thumbSize).clamp(0.0, double.infinity);
-          final left = _position.value * travel;
-          final filled = (left + _thumbSize / 2).clamp(0.0, width);
+          // Thumb and fill both measure from the [GlassSlider.min] end —
+          // the start edge, so the right one under RTL.
+          final start = _position.value * travel;
+          final filled = (start + _thumbSize / 2).clamp(0.0, width);
+          final left = _textDirection == TextDirection.rtl
+              ? travel - start
+              : start;
           const trackTop = (GlassControlFrame.minimumExtent - _trackHeight) / 2;
           const thumbTop = (GlassControlFrame.minimumExtent - _thumbSize) / 2;
           return Stack(
@@ -439,8 +458,8 @@ class _GlassSliderState extends State<GlassSlider>
                           decoration: BoxDecoration(color: trackColor),
                           child: SizedBox(width: width, height: _trackHeight),
                         ),
-                        Positioned(
-                          left: 0,
+                        PositionedDirectional(
+                          start: 0,
                           top: 0,
                           bottom: 0,
                           width: filled,
