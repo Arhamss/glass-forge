@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/physics.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
@@ -42,10 +44,13 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 /// control's label.
 ///
 /// **The keyboard inset.** On focus, and again on every subsequent change
-/// to `MediaQuery`'s metrics while still focused, this widget calls
-/// [Scrollable.ensureVisible] so a field inside a scroll view tracks the
-/// keyboard's own show/hide animation rather than only reacting once, to
-/// its first or last frame.
+/// to the view's metrics while still focused, a field inside a scroll view
+/// scrolls just far enough to sit clear of whatever covers the screen: the
+/// keyboard (`MediaQuery.viewInsets`), and a bar or safe area reported
+/// through `MediaQuery.padding` — in a `GlassScaffold`, the bottom bar
+/// riding the keyboard. It tracks the keyboard's own show/hide animation
+/// rather than reacting only to its first or last frame, and a field
+/// already in the clear does not move.
 ///
 /// ```dart
 /// GlassTextField(
@@ -225,6 +230,7 @@ class _GlassTextFieldState extends State<GlassTextField>
     // call tracks that animation instead of only reacting to its first or
     // last frame. See the class doc's "keyboard inset" section.
     if (_focusNode.hasFocus) {
+      _lastCovered = null;
       _scheduleEnsureVisible();
     }
   }
@@ -233,6 +239,7 @@ class _GlassTextFieldState extends State<GlassTextField>
     final focused = _focusNode.hasFocus;
     _animateFocusTo(focused ? _focusTravel : 0);
     if (focused) {
+      _lastCovered = null;
       _scheduleEnsureVisible();
     }
   }
@@ -260,9 +267,8 @@ class _GlassTextFieldState extends State<GlassTextField>
     );
   }
 
-  /// Runs `Scrollable.ensureVisible` after this frame, so a field inside a
-  /// scroll view has already laid out under the current `viewInsets` before
-  /// its enclosing `Scrollable` measures where it needs to scroll to.
+  /// Reveals the field after this frame, so it has already laid out under
+  /// the current insets before anything measures where it is.
   /// [_scrollIntoViewScheduled] collapses every call within one frame (a
   /// focus change and a metrics change can land in the same frame) into a
   /// single post-frame callback.
@@ -276,21 +282,76 @@ class _GlassTextFieldState extends State<GlassTextField>
       if (!mounted || !_focusNode.hasFocus) {
         return;
       }
-      Scrollable.ensureVisible(
-        context,
-        // 1.0: bring the field to the bottom-most visible position, just
-        // clear of whatever now covers the rest of the viewport — the
-        // keyboard, most of the time. `alignment` is a fraction of the
-        // *visible* viewport, so this already accounts for a shrunk
-        // viewport the same way `MediaQuery.viewInsetsOf` reports it.
-        alignment: 1,
-        duration: GlassReduceMotion.instance.value
-            ? Duration.zero
-            : const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-      );
+      _reveal();
     });
   }
+
+  /// The covered edges [_reveal] last scrolled clear of.
+  EdgeInsets? _lastCovered;
+
+  /// Scrolls the nearest [Scrollable] just far enough that the field sits
+  /// in the part of its viewport nothing covers.
+  ///
+  /// A viewport does not know what is drawn over it. A `GlassScaffold` body
+  /// spans the whole screen under its bars, and a full-screen list under a
+  /// keyboard is not shrunk by anything, so revealing the field inside the
+  /// viewport alone can leave it under the keyboard, or under a bottom bar
+  /// riding the keyboard. So the field reads what covers the screen from
+  /// the scrollable's `MediaQuery` — the larger of `viewInsets.bottom` (the
+  /// keyboard) and `padding.bottom` (a bar, or the home indicator), and
+  /// `padding.top` — and asks the viewport to reveal a rect grown by the
+  /// part of the viewport those cover. A field already in the clear does
+  /// not move.
+  ///
+  /// The scrollable's `MediaQuery` rather than the field's own: a list
+  /// takes the vertical padding out of its children's `MediaQuery`.
+  ///
+  /// What covers the screen can settle a frame after the insets do — a
+  /// `GlassScaffold` measures its bar's new height at the end of a frame —
+  /// so while the covered edges keep changing, this checks again after the
+  /// next frame.
+  void _reveal() {
+    final box = context.findRenderObject();
+    final scrollable = Scrollable.maybeOf(context);
+    if (box is! RenderBox || !box.hasSize || scrollable == null) {
+      return;
+    }
+    final viewport = scrollable.context.findRenderObject();
+    final media = MediaQuery.maybeOf(scrollable.context);
+    var above = 0.0;
+    var below = 0.0;
+    var covered = EdgeInsets.zero;
+    if (viewport is RenderBox && viewport.hasSize && media != null) {
+      covered = EdgeInsets.only(
+        top: media.padding.top,
+        bottom: math.max(media.viewInsets.bottom, media.padding.bottom),
+      );
+      final top = viewport.localToGlobal(Offset.zero).dy;
+      final bottom = top + viewport.size.height;
+      above = math.max(0, covered.top - top);
+      below = math.max(0, bottom - (media.size.height - covered.bottom));
+    }
+    final duration = GlassReduceMotion.instance.value
+        ? Duration.zero
+        : _revealDuration;
+    box.showOnScreen(
+      rect: Rect.fromLTRB(
+        0,
+        -above,
+        box.size.width,
+        box.size.height + below,
+      ),
+      duration: duration,
+      curve: Curves.easeOut,
+    );
+    if (covered != _lastCovered) {
+      _lastCovered = covered;
+      _scheduleEnsureVisible();
+      WidgetsBinding.instance.ensureVisualUpdate();
+    }
+  }
+
+  static const Duration _revealDuration = Duration(milliseconds: 250);
 
   @override
   Widget build(BuildContext context) {

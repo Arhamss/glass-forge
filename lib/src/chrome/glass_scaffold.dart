@@ -30,7 +30,11 @@ import 'package:glass_forge/src/widgets/glass_presence.dart';
 /// them for the bars to refract.
 ///
 /// [bottomBar] also rides `MediaQuery.viewInsets`' bottom inset, so it lifts
-/// clear of the keyboard rather than being covered by it.
+/// clear of the keyboard rather than being covered by it. The body then
+/// reads the keyboard once, as part of the bar's height in
+/// `MediaQuery.padding.bottom`, and sees a `viewInsets.bottom` of zero. A
+/// `GlassTextField` in the body scrolls itself clear of both the keyboard
+/// and the bar riding it.
 ///
 /// Each bar's glass fades through its own [GlassPresence], driven by the
 /// inverse of `ModalRoute.of(context)?.secondaryAnimation`: full presence
@@ -187,6 +191,12 @@ class _GlassScaffoldBodyState extends State<_GlassScaffoldBody> {
     // around it, so this replaces the ambient inset rather than adding to
     // it; with no bar the ambient safe-area inset is left alone, so content
     // still clears a notch with nothing here to clear it for.
+    //
+    // A bottom bar rides the keyboard, so its measured height already
+    // counts the keyboard. The body's `viewInsets.bottom` goes to zero with
+    // it, or a descendant that pads by both would count the keyboard twice
+    // — the same trade Material's `Scaffold` makes when it takes the inset
+    // out of its body.
     final body = MediaQuery(
       data: media.copyWith(
         padding: EdgeInsets.only(
@@ -195,6 +205,9 @@ class _GlassScaffoldBodyState extends State<_GlassScaffoldBody> {
           top: topBar == null ? media.padding.top : _topBarHeight,
           bottom: bottomBar == null ? media.padding.bottom : _bottomBarHeight,
         ),
+        viewInsets: bottomBar == null
+            ? media.viewInsets
+            : media.viewInsets.copyWith(bottom: 0),
       ),
       child: widget.body,
     );
