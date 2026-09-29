@@ -481,6 +481,49 @@ void main() {
     );
   });
 
+  testWidgets('on a wide screen the bar stops at its maximum width, '
+      'centred', (tester) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      _harness(
+        bar: GlassTabBar(tabs: _tabs, currentIndex: 0, onTap: (_) {}),
+      ),
+    );
+
+    final body = tester.getRect(_body);
+    expect(body.width, GlassTabBar.defaultMaxWidth);
+    expect(body.center.dx, 600);
+
+    // A caller's own cap wins, and infinity takes it away.
+    await tester.pumpWidget(
+      _harness(
+        bar: GlassTabBar(
+          tabs: _tabs,
+          currentIndex: 0,
+          onTap: (_) {},
+          maxWidth: 700,
+        ),
+      ),
+    );
+    expect(tester.getSize(_body).width, 700);
+    await tester.pumpWidget(
+      _harness(
+        bar: GlassTabBar(
+          tabs: _tabs,
+          currentIndex: 0,
+          onTap: (_) {},
+          maxWidth: double.infinity,
+        ),
+      ),
+    );
+    expect(
+      tester.getSize(_body).width,
+      1200 - GlassTabBar.margin.horizontal,
+    );
+  });
+
   group('large text', () {
     for (final scale in [1.0, 2.0, 3.0, 5.0]) {
       testWidgets('at ${scale}x the tabs fit the bar without overflow', (

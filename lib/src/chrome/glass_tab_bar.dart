@@ -102,6 +102,11 @@ class GlassTab {
 /// focused tab. They do not change the selection themselves, because
 /// selecting a tab navigates.
 ///
+/// The bar spans the width it is given, less [margin], up to [maxWidth]
+/// (480 points unless you pass another), and is centred past that — so on
+/// a tablet it stays a capsule under the content rather than a strip across
+/// the screen.
+///
 /// Every tab gets an equal share of the bar's width. Use at most five, as
 /// iOS does: with more tabs than leave each one 44 points, the bar reports
 /// an error in debug builds.
@@ -119,8 +124,9 @@ class GlassTabBar extends StatefulWidget {
     this.backdrop,
     this.backgroundColor,
     this.selectionMaterial,
+    this.maxWidth = defaultMaxWidth,
     super.key,
-  });
+  }) : assert(maxWidth > 0, 'maxWidth must be positive');
   // `tabs` being non-empty and `currentIndex` being inside it are asserted
   // in `_GlassTabBarState.initState` and `didUpdateWidget`, not here: a
   // `List.length` read is not a constant expression, and this constructor
@@ -187,6 +193,22 @@ class GlassTabBar extends StatefulWidget {
   /// The lens is the bar's only glass: it bends the painted bar and the
   /// backdrop showing through it.
   final GlassMaterial? selectionMaterial;
+
+  /// The widest the bar grows, in logical pixels; wider screens centre it.
+  ///
+  /// Pass [double.infinity] for a bar that spans whatever it is given, less
+  /// [margin].
+  final double maxWidth;
+
+  /// [maxWidth]'s default: 480 points.
+  ///
+  /// Wider than any iPhone's bar — the largest, at 440 points across,
+  /// lays out a 408-point bar between its margins — so a phone never meets
+  /// it. On a tablet or a desktop window it keeps the bar a floating
+  /// capsule under the content, rather than a strip whose three to five
+  /// tabs sit far apart and far from the thumb, and keeps each tab no wider
+  /// than about twice an iPhone's.
+  static const double defaultMaxWidth = 480;
 
   /// The bar's own height, not counting the safe-area inset below it or
   /// the clear space around it — what a layout hard-coding the bar's height
@@ -455,18 +477,24 @@ class _GlassTabBarState extends State<GlassTabBar>
     return SafeArea(
       top: false,
       minimum: _margin,
-      child: SizedBox(
-        height: _barHeight,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            _width = width;
-            _slot = (width - 2 * _inset) / widget.tabs.length;
-            if (kDebugMode) {
-              _debugCheckTabWidth();
-            }
-            return _bar(context, Size(width, _barHeight));
-          },
+      child: Center(
+        heightFactor: 1,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: widget.maxWidth),
+          child: SizedBox(
+            height: _barHeight,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                _width = width;
+                _slot = (width - 2 * _inset) / widget.tabs.length;
+                if (kDebugMode) {
+                  _debugCheckTabWidth();
+                }
+                return _bar(context, Size(width, _barHeight));
+              },
+            ),
+          ),
         ),
       ),
     );

@@ -124,6 +124,9 @@ void main() {
                         tabs: _tabs,
                         currentIndex: 0,
                         onTap: (_) {},
+                        // Edge to edge on this 800-point screen, so the
+                        // glass below lands on the lens.
+                        maxWidth: double.infinity,
                       ),
                     ),
                     // Inside the bar, over the lens resting under Home: the

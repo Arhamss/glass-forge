@@ -168,7 +168,9 @@ stop there. The text field grows instead.
   `GlassTabBar.height` and `GlassTabBar.margin` are
   public for laying out around it. `GlassTab.semanticLabel` names icon-only
   tabs. Labels stop growing at 1.5x text size. In debug it reports a bar
-  too narrow for 44-point tabs.
+  too narrow for 44-point tabs. `maxWidth` caps the bar, centred, at
+  `GlassTabBar.defaultMaxWidth` (480 points) unless you pass another, so on
+  a tablet it stays a capsule rather than a strip across the screen.
 - `GlassAppBar`: `leading`, a title centred iOS style and marked as a
   header, `actions`, the top safe area, and `material`.
 - `showGlassSheet` presents a modal glass sheet from the bottom edge. It
