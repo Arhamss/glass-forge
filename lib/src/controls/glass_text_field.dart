@@ -1,13 +1,12 @@
 import 'dart:math' as math;
 
-import 'package:flutter/physics.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
-import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
+import 'package:glass_forge/src/motion/settle_spring.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
@@ -151,7 +150,10 @@ class GlassTextField extends StatefulWidget {
 }
 
 class _GlassTextFieldState extends State<GlassTextField>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver
+    with
+        SingleTickerProviderStateMixin,
+        WidgetsBindingObserver,
+        ReduceMotionSnap
     implements TextSelectionGestureDetectorBuilderDelegate {
   static const double _height = GlassControlFrame.minimumExtent;
   static const EdgeInsetsGeometry _padding = EdgeInsets.symmetric(
@@ -209,14 +211,12 @@ class _GlassTextFieldState extends State<GlassTextField>
     super.initState();
     _focus = AnimationController(vsync: this, upperBound: _focusTravel);
     _focusNode.addListener(_handleFocusChange);
-    GlassReduceMotion.instance.addListener(_onReduceMotionChanged);
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    GlassReduceMotion.instance.removeListener(_onReduceMotionChanged);
     _focusNode.removeListener(_handleFocusChange);
     _ownedFocusNode?.dispose();
     _ownedController?.dispose();
@@ -245,27 +245,16 @@ class _GlassTextFieldState extends State<GlassTextField>
     }
   }
 
-  void _onReduceMotionChanged() {
-    if (GlassReduceMotion.instance.value && _focus.isAnimating) {
+  @override
+  void didChangeReduceMotion({required bool reduceMotion}) {
+    if (reduceMotion && _focus.isAnimating) {
       _focus.value = _focusNode.hasFocus ? _focusTravel : 0;
     }
   }
 
+  /// [_focus] runs in pixel-sized steps; see [_focusTravel].
   void _animateFocusTo(double target) {
-    if (GlassReduceMotion.instance.value) {
-      _focus.value = target;
-      return;
-    }
-    final motion = GlassTheme.motionOf(context, GlassMotionRole.settle);
-    _focus.animateWith(
-      SpringSimulation(
-        motion.spring,
-        _focus.value,
-        target,
-        0,
-        tolerance: motion.tolerance,
-      ),
-    );
+    _focus.settleTo(context, target, pixelsPerUnit: 1);
   }
 
   /// Reveals the field after this frame, so it has already laid out under

@@ -1,13 +1,12 @@
 import 'package:flutter/gestures.dart' show DragStartBehavior;
-import 'package:flutter/physics.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
-import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/motion/glass_jiggle.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
+import 'package:glass_forge/src/motion/settle_spring.dart';
 import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
@@ -128,7 +127,7 @@ class GlassSlider extends StatefulWidget {
 }
 
 class _GlassSliderState extends State<GlassSlider>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, ReduceMotionSnap {
   static const double _trackHeight = 6;
   static const double _thumbSize = 28;
 
@@ -181,7 +180,6 @@ class _GlassSliderState extends State<GlassSlider>
       lowerBound: 1,
       upperBound: _jiggle.maxStretch,
     );
-    GlassReduceMotion.instance.addListener(_onReduceMotionChanged);
   }
 
   @override
@@ -224,14 +222,14 @@ class _GlassSliderState extends State<GlassSlider>
 
   @override
   void dispose() {
-    GlassReduceMotion.instance.removeListener(_onReduceMotionChanged);
     _position.dispose();
     _stretch.dispose();
     super.dispose();
   }
 
-  void _onReduceMotionChanged() {
-    if (GlassReduceMotion.instance.value && _stretch.isAnimating) {
+  @override
+  void didChangeReduceMotion({required bool reduceMotion}) {
+    if (reduceMotion && _stretch.isAnimating) {
       _stretch.value = 1;
     }
   }
@@ -426,30 +424,12 @@ class _GlassSliderState extends State<GlassSlider>
     _lastX = x;
   }
 
+  /// [_stretch] is a ratio of the thumb's size, so one unit of it is
+  /// [_thumbSize] pixels: unscaled, a 0.5 px tolerance outweighs the whole
+  /// 0.18 stretch and the spring stops before it starts, leaving the thumb
+  /// stretched.
   void _animateStretchTo(double target) {
-    if (GlassReduceMotion.instance.value) {
-      _stretch.value = target;
-      return;
-    }
-    final motion = GlassTheme.motionOf(context, GlassMotionRole.settle);
-    // The motion's tolerance is in pixels and [_stretch] is a ratio of the
-    // thumb's size: rescaled, or a 0.5 px tolerance outweighs the whole
-    // 0.18 stretch and the spring stops before it starts, leaving the
-    // thumb stretched.
-    final tolerance = motion.tolerance;
-    _stretch.animateWith(
-      SpringSimulation(
-        motion.spring,
-        _stretch.value,
-        target,
-        0,
-        tolerance: Tolerance(
-          distance: tolerance.distance / _thumbSize,
-          time: tolerance.time,
-          velocity: tolerance.velocity / _thumbSize,
-        ),
-      ),
-    );
+    _stretch.settleTo(context, target, pixelsPerUnit: _thumbSize);
   }
 
   @override

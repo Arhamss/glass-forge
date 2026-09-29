@@ -1,14 +1,12 @@
 import 'package:flutter/gestures.dart' show DragStartBehavior;
-import 'package:flutter/physics.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
-import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/motion/interactive_glass.dart';
-import 'package:glass_forge/src/motion/reduce_motion.dart';
+import 'package:glass_forge/src/motion/settle_spring.dart';
 import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
@@ -105,7 +103,7 @@ class GlassSwitch extends StatefulWidget {
 }
 
 class _GlassSwitchState extends State<GlassSwitch>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, ReduceMotionSnap {
   // Track 64 × 28, knob 38 × 24, both iOS 26/27 proportions. No capture was
   // available while building this widget to confirm against — see the plan
   // for this task — so these are the plan's own numbers, kept as-is rather
@@ -168,7 +166,6 @@ class _GlassSwitchState extends State<GlassSwitch>
       value: _target,
       upperBound: _travel,
     );
-    GlassReduceMotion.instance.addListener(_onReduceMotionChanged);
   }
 
   @override
@@ -210,37 +207,24 @@ class _GlassSwitchState extends State<GlassSwitch>
 
   @override
   void dispose() {
-    GlassReduceMotion.instance.removeListener(_onReduceMotionChanged);
     _position.dispose();
     super.dispose();
   }
 
-  /// Reduce Motion turning on mid-travel must land the knob instantly, not
-  /// only a fresh transition started after it turns on. [AnimationController
-  /// .value]'s setter calls `stop()` before assigning, so this both halts
-  /// whatever spring is running and snaps to [_target] in the same step.
-  void _onReduceMotionChanged() {
-    if (GlassReduceMotion.instance.value && _position.isAnimating) {
+  /// [AnimationController.value]'s setter calls `stop()` before
+  /// assigning, so this both halts whatever spring is running and snaps to
+  /// [_target] in the same step.
+  @override
+  void didChangeReduceMotion({required bool reduceMotion}) {
+    if (reduceMotion && _position.isAnimating) {
       _position.value = _target;
     }
   }
 
+  /// [_position] already counts pixels, so its tolerance needs no scaling.
   void _animateTo(double target, {double velocity = 0}) {
     _target = target;
-    if (GlassReduceMotion.instance.value) {
-      _position.value = target;
-      return;
-    }
-    final motion = GlassTheme.motionOf(context, GlassMotionRole.settle);
-    _position.animateWith(
-      SpringSimulation(
-        motion.spring,
-        _position.value,
-        target,
-        velocity,
-        tolerance: motion.tolerance,
-      ),
-    );
+    _position.settleTo(context, target, pixelsPerUnit: 1, velocity: velocity);
   }
 
   void _toggle() {

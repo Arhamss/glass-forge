@@ -1,13 +1,11 @@
 import 'package:flutter/gestures.dart' show DragStartBehavior;
-import 'package:flutter/physics.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
-import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/design/glass_tint.dart';
-import 'package:glass_forge/src/motion/reduce_motion.dart';
+import 'package:glass_forge/src/motion/settle_spring.dart';
 import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
@@ -134,7 +132,7 @@ class GlassSegmentedControl<T> extends StatefulWidget {
 }
 
 class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, ReduceMotionSnap {
   /// The whole control's height, and the tappable height of every segment —
   /// `GlassControlFrame.minimumExtent` itself, the same reach `GlassSlider`
   /// gives its own track: the draggable hit area is the full visual, not a
@@ -213,7 +211,6 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
       vsync: this,
       value: _fractionOf(_targetIndex),
     );
-    GlassReduceMotion.instance.addListener(_onReduceMotionChanged);
   }
 
   @override
@@ -277,13 +274,13 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
 
   @override
   void dispose() {
-    GlassReduceMotion.instance.removeListener(_onReduceMotionChanged);
     _position.dispose();
     super.dispose();
   }
 
-  void _onReduceMotionChanged() {
-    if (GlassReduceMotion.instance.value && _position.isAnimating) {
+  @override
+  void didChangeReduceMotion({required bool reduceMotion}) {
+    if (reduceMotion && _position.isAnimating) {
       _position.value = _fractionOf(_targetIndex);
     }
   }
@@ -312,33 +309,14 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
 
   void _animateTo(int index, {double velocity = 0}) {
     _targetIndex = index;
-    final target = _fractionOf(index);
-    if (GlassReduceMotion.instance.value) {
-      _position.value = target;
-      return;
-    }
-    final travel = _travel;
-    if (travel <= 0) {
-      _position.value = target;
-      return;
-    }
-    final motion = GlassTheme.motionOf(context, GlassMotionRole.settle);
-    // The motion's tolerance is in pixels and [_position] is a fraction of
-    // [travel]: rescaled, or a 0.5 px tolerance reads as half the track and
-    // the spring stops well short of the segment.
-    final tolerance = motion.tolerance;
-    _position.animateWith(
-      SpringSimulation(
-        motion.spring,
-        _position.value,
-        target,
-        velocity,
-        tolerance: Tolerance(
-          distance: tolerance.distance / travel,
-          time: tolerance.time,
-          velocity: tolerance.velocity / travel,
-        ),
-      ),
+    // [_position] is a fraction of [_travel], so one unit of it is
+    // [_travel] pixels: unscaled, a 0.5 px tolerance reads as half the
+    // track and the spring stops well short of the segment.
+    _position.settleTo(
+      context,
+      _fractionOf(index),
+      pixelsPerUnit: _travel,
+      velocity: velocity,
     );
   }
 

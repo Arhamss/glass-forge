@@ -12,6 +12,7 @@ import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
+import 'package:glass_forge/src/motion/settle_spring.dart';
 import 'package:glass_forge/src/rendering/declared_glass_handoff.dart';
 import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
@@ -174,7 +175,7 @@ const double _maxSwell = 0.32;
 const double _throw = 0.08;
 
 class _GlassTabBarState extends State<GlassTabBar>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, ReduceMotionSnap {
   late final _Lens _lens;
 
   /// 1 while a finger is down on the bar.
@@ -233,7 +234,6 @@ class _GlassTabBarState extends State<GlassTabBar>
       reverseDuration: _sink,
     );
     _lensPresence = _Product(_barPresence, _flight);
-    GlassReduceMotion.instance.addListener(_onReduceMotionChanged);
   }
 
   @override
@@ -263,7 +263,6 @@ class _GlassTabBarState extends State<GlassTabBar>
 
   @override
   void dispose() {
-    GlassReduceMotion.instance.removeListener(_onReduceMotionChanged);
     _lens.dispose();
     _hold.dispose();
     _flight.dispose();
@@ -278,8 +277,9 @@ class _GlassTabBarState extends State<GlassTabBar>
     );
   }
 
-  void _onReduceMotionChanged() {
-    if (_reduceMotion) {
+  @override
+  void didChangeReduceMotion({required bool reduceMotion}) {
+    if (reduceMotion) {
       // Turned on mid-flight: land now rather than freeze half way.
       _lens.jump(_hover?.toDouble() ?? widget.currentIndex.toDouble());
       _hold.value = 0;
