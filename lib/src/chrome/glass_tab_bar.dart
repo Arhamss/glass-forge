@@ -218,6 +218,12 @@ class _GlassTabBarState extends State<GlassTabBar>
   /// animation by identity and a fresh one is a fresh backdrop pass.
   late Animation<double> _lensPresence;
 
+  /// What moves the painted pill, and what moves the lens: merged once
+  /// here, not in `build`, where every rebuild would have its
+  /// `AnimatedBuilder` unsubscribe and resubscribe.
+  late final Listenable _pillMotion = Listenable.merge([_lens, _flight, _hold]);
+  late final Listenable _lensMotion = Listenable.merge([_lens, _hold]);
+
   /// Whether a finger is down on the bar.
   bool _pressed = false;
 
@@ -495,7 +501,7 @@ class _GlassTabBarState extends State<GlassTabBar>
     final content = Stack(
       children: [
         AnimatedBuilder(
-          animation: Listenable.merge([_lens, _flight, _hold]),
+          animation: _pillMotion,
           builder: (context, child) => PositionedDirectional(
             start: _inset + _lens.position * _slot,
             top: _inset,
@@ -578,6 +584,7 @@ class _GlassTabBarState extends State<GlassTabBar>
               _LensGlass(
                 lens: _lens,
                 hold: _hold,
+                motion: _lensMotion,
                 slot: _slot,
                 size: lensSize,
                 presence: _lensPresence,
@@ -600,6 +607,7 @@ class _GlassTabBarState extends State<GlassTabBar>
 /// while it is up, but never raises it.
 class _LensGlass extends StatelessWidget {
   const _LensGlass({
+    required this.motion,
     required this.lens,
     required this.hold,
     required this.slot,
@@ -613,6 +621,9 @@ class _LensGlass extends StatelessWidget {
 
   /// 1 while a finger holds the bar.
   final Animation<double> hold;
+
+  /// [lens] and [hold] merged, once, by the bar's state.
+  final Listenable motion;
 
   /// One tab's width.
   final double slot;
@@ -630,7 +641,7 @@ class _LensGlass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([lens, hold]),
+      animation: motion,
       child: GlassPresence(presence: presence, child: glass),
       builder: (context, child) {
         final speed = lens.velocity.abs();

@@ -188,6 +188,15 @@ class _GlassSliderState extends State<GlassSlider>
     );
   }
 
+  /// The thumb's position and stretch, merged once: a merge built in
+  /// `build` would have its `AnimatedBuilder` unsubscribe and resubscribe
+  /// on every rebuild, and a controlled slider rebuilds on every drag
+  /// frame.
+  late final Listenable _thumbMotion = Listenable.merge([
+    _position,
+    _stretch,
+  ]);
+
   @override
   void didUpdateWidget(GlassSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -500,7 +509,7 @@ class _GlassSliderState extends State<GlassSlider>
       width: width,
       height: GlassControlFrame.minimumExtent,
       child: AnimatedBuilder(
-        animation: Listenable.merge([_position, _stretch]),
+        animation: _thumbMotion,
         builder: (context, child) {
           final travel = (width - _thumbSize).clamp(0.0, double.infinity);
           // Thumb and fill both measure from the [GlassSlider.min] end —
