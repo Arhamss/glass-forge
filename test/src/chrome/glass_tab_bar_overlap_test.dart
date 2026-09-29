@@ -4,12 +4,10 @@
 // pushed, which needs `ui.ImageFilter.shader`. Run with
 // `flutter test --tags impeller --run-skipped --enable-impeller`.
 //
-// The lens is a second pass over the bar's, on purpose and only while the
-// selection travels. It declares itself a handoff (see
-// `DeclaredGlassHandoff`), and the overlap check leaves declared handoffs
-// out, so nothing prints: not at rest before the tap, not mid-flight, and
-// not once it has landed. Before that declaration, the first tap in any
-// debug app printed the flutter#187820 warning.
+// The lens is a second pass over the bar's, on purpose and always. It
+// declares itself a handoff (see `DeclaredGlassHandoff`), and the overlap
+// check leaves declared handoffs out against the bar, so nothing prints:
+// not at rest, not mid-flight, and not once it has landed.
 @Tags(<String>['impeller'])
 library;
 
@@ -30,7 +28,8 @@ void main() {
   setUpAll(ShaderLibrary.instance.warmUp);
   tearDownAll(ShaderLibrary.instance.disposeAll);
 
-  testWidgets('a tap on a tab prints no overlap warning', (tester) async {
+  testWidgets('the bar and its lens print no overlap warning, at rest or '
+      'across a tap', (tester) async {
     var index = 0;
     final printed = <String>[];
     final previous = debugPrint;
@@ -84,14 +83,14 @@ void main() {
       debugPrint = previous;
     }
 
-    expect(sawLens, isTrue, reason: 'the lens must fly for this to count');
+    expect(sawLens, isTrue, reason: 'the lens must be up for this to count');
     expect(index, 2);
     expect(printed.where((line) => line.contains('187820')), isEmpty);
   });
 
   testWidgets(
-    'the lens swelling over other glass next to the bar still warns: the '
-    'handoff exemption is for the bar alone',
+    'other glass over the lens still warns against it: the handoff '
+    'exemption is for the bar alone',
     (tester) async {
       final printed = <String>[];
       final previous = debugPrint;
@@ -100,7 +99,6 @@ void main() {
           printed.add(message);
         }
       };
-      var sawLens = false;
       try {
         await tester.pumpWidget(
           MediaQuery(
@@ -119,14 +117,14 @@ void main() {
                         onTap: (_) {},
                       ),
                     ),
-                    // Beside the bar, past its right edge: the bar never
-                    // meets it, but the lens, swollen by a held finger over
-                    // the last tab, reaches past the bar's edge onto it.
+                    // Inside the bar, over the lens resting under Home: the
+                    // bar's 16-point margin, its 6-point inset, and a little
+                    // more.
                     const Positioned(
-                      right: 0,
-                      bottom: 10,
+                      left: 30,
+                      bottom: 30,
                       width: 12,
-                      height: 60,
+                      height: 12,
                       child: Glass(
                         shape: GlassOval(),
                         material: GlassMaterial(frost: 20),
@@ -139,38 +137,16 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(
-          printed.where((line) => line.contains('187820')),
-          isEmpty,
-          reason: 'at rest the bar and the side glass do not meet',
-        );
-
-        // Drag from Home onto Profile and hold: the held finger keeps the
-        // lens fully swollen while the selection travels.
-        final gesture = await tester.startGesture(
-          tester.getCenter(find.text('Home')),
-        );
-        await gesture.moveTo(tester.getCenter(find.text('Profile')));
-        for (var i = 0; i < 60; i++) {
-          await tester.pump(const Duration(milliseconds: 16));
-          final lens = tester
-              .widgetList<GlassPresence>(
-                find.descendant(
-                  of: find.byType(GlassTabBar),
-                  matching: find.byType(GlassPresence),
-                ),
-              )
-              .single;
-          sawLens = sawLens || lens.presence.value > 0;
-        }
-        await gesture.up();
-        await tester.pumpAndSettle();
       } finally {
         debugPrint = previous;
       }
 
-      expect(sawLens, isTrue, reason: 'the lens must fly for this to count');
-      expect(printed.where((line) => line.contains('187820')), isNotEmpty);
+      // Once against the bar and once against the lens. A lens exempt
+      // against everything would leave only the bar's.
+      expect(
+        printed.where((line) => line.contains('187820')),
+        hasLength(2),
+      );
     },
   );
 }

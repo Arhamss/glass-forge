@@ -120,11 +120,17 @@ stop there. The text field grows instead.
   bar fades out over the first 40% of any route that covers the page, so
   the bar and the covering glass are never two backdrop filters over the
   same pixels. `material` is what a bare `Glass` in either layer inherits.
-- `GlassTabBar` and `GlassTab`, a floating capsule with a painted selection
-  pill. A glass lens rises out of the pill only while the selection
-  travels (a tap, or a drag it chases under the finger), then sinks back.
-  A resting finger swells the pill and raises no lens. `material` takes a
-  look of the bar's own. `GlassTabBar.height` and `GlassTabBar.margin` are
+- `GlassTabBar` and `GlassTab`, a floating capsule whose selection is
+  always a clear glass lens, after the Kibu app's bar. A bouncy spring
+  moves it and it squashes along its travel with its speed. A drag carries
+  it under the finger, clicks once per tab crossed, and commits the tab
+  under the finger on release; a cancelled drag sends it back. Reduce
+  Motion moves it at once, still glass. `material` takes a look of the
+  bar's own, raised to `minimumTintOpacity` (the role's own tint by
+  default) so the lens reads against it; `selectionMaterial` replaces
+  `GlassTabBar.defaultSelectionMaterial`. The lens is glass over the bar's
+  glass at rest, which is untested on a physical iPhone for
+  flutter#187820. `GlassTabBar.height` and `GlassTabBar.margin` are
   public for laying out around it. `GlassTab.semanticLabel` names icon-only
   tabs. Labels stop growing at 1.5x text size. In debug it reports a bar
   too narrow for 44-point tabs.
@@ -189,7 +195,8 @@ stop there. The text field grows instead.
 - The cross-pass overlap warning reports every overlapping pair of passes
   in the same paint, not only the first. An overlap that animates is
   reported once. The tab-bar lens is exempt against its own bar, and
-  against nothing else.
+  against nothing else. That silences the warning for the pair; it does
+  not make the overlap safe on a device.
 
 ### Motion
 

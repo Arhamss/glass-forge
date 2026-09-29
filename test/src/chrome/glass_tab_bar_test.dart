@@ -62,6 +62,67 @@ Animation<double> _lensPresence(WidgetTester tester) {
       .presence;
 }
 
+/// The lens's glass: the one under the lens's own presence.
+final Finder _lens = find.descendant(
+  of: find.descendant(
+    of: find.byType(GlassTabBar),
+    matching: find.byType(GlassPresence),
+  ),
+  matching: find.byType(Glass),
+);
+
+/// The lens as drawn, squash included: [WidgetTester.getRect] puts the
+/// corners through every transform above it.
+Rect _lensRect(WidgetTester tester) => tester.getRect(_lens);
+
+/// The bar's own glass, inside its [GlassSurface].
+Glass _barGlass(WidgetTester tester) => tester.widget<Glass>(
+  find
+      .descendant(
+        of: find.byType(GlassSurface),
+        matching: find.byType(Glass),
+      )
+      .first,
+);
+
+/// Records every haptic the bar asks the platform for, by type.
+List<String> _recordHaptics(WidgetTester tester) {
+  final haptics = <String>[];
+  final messenger = tester.binding.defaultBinaryMessenger
+    ..setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'HapticFeedback.vibrate') {
+        haptics.add(call.arguments as String);
+      }
+      return null;
+    });
+  addTearDown(
+    () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+  );
+  return haptics;
+}
+
+/// Drags from [from] to [to] in ten steps, a frame apart, and holds.
+Future<TestGesture> _dragTo(
+  WidgetTester tester,
+  Offset from,
+  Offset to,
+) async {
+  final gesture = await tester.startGesture(
+    from,
+    kind: PointerDeviceKind.mouse,
+  );
+  for (var i = 1; i <= 10; i++) {
+    await gesture.moveTo(Offset.lerp(from, to, i / 10)!);
+    await tester.pump(const Duration(milliseconds: 16));
+  }
+  return gesture;
+}
+
+void expectUnder(Rect rect, Offset label) {
+  expect(rect.left, lessThan(label.dx));
+  expect(rect.right, greaterThan(label.dx));
+}
+
 /// How opaque [finder] is actually drawn: every [FadeTransition] and
 /// [Opacity] between it and the root, multiplied together.
 double _effectiveOpacity(WidgetTester tester, Finder finder) {
@@ -124,144 +185,205 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('the lens is absent at rest and rises while it travels', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_harness(bar: _followingBar(<int>[])));
+  group('the lens', () {
+    testWidgets('is glass at rest, in its own material, under the '
+        'selected tab', (tester) async {
+      await tester.pumpWidget(_harness(bar: _followingBar(<int>[])));
 
-    // At rest: a painted pill, and a lens whose pass does not exist.
-    expect(_lensPresence(tester).value, 0);
+      expect(_lensPresence(tester).value, 1);
+      final lens = tester.widget<Glass>(_lens);
+      expect(lens.material, GlassTabBar.defaultSelectionMaterial);
+      expect(lens.material, isNot(_barGlass(tester).material));
+      expectUnder(_lensRect(tester), tester.getCenter(find.text('Home')));
+    });
 
-    await tester.tap(find.text('Profile'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 60));
-    expect(_lensPresence(tester).value, greaterThan(0));
+    testWidgets('settles under a tapped tab, and stays glass', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_harness(bar: _followingBar(<int>[])));
 
-    await tester.pumpAndSettle();
-    expect(_lensPresence(tester).value, 0);
+      await tester.tap(find.text('Profile'));
+      await tester.pumpAndSettle();
+      expect(_lensPresence(tester).value, 1);
+      expectUnder(_lensRect(tester), tester.getCenter(find.text('Profile')));
+    });
+
+    testWidgets('takes a selectionMaterial in place of its own', (
+      tester,
+    ) async {
+      const material = GlassMaterial(frost: 3, tintOpacity: 0.2);
+      await tester.pumpWidget(
+        _harness(
+          bar: GlassTabBar(
+            tabs: _tabs,
+            currentIndex: 0,
+            onTap: (_) {},
+            selectionMaterial: material,
+          ),
+        ),
+      );
+      expect(tester.widget<Glass>(_lens).material, material);
+    });
+
+    testWidgets('squashes along its travel, and is its own shape at rest', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_harness(bar: _followingBar(<int>[])));
+      final rest = _lensRect(tester).size;
+
+      await tester.tap(find.text('Profile'));
+      await tester.pump();
+      var narrowest = rest.width;
+      var tallest = rest.height;
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        final size = _lensRect(tester).size;
+        if (size.width < narrowest) {
+          narrowest = size.width;
+        }
+        if (size.height > tallest) {
+          tallest = size.height;
+        }
+      }
+      // Two tabs in half a second peaks well past 5 tabs a second — at
+      // least a quarter of the full squash on a three-tab bar.
+      expect(narrowest, lessThan(rest.width * 0.95));
+      expect(tallest, greaterThan(rest.height * 1.03));
+
+      await tester.pumpAndSettle();
+      final landed = _lensRect(tester).size;
+      expect(landed.width, closeTo(rest.width, 1e-6));
+      expect(landed.height, closeTo(rest.height, 1e-6));
+    });
+
+    testWidgets("a covered bar's lens has no presence, even mid-flight", (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _harness(
+          bar: _followingBar(<int>[]),
+          barPresence: const AlwaysStoppedAnimation<double>(0),
+        ),
+      );
+      expect(_lensPresence(tester).value, 0);
+
+      await tester.tap(find.text('Profile'), warnIfMissed: false);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(_lensPresence(tester).value, 0);
+    });
   });
 
-  testWidgets(
-    'a finger resting on the bar without moving never raises the lens',
-    (tester) async {
-      await tester.pumpWidget(_harness(bar: _followingBar(<int>[])));
+  group('a drag', () {
+    testWidgets('carries the lens under the finger, clamped to the bar', (
+      tester,
+    ) async {
+      final taps = <int>[];
+      await tester.pumpWidget(_harness(bar: _followingBar(taps)));
 
-      // On the current tab and on another one: neither is travel until the
-      // finger lifts.
-      for (final label in ['Home', 'Search']) {
-        final gesture = await tester.startGesture(
-          tester.getCenter(find.text(label)),
-        );
-        for (var i = 0; i < 60; i++) {
-          await tester.pump(const Duration(milliseconds: 16));
-          expect(
-            _lensPresence(tester).value,
-            0,
-            reason: 'a resting finger on $label raised the lens',
-          );
-        }
-        await gesture.cancel();
-        await tester.pumpAndSettle();
-      }
-    },
-  );
+      final home = tester.getCenter(find.text('Home'));
+      final search = tester.getCenter(find.text('Search'));
+      final profile = tester.getCenter(find.text('Profile'));
+      final between = Offset.lerp(search, profile, 0.5)!;
+      final gesture = await _dragTo(tester, home, between);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(_lensRect(tester).center.dx, closeTo(between.dx, 0.5));
+      expect(taps, isEmpty, reason: 'nothing is reported until release');
 
-  testWidgets(
-    'a drag that stops keeps the lens only until the selection catches up',
-    (tester) async {
-      await tester.pumpWidget(_harness(bar: _followingBar(<int>[])));
-
-      final start = tester.getCenter(find.text('Home'));
-      final gesture = await tester.startGesture(start);
-      await gesture.moveBy(const Offset(40, 0));
-      await tester.pump(const Duration(milliseconds: 16));
-      await tester.pump(const Duration(milliseconds: 16));
-      expect(_lensPresence(tester).value, greaterThan(0));
-
-      // Finger still, still down: the spring settles on the finger and the
-      // lens sinks. One second is generous for a settle spring plus the
-      // 280 ms sink.
-      for (var i = 0; i < 60; i++) {
-        await tester.pump(const Duration(milliseconds: 16));
-      }
-      expect(_lensPresence(tester).value, 0);
+      // Far past the bar's end: the lens stops under the last tab.
+      await gesture.moveTo(Offset(profile.dx + 400, profile.dy));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(_lensRect(tester).center.dx, closeTo(profile.dx, 0.5));
 
       await gesture.up();
       await tester.pumpAndSettle();
-    },
-  );
+      expect(taps, [2]);
+    });
 
-  testWidgets('a drag carries the selection to where it is released', (
-    tester,
-  ) async {
-    final taps = <int>[];
-    await tester.pumpWidget(_harness(bar: _followingBar(taps)));
+    testWidgets('clicks once per tab crossed, and commits the tab under the '
+        'finger on release', (tester) async {
+      final haptics = _recordHaptics(tester);
+      final taps = <int>[];
+      await tester.pumpWidget(_harness(bar: _followingBar(taps)));
 
-    final from = tester.getCenter(find.text('Home'));
-    final to = tester.getCenter(find.text('Profile'));
-    final gesture = await tester.startGesture(
-      from,
-      kind: PointerDeviceKind.mouse,
-    );
-    for (var i = 1; i <= 10; i++) {
-      await gesture.moveTo(Offset.lerp(from, to, i / 10)!);
-      await tester.pump(const Duration(milliseconds: 16));
-    }
-    // Held mid-drag, the lens is up; nothing is committed yet.
-    expect(_lensPresence(tester).value, greaterThan(0));
-    expect(taps, isEmpty);
+      final gesture = await _dragTo(
+        tester,
+        tester.getCenter(find.text('Home')),
+        tester.getCenter(find.text('Search')),
+      );
+      expect(haptics, ['HapticFeedbackType.selectionClick']);
+      expect(taps, isEmpty);
 
-    await gesture.up();
-    await tester.pumpAndSettle();
-    expect(taps, [2]);
-    expect(_lensPresence(tester).value, 0);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(taps, [1]);
+      expect(haptics, [
+        'HapticFeedbackType.selectionClick',
+        'HapticFeedbackType.lightImpact',
+      ]);
+      expectUnder(_lensRect(tester), tester.getCenter(find.text('Search')));
+    });
+
+    testWidgets('released on the current tab reports nothing', (
+      tester,
+    ) async {
+      final taps = <int>[];
+      await tester.pumpWidget(_harness(bar: _followingBar(taps)));
+      final home = tester.getCenter(find.text('Home'));
+      final gesture = await _dragTo(tester, home, home + const Offset(20, 0));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(taps, isEmpty);
+    });
+
+    testWidgets('cancelled, sends the lens back', (tester) async {
+      final taps = <int>[];
+      await tester.pumpWidget(_harness(bar: _followingBar(taps)));
+      final gesture = await _dragTo(
+        tester,
+        tester.getCenter(find.text('Home')),
+        tester.getCenter(find.text('Profile')),
+      );
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+      expect(taps, isEmpty);
+      expectUnder(_lensRect(tester), tester.getCenter(find.text('Home')));
+    });
   });
 
-  testWidgets('Reduce Motion: no lens, and the pill lands instantly', (
-    tester,
-  ) async {
+  testWidgets('Reduce Motion: the lens is glass, and lands at once without '
+      'squashing', (tester) async {
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
     tester.platformDispatcher.accessibilityFeaturesTestValue =
         const FakeAccessibilityFeatures(disableAnimations: true);
 
     await tester.pumpWidget(_harness(bar: _followingBar(<int>[])));
 
-    // Only the bar's own glass.
+    // The bar's glass and the lens's.
     expect(
       find.descendant(
         of: find.byType(GlassTabBar),
         matching: find.byType(Glass),
       ),
-      findsOneWidget,
+      findsNWidgets(2),
     );
-    expect(
-      find.descendant(
-        of: find.byType(GlassTabBar),
-        matching: find.byType(GlassPresence),
-      ),
-      findsNothing,
-    );
-
-    final pill = find.descendant(
-      of: find.byType(GlassTabBar),
-      matching: find.byType(ClipPath),
-    );
-    double pillLeft() => tester.getTopLeft(pill.last).dx;
-    final homeLeft = pillLeft();
+    expect(_lensPresence(tester).value, 1);
+    final rest = _lensRect(tester);
 
     await tester.tap(find.text('Profile'));
     // One frame for the parent to rebuild with the new index — and no more.
     await tester.pump();
-    final landed = pillLeft();
-    expect(landed, greaterThan(homeLeft));
+    final landed = _lensRect(tester);
+    expectUnder(landed, tester.getCenter(find.text('Profile')));
+    expect(landed.size, rest.size);
     expect(tester.hasRunningAnimations, isFalse);
     await tester.pumpAndSettle();
-    expect(pillLeft(), landed);
+    expect(_lensRect(tester), landed);
   });
 
-  testWidgets('bar presence 0 hides the labels, icons and pill', (
-    tester,
-  ) async {
+  testWidgets('bar presence 0 hides the labels and icons', (tester) async {
     await tester.pumpWidget(
       _harness(
         bar: _followingBar(<int>[]),
@@ -285,22 +407,6 @@ void main() {
     expect(_effectiveOpacity(tester, find.text('Home')), 1);
   });
 
-  testWidgets("a covered bar's lens has no presence, even mid-flight", (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _harness(
-        bar: _followingBar(<int>[]),
-        barPresence: const AlwaysStoppedAnimation<double>(0),
-      ),
-    );
-
-    await tester.tap(find.text('Profile'), warnIfMissed: false);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 60));
-    expect(_lensPresence(tester).value, 0);
-  });
-
   testWidgets('the bottom safe area is built in', (tester) async {
     await tester.pumpWidget(
       _harness(
@@ -318,7 +424,7 @@ void main() {
   });
 
   testWidgets("a passed material reaches the bar's Glass", (tester) async {
-    const material = GlassMaterial(frost: 2, tintOpacity: 0.3);
+    const material = GlassMaterial(frost: 2, tintOpacity: 0.9);
     await tester.pumpWidget(
       _harness(
         bar: GlassTabBar(
@@ -440,24 +546,70 @@ void main() {
     }
   });
 
+  group('the body tint floor', () {
+    GlassSurfaceStyle roleOf(BuildContext context) => GlassTheme.surfaceOf(
+      context,
+      GlassSurfaceRole.navigationBar,
+      size: const Size(300, GlassTabBar.height),
+    );
+
+    Future<GlassSurfaceStyle> pump(
+      WidgetTester tester,
+      GlassMaterial material, {
+      double? minimumTintOpacity,
+    }) async {
+      late GlassSurfaceStyle role;
+      await tester.pumpWidget(
+        _harness(
+          bar: Builder(
+            builder: (context) {
+              role = roleOf(context);
+              return GlassTabBar(
+                tabs: _tabs,
+                currentIndex: 0,
+                onTap: (_) {},
+                material: material,
+                minimumTintOpacity: minimumTintOpacity,
+              );
+            },
+          ),
+        ),
+      );
+      return role;
+    }
+
+    testWidgets("raises a clear material to the role's tint", (
+      tester,
+    ) async {
+      const clear = GlassMaterial(frost: 2);
+      final role = await pump(tester, clear);
+      expect(role.material.tintOpacity, greaterThan(0));
+
+      final drawn = _barGlass(tester).material!;
+      expect(drawn.tintOpacity, role.material.tintOpacity);
+      expect(drawn.tint, role.material.tint);
+      // Only the tint is raised.
+      expect(drawn.frost, 2);
+    });
+
+    testWidgets('leaves an already-tinted material as it is', (tester) async {
+      const tinted = GlassMaterial(
+        frost: 2,
+        tint: Color(0xFF4A2A55),
+        tintOpacity: 0.9,
+      );
+      await pump(tester, tinted);
+      expect(_barGlass(tester).material, tinted);
+    });
+
+    testWidgets('is turned off by a floor of 0', (tester) async {
+      const clear = GlassMaterial(frost: 2);
+      await pump(tester, clear, minimumTintOpacity: 0);
+      expect(_barGlass(tester).material, clear);
+    });
+  });
+
   group('the owner rejects the change', () {
-    /// The painted pill: the last clip the bar builds.
-    Rect pillOf(WidgetTester tester) => tester.getRect(
-      find
-          .descendant(
-            of: find.byType(GlassTabBar),
-            matching: find.byType(ClipPath),
-          )
-          .last,
-    );
-
-    Rect lensOf(WidgetTester tester) => tester.getRect(
-      find.descendant(
-        of: find.byType(GlassPresence),
-        matching: find.byType(Glass),
-      ),
-    );
-
     testWidgets('a drag released on another tab settles back', (
       tester,
     ) async {
@@ -471,25 +623,16 @@ void main() {
         ),
       );
 
-      final from = tester.getCenter(find.text('Home'));
-      final to = tester.getCenter(find.text('Profile'));
-      final gesture = await tester.startGesture(
-        from,
-        kind: PointerDeviceKind.mouse,
+      final gesture = await _dragTo(
+        tester,
+        tester.getCenter(find.text('Home')),
+        tester.getCenter(find.text('Profile')),
       );
-      for (var i = 1; i <= 10; i++) {
-        await gesture.moveTo(Offset.lerp(from, to, i / 10)!);
-        await tester.pump(const Duration(milliseconds: 16));
-      }
       await gesture.up();
       await tester.pumpAndSettle();
 
       expect(taps, [2]);
-      final home = tester.getCenter(find.text('Home')).dx;
-      for (final rect in [pillOf(tester), lensOf(tester)]) {
-        expect(rect.left, lessThan(home));
-        expect(rect.right, greaterThan(home));
-      }
+      expectUnder(_lensRect(tester), tester.getCenter(find.text('Home')));
       expect(
         tester.getSemantics(find.byType(GlassControlFrame).at(0)),
         isSemantics(
@@ -509,30 +652,6 @@ void main() {
       bar: _followingBar(taps, initial: initial),
     );
 
-    /// The painted pill: the last clip the bar builds, as the Reduce
-    /// Motion test above reads it.
-    Rect pillOf(WidgetTester tester) => tester.getRect(
-      find
-          .descendant(
-            of: find.byType(GlassTabBar),
-            matching: find.byType(ClipPath),
-          )
-          .last,
-    );
-
-    /// The lens's glass: the one under the lens's own presence.
-    Rect lensOf(WidgetTester tester) => tester.getRect(
-      find.descendant(
-        of: find.byType(GlassPresence),
-        matching: find.byType(Glass),
-      ),
-    );
-
-    void expectUnder(Rect rect, Offset label) {
-      expect(rect.left, lessThan(label.dx));
-      expect(rect.right, greaterThan(label.dx));
-    }
-
     testWidgets('the first tab is on the right', (tester) async {
       await tester.pumpWidget(rtl(<int>[]));
       expect(
@@ -542,35 +661,37 @@ void main() {
     });
 
     for (final (index, label) in [(0, 'Home'), (2, 'Profile')]) {
-      testWidgets('the pill and lens sit under "$label" at rest', (
-        tester,
-      ) async {
+      testWidgets('the lens sits under "$label" at rest', (tester) async {
         await tester.pumpWidget(rtl(<int>[], initial: index));
-        final centre = tester.getCenter(find.text(label));
-        expectUnder(pillOf(tester), centre);
-        expectUnder(lensOf(tester), centre);
+        expectUnder(_lensRect(tester), tester.getCenter(find.text(label)));
       });
     }
 
-    testWidgets('a drag commits the tab under the finger', (tester) async {
+    testWidgets('a drag follows the finger, clicks once per tab, and '
+        'commits the tab under it', (tester) async {
+      final haptics = _recordHaptics(tester);
       final taps = <int>[];
       await tester.pumpWidget(rtl(taps, initial: 1));
 
-      final from = tester.getCenter(find.text('Search'));
-      final to = tester.getCenter(find.text('Home'));
-      final gesture = await tester.startGesture(
-        from,
-        kind: PointerDeviceKind.mouse,
-      );
-      for (var i = 1; i <= 10; i++) {
-        await gesture.moveTo(Offset.lerp(from, to, i / 10)!);
-        await tester.pump(const Duration(milliseconds: 16));
-      }
+      final search = tester.getCenter(find.text('Search'));
+      final home = tester.getCenter(find.text('Home'));
+      final between = Offset.lerp(search, home, 0.4)!;
+      final gesture = await _dragTo(tester, search, between);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(_lensRect(tester).center.dx, closeTo(between.dx, 0.5));
+
+      await gesture.moveTo(home);
+      await tester.pump(const Duration(milliseconds: 16));
       await gesture.up();
       await tester.pumpAndSettle();
 
       expect(taps, [0]);
-      expectUnder(pillOf(tester), tester.getCenter(find.text('Home')));
+      expect(
+        haptics.where((h) => h == 'HapticFeedbackType.selectionClick'),
+        hasLength(1),
+      );
+      expectUnder(_lensRect(tester), home);
     });
 
     testWidgets('the lens travels leftward toward a later tab', (
@@ -583,12 +704,12 @@ void main() {
       await tester.tap(find.text('Profile'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 60));
-      final midFlight = lensOf(tester).center.dx;
+      final midFlight = _lensRect(tester).center.dx;
       expect(midFlight, lessThan(home));
       expect(midFlight, greaterThan(profile));
 
       await tester.pumpAndSettle();
-      expectUnder(lensOf(tester), Offset(profile, 0));
+      expectUnder(_lensRect(tester), Offset(profile, 0));
     });
   });
 

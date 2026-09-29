@@ -48,8 +48,8 @@ class GlassTab {
   final String? semanticLabel;
 }
 
-/// A floating glass capsule of tabs whose selection turns to glass while it
-/// moves.
+/// A floating glass capsule of tabs whose selection is a clear glass lens
+/// that springs from tab to tab.
 ///
 /// ```dart
 /// GlassScaffold(
@@ -66,36 +66,43 @@ class GlassTab {
 /// ```
 ///
 /// The bar is a [GlassSurface.navigationBar] with the bottom safe-area
-/// inset built in. The selection is a painted pill at rest — it sits on the
-/// bar's glass, and glass on glass is the stacked backdrop filter this
-/// package exists to avoid (flutter#187820). While the selection travels,
-/// and only then, a glass lens in a material of its own rises out of the
-/// pill through a [GlassPresence], swelling a little past the bar's edges,
-/// and fades back into the pill as it lands. A finger resting on the bar
-/// without moving swells the painted pill instead, and the lens sinks
-/// within 280 ms of the selection catching up with a finger that stops
-/// mid-drag. At rest the lens's presence is 0, which drops its backdrop
-/// pass entirely: the bar is the only glass there. The lens is the one
-/// place this package puts glass over glass, as a bounded handoff, and it
-/// is exempt from the layer's debug overlap warning for that reason.
+/// inset built in. The selection is always glass: a clear lens in a
+/// material of its own, [selectionMaterial], one tab wide, sitting in the
+/// bar and bending the bar's own glass through it.
 ///
-/// One spring — the theme's [GlassMotionRole.settle] — moves the selection.
-/// A tap aims it at the new tab. A drag anywhere along the bar keeps
-/// re-aiming it at the finger, so it chases rather than sticks, and a
-/// release throws it to the tab it was heading for, carrying the finger's
-/// speed. Nothing is reported until the finger lifts. The selection always
-/// ends up at [currentIndex]: an owner that declines the tab a drag was
-/// released on, or has not rebuilt with it by the next frame, gets the
-/// selection sent back, and only the tab at [currentIndex] ever reports
-/// itself selected.
+/// That is glass on glass at rest, by design, and it is the one place this
+/// package does it. Two backdrop passes over the same pixels is
+/// flutter#187820: on a physical iPhone the upper pass can read the lower
+/// one's previous frame and white-wash progressively. The lens has not yet
+/// been checked on a physical device for it — verify there before
+/// shipping. It is exempt from the layer's debug overlap warning against
+/// this bar's glass alone; over any other glass it still warns. It costs a
+/// second backdrop pass for as long as the bar is shown.
 ///
-/// The lens shares the bar's presence: its own is the bar's times its
-/// flight, so a bar faded out by a covering route never leaves a lens
-/// behind. Presence only reaches glass, so the bar fades its own painted
-/// labels, icons and pill with it too.
+/// A bouncy spring — the theme's [GlassMotionRole.settle], SwiftUI's
+/// `.bouncy` unless a theme retunes it — moves the lens, and the lens
+/// squashes along its travel with its speed: narrower and taller the
+/// faster it goes, back to its own shape once it lands. A tap aims it at
+/// the new tab. A drag anywhere along the bar keeps re-aiming it at the
+/// finger, clamped to the bar, with a selection click each time the finger
+/// crosses into another tab, and the release commits the tab under the
+/// finger; a cancelled drag sends the lens back. Nothing is reported until
+/// the finger lifts, and a release on the current tab reports nothing. The
+/// selection always ends up at [currentIndex]: an owner that declines the
+/// tab a drag was released on, or has not rebuilt with it by the next
+/// frame, gets the lens sent back, and only the tab at [currentIndex] ever
+/// reports itself selected.
 ///
-/// Under Reduce Motion there is no lens at all and the pill moves
-/// instantly.
+/// The lens shares the bar's presence, so a bar faded out by a covering
+/// route never leaves a lens behind. Presence only reaches glass, so the
+/// bar fades its own painted labels and icons with it too.
+///
+/// Under Reduce Motion the lens is still glass, but it moves instantly and
+/// never squashes.
+///
+/// Inside other glass — a sheet, say — the bar paints (see
+/// [GlassSurface]) and so does its selection: a flat pill in place of the
+/// lens, since glass is never built inside glass.
 ///
 /// The arrow keys move keyboard focus from tab to tab, through the app's
 /// ordinary directional focus traversal; Enter or Space then selects the
@@ -118,6 +125,8 @@ class GlassTabBar extends StatefulWidget {
     required this.onTap,
     this.backdrop,
     this.material,
+    this.selectionMaterial,
+    this.minimumTintOpacity,
     super.key,
   });
   // `tabs` being non-empty and `currentIndex` being inside it are asserted
@@ -125,9 +134,33 @@ class GlassTabBar extends StatefulWidget {
   // `List.length` read is not a constant expression, and this constructor
   // stays `const`-constructible.
 
+  /// The selection lens's material when [selectionMaterial] is null.
+  ///
+  /// Clear glass: no frost, a 10% white tint, a bright rim, a strong colour
+  /// split at the edge and a backdrop saturated half as much again. It is
+  /// fitted by eye to a liquid_glass_renderer lens of refractive index
+  /// 1.15, light intensity 2 and chromatic aberration 0.5. The two
+  /// packages split colour by the same rule — red and blue displaced by
+  /// `1 ± chromaticAberration / 2` of the refraction — so the 0.5 carries
+  /// over as it is. Their refractive indices do not: that package's is a
+  /// physical index over a depth it does not scale with the screen, and
+  /// this one's [GlassMaterial.edgeRefraction] is pixels of displacement.
+  /// The edge refraction here keeps the lens's bend to the bar's in the
+  /// same proportion, (1.15 − 1) / (1.21 − 1) of the fitted bar's 27.42
+  /// points, about 20.
+  static const GlassMaterial defaultSelectionMaterial = GlassMaterial(
+    edgeRefraction: 20,
+    frost: 0,
+    chromaticAberration: 0.5,
+    tint: Color(0xFFFFFFFF),
+    tintOpacity: 0.1,
+    saturation: 1.5,
+    highlight: 2,
+  );
+
   /// The destinations, in reading order: left to right, or right to left
-  /// under [TextDirection.rtl], where the pill, the lens and a drag mirror
-  /// with them. Never empty.
+  /// under [TextDirection.rtl], where the lens and a drag mirror with them.
+  /// Never empty.
   final List<GlassTab> tabs;
 
   /// The index into [tabs] of the selected destination.
@@ -135,7 +168,8 @@ class GlassTabBar extends StatefulWidget {
 
   /// Called with a tab's index when it is tapped, activated from the
   /// keyboard, or is where a drag was released. Called for the current tab
-  /// too when it is tapped again, so a caller can pop to that tab's root.
+  /// too when it is tapped again, so a caller can pop to that tab's root —
+  /// but not when a drag is released on it.
   final ValueChanged<int> onTap;
 
   /// What is behind the bar, for the adaptation `GlassSurface` offers.
@@ -148,7 +182,32 @@ class GlassTabBar extends StatefulWidget {
   /// blur and tint steps, which is right for a bar of app chrome. An app
   /// with a look of its own names one here; the label colour and motion
   /// still come from the role.
+  ///
+  /// A material tinted less than [minimumTintOpacity] is raised to it, in
+  /// the role's own tint colour, so the clear lens and the labels still
+  /// read against the bar: see [minimumTintOpacity].
   final GlassMaterial? material;
+
+  /// The selection lens's material. Null is [defaultSelectionMaterial].
+  ///
+  /// Always a pass of its own, over the bar's: see the note on glass over
+  /// glass above.
+  final GlassMaterial? selectionMaterial;
+
+  /// The least tint a passed [material] is drawn with, from 0 to 1.
+  ///
+  /// A clear lens over a clear bar has nothing to read against: both bend
+  /// the same backdrop, and the labels sit on whatever is behind. So a
+  /// [material] whose [GlassMaterial.tintOpacity] is below this floor is
+  /// drawn with this opacity instead, and with the tint colour the
+  /// navigationBar role resolves to — the dark scheme's grey in dark mode —
+  /// because that is the colour the labels are chosen against. A material
+  /// already at or above the floor is used exactly as given.
+  ///
+  /// Null is the role's own tint opacity: a passed material is never
+  /// lighter than the bar the role would have drawn. 0 turns the floor off.
+  /// It has no effect when [material] is null.
+  final double? minimumTintOpacity;
 
   /// The bar's own height, not counting the safe-area inset below it or
   /// the clear space around it — what a layout hard-coding the bar's height
@@ -188,36 +247,20 @@ const double _maxLabelScale = 1.5;
 /// safe area asks for less.
 const EdgeInsets _margin = EdgeInsets.fromLTRB(16, 0, 16, 8);
 
-/// How quickly the lens rises out of the pill when the selection starts to
-/// move, and how quickly it sinks back once it lands.
-const Duration _rise = Duration(milliseconds: 160);
-const Duration _sink = Duration(milliseconds: 280);
-
-/// How long a finger's press takes to swell the painted pill (and, while
-/// the selection is travelling, the lens already up), and to let it go.
-const Duration _holdIn = Duration(milliseconds: 200);
-const Duration _holdOut = Duration(milliseconds: 360);
-
-/// How far the lens swells past its slot, at most: a 50-point lens reaches
-/// 66, a little past the 62-point bar.
-const double _maxSwell = 0.32;
-
-/// How far past the first or last tab a dragging finger may pull the
-/// selection, in tabs: a little give at either end, not a hard stop.
-const double _fingerOvershoot = 0.2;
-
-/// The painted pill's alpha over the bar's label colour.
+/// The painted pill's alpha over the bar's label colour, on glass only.
 const double _pillAlpha = 0.14;
 
-/// The speed, in tabs per second, at which the lens has swollen about
-/// two-thirds of the way ([_maxSwell] × (1 − 1/e)).
-const double _swellSpeed = 2.5;
-
-/// The speed, in tabs per second, at which the lens's jelly squash is at
-/// its most, and how far that squashes it: up to 24% narrower and 24%
-/// taller.
+/// The lens's squash, after Kibu's `_jellyTransform`.
+///
+/// Measured in alignment units — the lens's position with the first tab
+/// at −1 and the last at 1 — as that transform is: the squash is
+/// `clamp(speed / 10, 0, 1) × 0.8`, the lens narrows by half of it and
+/// grows taller by three tenths of it. At full speed that is 60% of its
+/// width and 124% of its height.
 const double _jellySpeed = 10;
-const double _maxJelly = 0.24;
+const double _maxJelly = 0.8;
+const double _jellyNarrow = 0.5;
+const double _jellyTall = 0.3;
 
 /// An unselected tab's alpha over the bar's label colour.
 const double _unlitAlpha = 0.62;
@@ -239,19 +282,24 @@ const double _substep = 1 / 240;
 const double _restDistance = 1e-3;
 const double _restVelocity = 1e-2;
 
-/// How far a release carries the selection per tab-per-second of throw.
-const double _throw = 0.08;
+/// How far the lens is scaled across and along the bar by [velocity], in
+/// tabs per second, on a bar of [tabCount] tabs.
+///
+/// Kibu's squash is driven by speed in alignment units, where the bar's
+/// first tab is −1 and its last is 1, so `tabCount − 1` tabs span 2 units.
+/// One tab per second is `2 / (tabCount − 1)` units per second.
+({double x, double y}) _squash(double velocity, int tabCount) {
+  if (tabCount < 2 || velocity == 0) {
+    return (x: 1, y: 1);
+  }
+  final speed = velocity.abs() * 2 / (tabCount - 1);
+  final jelly = (speed / _jellySpeed).clamp(0.0, 1.0) * _maxJelly;
+  return (x: 1 - jelly * _jellyNarrow, y: 1 + jelly * _jellyTall);
+}
 
 class _GlassTabBarState extends State<GlassTabBar>
-    with TickerProviderStateMixin, ReduceMotionSnap {
+    with SingleTickerProviderStateMixin, ReduceMotionSnap {
   late final _Lens _lens;
-
-  /// 1 while a finger is down on the bar.
-  late final AnimationController _hold;
-
-  /// 1 while the lens is up, which is only while the selection is moving;
-  /// a still finger never raises it. See [_syncFlight].
-  late final AnimationController _flight;
 
   /// The bar's presence, from the enclosing [GlassPresence] — a
   /// `GlassScaffold`'s, usually — or [_ownPresence] without one.
@@ -266,25 +314,14 @@ class _GlassTabBarState extends State<GlassTabBar>
   /// overlap check, and the lens would be exempt against all of them.
   final Animation<double> _ownPresence = _FullPresence();
 
-  /// The lens's presence: the bar's, times [_flight]. Rebuilt only when the
-  /// bar's presence object changes, because [GlassPresence] holds its
-  /// animation by identity and a fresh one is a fresh backdrop pass.
+  /// The lens's presence: the bar's, under an identity of the lens's own.
+  /// Rebuilt only when the bar's presence object changes, because
+  /// [GlassPresence] holds its animation by identity and a fresh one is a
+  /// fresh backdrop pass.
   late Animation<double> _lensPresence;
-
-  /// What moves the painted pill, and what moves the lens: merged once
-  /// here, not in `build`, where every rebuild would have its
-  /// `AnimatedBuilder` unsubscribe and resubscribe.
-  late final Listenable _pillMotion = Listenable.merge([_lens, _flight, _hold]);
-  late final Listenable _lensMotion = Listenable.merge([_lens, _hold]);
-
-  /// Whether a finger is down on the bar.
-  bool _pressed = false;
 
   /// The tab under the finger while dragging, lit before it is committed.
   int? _hover;
-
-  /// Where the finger is, in tabs, while dragging.
-  double _finger = 0;
 
   /// One tab's width, from the most recent layout, for the drag handlers.
   double _slot = 0;
@@ -297,12 +334,6 @@ class _GlassTabBarState extends State<GlassTabBar>
   /// [TextDirection.rtl], so a finger is measured from that edge.
   bool _rtl = false;
 
-  /// Whether the bar is on glass already — inside a sheet, say — from the
-  /// most recent build. There the bar paints (see `GlassSurface`) and has
-  /// no lens: the painted pill carries the selection and springs to it,
-  /// and nothing here is glass.
-  bool _onGlass = false;
-
   int get _last => widget.tabs.length - 1;
 
   bool get _reduceMotion => GlassReduceMotion.instance.value;
@@ -311,18 +342,7 @@ class _GlassTabBarState extends State<GlassTabBar>
   void initState() {
     super.initState();
     _assertIndex();
-    _lens = _Lens(this, widget.currentIndex.toDouble())
-      ..addListener(_syncFlight);
-    _hold = AnimationController(
-      vsync: this,
-      duration: _holdIn,
-      reverseDuration: _holdOut,
-    );
-    _flight = AnimationController(
-      vsync: this,
-      duration: _rise,
-      reverseDuration: _sink,
-    );
+    _lens = _Lens(this, widget.currentIndex.toDouble());
   }
 
   @override
@@ -332,7 +352,7 @@ class _GlassTabBarState extends State<GlassTabBar>
     if (!_lensPresenceBuilt || !identical(bar, _barPresence)) {
       _lensPresenceBuilt = true;
       _barPresence = bar;
-      _lensPresence = _Product(bar, _flight, handsOffWith: bar);
+      _lensPresence = _HandoffPresence(bar);
     }
   }
 
@@ -345,8 +365,8 @@ class _GlassTabBarState extends State<GlassTabBar>
     _followIndex();
   }
 
-  /// Aims the selection at [GlassTabBar.currentIndex] unless a drag owns it
-  /// or it is already heading there.
+  /// Aims the lens at [GlassTabBar.currentIndex] unless a drag owns it or
+  /// it is already heading there.
   void _followIndex() {
     if (_hover == null && _lens.target != widget.currentIndex) {
       _aim(widget.currentIndex.toDouble());
@@ -356,8 +376,6 @@ class _GlassTabBarState extends State<GlassTabBar>
   @override
   void dispose() {
     _lens.dispose();
-    _hold.dispose();
-    _flight.dispose();
     super.dispose();
   }
 
@@ -373,9 +391,7 @@ class _GlassTabBarState extends State<GlassTabBar>
   void didChangeReduceMotion({required bool reduceMotion}) {
     if (reduceMotion) {
       // Turned on mid-flight: land now rather than freeze half way.
-      _lens.jump(_hover?.toDouble() ?? widget.currentIndex.toDouble());
-      _hold.value = 0;
-      _flight.value = 0;
+      _lens.jump(_lens.target);
     }
     setState(() {});
   }
@@ -389,61 +405,18 @@ class _GlassTabBarState extends State<GlassTabBar>
     _lens.aim(target, motion.spring);
   }
 
-  /// Raises the lens while the selection is travelling, and lets it sink
-  /// once it has caught up with its target.
-  ///
-  /// Only travel, never a press: the lens is a second backdrop pass over
-  /// the bar's (flutter#187820), declared as a bounded handoff (see
-  /// [_Product]), and a finger resting on the bar has no bound. A still
-  /// finger, before or during a drag, shows the painted pill swelling
-  /// under it instead; the lens sinks within [_sink] of the spring
-  /// settling on the finger.
-  void _syncFlight() {
-    if (_reduceMotion || _onGlass) {
-      return;
-    }
-    final up = _lens.isMoving;
-    final status = _flight.status;
-    if (up) {
-      if (status != AnimationStatus.forward &&
-          status != AnimationStatus.completed) {
-        _flight.forward();
-      }
-    } else if (status != AnimationStatus.reverse &&
-        status != AnimationStatus.dismissed) {
-      _flight.reverse();
-    }
-  }
-
-  void _press(bool down) {
-    if (_pressed == down) {
-      return;
-    }
-    _pressed = down;
-    if (!_reduceMotion) {
-      unawaited(down ? _hold.forward() : _hold.reverse());
-    }
-    _syncFlight();
-  }
-
-  void _onDragStart(DragStartDetails details) {
-    _press(true);
-    _onDrag(details.localPosition.dx);
-  }
+  /// How far the finger at [dx] is from the edge tab 0 sits on, inside
+  /// the selection's inset.
+  double _fromStart(double dx) => (_rtl ? _width - dx : dx) - _inset;
 
   void _onDrag(double dx) {
     if (_slot <= 0) {
       return;
     }
-    // The finger in tabs, allowed a little past either end, measured from
-    // the edge tab 0 sits on.
-    final fromStart = _rtl ? _width - dx : dx;
-    _finger = ((fromStart - _inset) / _slot - 0.5).clamp(
-      -_fingerOvershoot,
-      _last + _fingerOvershoot,
-    );
-    _aim(_finger);
-    final hover = _finger.round().clamp(0, _last);
+    final along = _fromStart(dx);
+    // The lens centred on the finger, and no further than the end tabs.
+    _aim((along / _slot - 0.5).clamp(0, _last.toDouble()));
+    final hover = (along / _slot).floor().clamp(0, _last);
     if (hover != _hover) {
       if (_hover != null) {
         unawaited(HapticFeedback.selectionClick());
@@ -452,29 +425,41 @@ class _GlassTabBarState extends State<GlassTabBar>
     }
   }
 
-  void _onDragEnd(DragEndDetails details) {
-    final dx = details.velocity.pixelsPerSecond.dx;
-    final fling = _slot > 0 ? (_rtl ? -dx : dx) / _slot : 0.0;
-    _release((_finger + fling * _throw).round().clamp(0, _last));
+  /// Whether the pointer driving the drag was cancelled rather than lifted:
+  /// the drag recognizer ends an accepted drag either way, and only a lift
+  /// commits.
+  bool _pointerCancelled = false;
+
+  void _onDragEnd() {
+    final hover = _hover;
+    if (hover == null) {
+      return;
+    }
+    if (_pointerCancelled) {
+      _onDragCancel();
+      return;
+    }
+    setState(() => _hover = null);
+    _aim(hover.toDouble());
+    if (hover == widget.currentIndex) {
+      return;
+    }
+    unawaited(HapticFeedback.lightImpact());
+    widget.onTap(hover);
+    // An owner that declined [hover], or has not rebuilt with it yet, left
+    // [GlassTabBar.currentIndex] where it was: send the lens back there.
+    SchedulerBinding.instance
+      ..addPostFrameCallback((_) {
+        if (mounted) {
+          _followIndex();
+        }
+      })
+      ..ensureVisualUpdate();
   }
 
-  void _release(int target) {
+  void _onDragCancel() {
     setState(() => _hover = null);
-    _aim(target.toDouble());
-    _press(false);
-    if (target != widget.currentIndex) {
-      unawaited(HapticFeedback.lightImpact());
-      widget.onTap(target);
-      // An owner that declined [target], or has not rebuilt with it yet,
-      // left [GlassTabBar.currentIndex] where it was: send it back there.
-      SchedulerBinding.instance
-        ..addPostFrameCallback((_) {
-          if (mounted) {
-            _followIndex();
-          }
-        })
-        ..ensureVisualUpdate();
-    }
+    _aim(widget.currentIndex.toDouble());
   }
 
   /// Whether [_debugCheckTabWidth] has already reported this bar.
@@ -517,7 +502,6 @@ class _GlassTabBarState extends State<GlassTabBar>
   @override
   Widget build(BuildContext context) {
     _rtl = Directionality.of(context) == TextDirection.rtl;
-    _onGlass = GlassHostScope.isOnGlass(context);
     return SafeArea(
       top: false,
       minimum: _margin,
@@ -538,8 +522,22 @@ class _GlassTabBarState extends State<GlassTabBar>
     );
   }
 
+  /// The bar's material: the passed one, raised to the tint floor, or null
+  /// for the role's own. See [GlassTabBar.minimumTintOpacity].
+  GlassMaterial? _barMaterial(GlassSurfaceStyle role) {
+    final material = widget.material;
+    if (material == null) {
+      return null;
+    }
+    final floor = widget.minimumTintOpacity ?? role.material.tintOpacity;
+    if (material.tintOpacity >= floor) {
+      return material;
+    }
+    return material.copyWith(tint: role.material.tint, tintOpacity: floor);
+  }
+
   Widget _bar(BuildContext context, Size size) {
-    final reduceMotion = _reduceMotion;
+    final onGlass = GlassHostScope.isOnGlass(context);
     final bar = GlassTheme.surfaceOf(
       context,
       GlassSurfaceRole.navigationBar,
@@ -547,39 +545,31 @@ class _GlassTabBarState extends State<GlassTabBar>
       backdrop: widget.backdrop,
     );
     final lensSize = Size(_slot, _barHeight - 2 * _inset);
-    final lensStyle = GlassTheme.surfaceOf(
+    final lensShape = GlassTheme.surfaceOf(
       context,
       GlassSurfaceRole.control,
       size: lensSize,
       backdrop: widget.backdrop,
-    );
+    ).shape;
     final lit = _hover ?? widget.currentIndex;
 
     // The bar's [GlassSurface] fades this with the bar's presence.
     final content = Stack(
       children: [
-        AnimatedBuilder(
-          animation: _pillMotion,
-          builder: (context, child) => PositionedDirectional(
-            start: _inset + _lens.position * _slot,
-            top: _inset,
-            width: lensSize.width,
-            height: lensSize.height,
-            // A held finger swells the painted pill, never the lens: see
-            // [_syncFlight]. Kept inside the bar, a quarter of the lens's
-            // swell.
-            child: Transform.scale(
-              scale: 1 + _maxSwell / 4 * Curves.easeOut.transform(_hold.value),
-              child: Opacity(opacity: 1 - _flight.value, child: child),
+        // On glass already the bar paints, and so does its selection.
+        if (onGlass)
+          _Selection(
+            lens: _lens,
+            slot: _slot,
+            size: lensSize,
+            tabCount: widget.tabs.length,
+            child: ClipPath(
+              clipper: GlassShapeClipper(lensShape),
+              child: ColoredBox(
+                color: bar.labelColor.withValues(alpha: _pillAlpha),
+              ),
             ),
           ),
-          child: ClipPath(
-            clipper: GlassShapeClipper(lensStyle.shape),
-            child: ColoredBox(
-              color: bar.labelColor.withValues(alpha: _pillAlpha),
-            ),
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.all(_inset),
           child: Row(
@@ -601,33 +591,22 @@ class _GlassTabBarState extends State<GlassTabBar>
       ],
     );
 
+    // The listener sees a pointer's cancel before the drag recognizer turns
+    // it into an end: see [_pointerCancelled].
     return Listener(
-      // A raw listener, not a tap handler: it tracks a press, which swells
-      // the painted pill, without joining the arena the tabs and the drag
-      // compete in. A press alone never raises the lens.
-      onPointerDown: (_) => _press(true),
-      onPointerUp: (_) {
-        if (_hover == null) {
-          _press(false);
-        }
-      },
-      onPointerCancel: (_) {
-        if (_hover == null) {
-          _press(false);
-        }
-      },
+      onPointerDown: (_) => _pointerCancelled = false,
+      onPointerCancel: (_) => _pointerCancelled = true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         // `down`, not `start`: the slop a drag must clear before `start`
-        // reports anything would otherwise be dropped from the lens's
-        // travel rather than merely delayed.
+        // reports anything would otherwise be dropped from the lens's travel
+        // rather than merely delayed.
         dragStartBehavior: DragStartBehavior.down,
-        onHorizontalDragStart: _onDragStart,
+        onHorizontalDragStart: (d) => _onDrag(d.localPosition.dx),
         onHorizontalDragUpdate: (d) => _onDrag(d.localPosition.dx),
-        onHorizontalDragEnd: _onDragEnd,
-        onHorizontalDragCancel: () => _release(widget.currentIndex),
+        onHorizontalDragEnd: (_) => _onDragEnd(),
+        onHorizontalDragCancel: _onDragCancel,
         child: Stack(
-          clipBehavior: Clip.none,
           children: [
             Positioned.fill(
               // The bar's glass, under its own presence; see
@@ -636,24 +615,30 @@ class _GlassTabBarState extends State<GlassTabBar>
                 presence: _barPresence,
                 child: GlassSurface.navigationBar(
                   backdrop: widget.backdrop,
-                  material: widget.material,
+                  material: _barMaterial(bar),
                   child: content,
                 ),
               ),
             ),
-            // A sibling of the bar's glass, never inside it: a `Glass`
-            // built in another's child is refused outright.
-            if (!reduceMotion && !_onGlass)
-              _LensGlass(
+            // A sibling of the bar's glass, never inside it: a `Glass` built
+            // in another's child is refused outright. It takes no pointers:
+            // the tabs and the drag under it do.
+            if (!onGlass)
+              _Selection(
                 lens: _lens,
-                hold: _hold,
-                motion: _lensMotion,
                 slot: _slot,
                 size: lensSize,
-                presence: _lensPresence,
-                glass: Glass(
-                  shape: lensStyle.shape,
-                  material: lensStyle.material,
+                tabCount: widget.tabs.length,
+                child: IgnorePointer(
+                  child: GlassPresence(
+                    presence: _lensPresence,
+                    child: Glass(
+                      shape: lensShape,
+                      material:
+                          widget.selectionMaterial ??
+                          GlassTabBar.defaultSelectionMaterial,
+                    ),
+                  ),
                 ),
               ),
           ],
@@ -663,72 +648,49 @@ class _GlassTabBarState extends State<GlassTabBar>
   }
 }
 
-/// The glass lens, positioned over the selection and swollen by its speed.
+/// The selection, positioned at the lens's place in the bar and squashed
+/// by its speed.
 ///
-/// It is only up while the selection travels (see
-/// `_GlassTabBarState._syncFlight`). A finger's hold adds to the swell
-/// while it is up, but never raises it.
-class _LensGlass extends StatelessWidget {
-  const _LensGlass({
-    required this.motion,
+/// A [Transform], which the glass under it follows: the layer reads each
+/// shape's transform when it paints.
+class _Selection extends StatelessWidget {
+  const _Selection({
     required this.lens,
-    required this.hold,
     required this.slot,
     required this.size,
-    required this.presence,
-    required this.glass,
+    required this.tabCount,
+    required this.child,
   });
 
   /// Where the lens is, in tabs, and how fast it is going.
   final _Lens lens;
 
-  /// 1 while a finger holds the bar.
-  final Animation<double> hold;
-
-  /// [lens] and [hold] merged, once, by the bar's state.
-  final Listenable motion;
-
   /// One tab's width.
   final double slot;
 
-  /// The lens's unswollen size.
+  /// The lens's size at rest.
   final Size size;
 
-  /// The lens's own presence. Held by identity: it drives one backdrop
-  /// pass, separate from the bar's.
-  final Animation<double> presence;
+  /// How many tabs the bar has, for the squash's units.
+  final int tabCount;
 
-  /// The lens's glass.
-  final Widget glass;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: motion,
-      child: GlassPresence(presence: presence, child: glass),
+      animation: lens,
+      child: child,
       builder: (context, child) {
-        final speed = lens.velocity.abs();
-        // Swells out of the bar with its speed, and with a finger's hold
-        // while it is already up. A still press never raises it; the
-        // painted pill swells for that instead.
-        final swell =
-            1 +
-            _maxSwell *
-                math.max(
-                  Curves.easeOut.transform(hold.value),
-                  1 - math.exp(-speed / _swellSpeed),
-                );
-        // Squashed along its travel and bulging across it, by speed in
-        // tabs per second, saturating at 10.
-        final jelly = (speed / _jellySpeed).clamp(0.0, 1.0) * _maxJelly;
+        final squash = _squash(lens.velocity, tabCount);
         return PositionedDirectional(
           start: _inset + lens.position * slot,
           top: _inset,
           width: size.width,
           height: size.height,
           child: Transform.scale(
-            scaleX: swell * (1 - jelly),
-            scaleY: swell * (1 + jelly),
+            scaleX: squash.x,
+            scaleY: squash.y,
             child: child,
           ),
         );
@@ -799,25 +761,17 @@ class _TabButton extends StatelessWidget {
   }
 }
 
-/// [first] times [next].
-///
-/// The lens's presence, and a [DeclaredGlassHandoff]: the lens overlaps the
-/// bar's glass on purpose, only while the selection travels (see
-/// `_GlassTabBarState._syncFlight`), so the layer's overlap warning leaves
-/// it out. Its bound is the settle spring plus the 280 ms sink.
-class _Product extends CompoundAnimation<double>
-    implements DeclaredGlassHandoff {
-  _Product(
-    Animation<double> first,
-    Animation<double> next, {
-    required this.handsOffWith,
-  }) : super(first: first, next: next);
+/// The bar's presence, under an identity of the lens's own, and a
+/// [DeclaredGlassHandoff]: the lens sits over the bar's glass on purpose,
+/// always, so the layer's overlap warning leaves that one pair out. Unlike
+/// the bounded handoffs the interface was written for, this one does not
+/// end: see the note on flutter#187820 on [GlassTabBar].
+class _HandoffPresence extends ProxyAnimation implements DeclaredGlassHandoff {
+  _HandoffPresence(Animation<double> super.animation)
+    : handsOffWith = animation;
 
   @override
   final Object? handsOffWith;
-
-  @override
-  double get value => first.value * next.value;
 }
 
 /// The selection's position, in tabs, moved by a spring stepped every
@@ -848,9 +802,6 @@ class _Lens extends ChangeNotifier {
 
   /// Where it is heading, in tabs.
   double target;
-
-  /// Whether it is still travelling.
-  bool get isMoving => _ticker.isActive;
 
   /// Sends it toward [to] on [spring], keeping its current speed.
   void aim(double to, SpringDescription spring) {

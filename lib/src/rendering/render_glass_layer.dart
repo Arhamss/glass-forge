@@ -821,11 +821,10 @@ class RenderGlassLayer extends RenderProxyBox {
   /// long as the handoff takes, and an assert would throw on the very
   /// frame that was in the middle of fixing it. A shape whose presence is a
   /// [DeclaredGlassHandoff] is left out against the one glass it declares
-  /// it hands off over, and against nothing else: that pair is this
-  /// package's own bounded overlap, declared as such. Shapes inside one
-  /// pass are
-  /// fine: they share a matte and fold into one surface via smooth-min,
-  /// which is the supported way to overlap.
+  /// it hands off over, and against nothing else: that pair is an overlap
+  /// this package makes on purpose, declared as such. Shapes inside one
+  /// pass are fine: they share a matte and fold into one surface via
+  /// smooth-min, which is the supported way to overlap.
   ///
   /// Each shape's box comes from [ShapeGeometry.layerBounds], which puts
   /// the shape's own extent through its own basis. Building it from

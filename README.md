@@ -346,13 +346,16 @@ GlassTabBar(
 )
 ```
 
-At rest the selection is a painted pill on the bar's glass. While it moves
-— a tap, or a drag along the bar that it chases under your finger — a glass
-lens rises out of the pill, swells a little past the bar's edges, and sinks
-back as it lands, so there is never glass on glass at rest. A finger
-resting on a tab swells the pill but raises no lens. It fades with the bar,
-and Reduce Motion replaces it with an instant pill. `GlassTabBar.height`
-and `GlassTabBar.margin` are public for laying out content around the bar.
+The selection is always a clear glass lens in a material of its own
+(`selectionMaterial`). A bouncy spring moves it from tab to tab, and it
+squashes along its travel, narrower and taller the faster it goes. Drag
+along the bar and it follows your finger, with a click for each tab you
+cross; lift and the tab under your finger is selected. It fades with the
+bar, and under Reduce Motion it moves at once, still glass. A `material`
+you pass is tinted at least as much as the role's own bar
+(`minimumTintOpacity`), so the lens has something to read against.
+`GlassTabBar.height` and `GlassTabBar.margin` are public for laying out
+content around the bar.
 
 `showGlassSheet` presents a modal glass sheet from the bottom edge and
 completes with whatever it is popped with.
@@ -408,10 +411,10 @@ harness marks such a run untrustworthy rather than letting it quietly pass.
   mattes could meet, and every shape in one blend group, share a cluster.
   Past eight in one cluster the extras are not drawn, and a debug warning
   says so.
-- The tab-bar lens is glass over the bar's glass while it travels. That is
-  the one overlap this package allows on purpose, and it has not yet been
-  checked on a physical iPhone for [flutter#187820].
-- Holding a tab differs from iOS: the pill swells and no lens rises.
+- The tab-bar lens is glass over the bar's glass, always, at rest too.
+  That is the one overlap this package makes on purpose, and it has not
+  yet been checked on a physical iPhone for [flutter#187820]. Check it on
+  a device before you ship the bar.
 - `GlassSwitch` and `GlassSegmentedControl` dimensions are not yet measured
   against an iOS capture. The controls pick some of their own colours,
   such as the switch's green track and white knob.
