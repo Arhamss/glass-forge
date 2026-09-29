@@ -17,12 +17,13 @@ Widget _harness({
   required Widget bar,
   double bottomInset = 0,
   Animation<double>? barPresence,
+  TextDirection textDirection = TextDirection.ltr,
 }) {
   final pinned = Align(alignment: Alignment.bottomCenter, child: bar);
   return MediaQuery(
     data: MediaQueryData(padding: EdgeInsets.only(bottom: bottomInset)),
     child: Directionality(
-      textDirection: TextDirection.ltr,
+      textDirection: textDirection,
       child: GlassLayer(
         tier: GeometryTier.none,
         child: barPresence == null
@@ -379,5 +380,94 @@ void main() {
     expect(GlassTabBar.height, 62);
     final surface = find.byType(GlassSurface);
     expect(tester.getSize(surface).height, GlassTabBar.height);
+  });
+
+  group('right to left', () {
+    Widget rtl(List<int> taps, {int initial = 0}) => _harness(
+      textDirection: TextDirection.rtl,
+      bar: _followingBar(taps, initial: initial),
+    );
+
+    /// The painted pill: the last clip the bar builds, as the Reduce
+    /// Motion test above reads it.
+    Rect pillOf(WidgetTester tester) => tester.getRect(
+      find
+          .descendant(
+            of: find.byType(GlassTabBar),
+            matching: find.byType(ClipPath),
+          )
+          .last,
+    );
+
+    /// The lens's glass: the one under the lens's own presence.
+    Rect lensOf(WidgetTester tester) => tester.getRect(
+      find.descendant(
+        of: find.byType(GlassPresence),
+        matching: find.byType(Glass),
+      ),
+    );
+
+    void expectUnder(Rect rect, Offset label) {
+      expect(rect.left, lessThan(label.dx));
+      expect(rect.right, greaterThan(label.dx));
+    }
+
+    testWidgets('the first tab is on the right', (tester) async {
+      await tester.pumpWidget(rtl(<int>[]));
+      expect(
+        tester.getCenter(find.text('Home')).dx,
+        greaterThan(tester.getCenter(find.text('Profile')).dx),
+      );
+    });
+
+    for (final (index, label) in [(0, 'Home'), (2, 'Profile')]) {
+      testWidgets('the pill and lens sit under "$label" at rest', (
+        tester,
+      ) async {
+        await tester.pumpWidget(rtl(<int>[], initial: index));
+        final centre = tester.getCenter(find.text(label));
+        expectUnder(pillOf(tester), centre);
+        expectUnder(lensOf(tester), centre);
+      });
+    }
+
+    testWidgets('a drag commits the tab under the finger', (tester) async {
+      final taps = <int>[];
+      await tester.pumpWidget(rtl(taps, initial: 1));
+
+      final from = tester.getCenter(find.text('Search'));
+      final to = tester.getCenter(find.text('Home'));
+      final gesture = await tester.startGesture(
+        from,
+        kind: PointerDeviceKind.mouse,
+      );
+      for (var i = 1; i <= 10; i++) {
+        await gesture.moveTo(Offset.lerp(from, to, i / 10)!);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(taps, [0]);
+      expectUnder(pillOf(tester), tester.getCenter(find.text('Home')));
+    });
+
+    testWidgets('the lens travels leftward toward a later tab', (
+      tester,
+    ) async {
+      await tester.pumpWidget(rtl(<int>[]));
+      final home = tester.getCenter(find.text('Home')).dx;
+      final profile = tester.getCenter(find.text('Profile')).dx;
+
+      await tester.tap(find.text('Profile'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      final midFlight = lensOf(tester).center.dx;
+      expect(midFlight, lessThan(home));
+      expect(midFlight, greaterThan(profile));
+
+      await tester.pumpAndSettle();
+      expectUnder(lensOf(tester), Offset(profile, 0));
+    });
   });
 }

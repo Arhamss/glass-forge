@@ -96,7 +96,9 @@ class GlassTabBar extends StatefulWidget {
   // `List.length` read is not a constant expression, and this constructor
   // stays `const`-constructible.
 
-  /// The destinations, left to right. Never empty.
+  /// The destinations, in reading order: left to right, or right to left
+  /// under [TextDirection.rtl], where the pill, the lens and a drag mirror
+  /// with them. Never empty.
   final List<GlassTab> tabs;
 
   /// The index into [tabs] of the selected destination.
@@ -183,6 +185,14 @@ class _GlassTabBarState extends State<GlassTabBar>
 
   /// One tab's width, from the most recent layout, for the drag handlers.
   double _slot = 0;
+
+  /// The bar's width, from the most recent layout, for the drag handlers.
+  double _width = 0;
+
+  /// Whether the tabs run right to left, from the most recent build, for
+  /// the drag handlers: the `Row` puts tab 0 on the right under
+  /// [TextDirection.rtl], so a finger is measured from that edge.
+  bool _rtl = false;
 
   int get _last => widget.tabs.length - 1;
 
@@ -309,8 +319,10 @@ class _GlassTabBarState extends State<GlassTabBar>
     if (_slot <= 0) {
       return;
     }
-    // The finger in tabs, allowed a little past either end.
-    _finger = ((dx - _inset) / _slot - 0.5).clamp(-0.2, _last + 0.2);
+    // The finger in tabs, allowed a little past either end, measured from
+    // the edge tab 0 sits on.
+    final fromStart = _rtl ? _width - dx : dx;
+    _finger = ((fromStart - _inset) / _slot - 0.5).clamp(-0.2, _last + 0.2);
     _aim(_finger);
     final hover = _finger.round().clamp(0, _last);
     if (hover != _hover) {
@@ -322,7 +334,8 @@ class _GlassTabBarState extends State<GlassTabBar>
   }
 
   void _onDragEnd(DragEndDetails details) {
-    final fling = _slot > 0 ? details.velocity.pixelsPerSecond.dx / _slot : 0.0;
+    final dx = details.velocity.pixelsPerSecond.dx;
+    final fling = _slot > 0 ? (_rtl ? -dx : dx) / _slot : 0.0;
     _release((_finger + fling * _throw).round().clamp(0, _last));
   }
 
@@ -343,6 +356,7 @@ class _GlassTabBarState extends State<GlassTabBar>
 
   @override
   Widget build(BuildContext context) {
+    _rtl = Directionality.of(context) == TextDirection.rtl;
     return SafeArea(
       top: false,
       minimum: _margin,
@@ -351,6 +365,7 @@ class _GlassTabBarState extends State<GlassTabBar>
         child: LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
+            _width = width;
             _slot = (width - 2 * _inset) / widget.tabs.length;
             return _bar(context, Size(width, _barHeight));
           },
@@ -384,8 +399,8 @@ class _GlassTabBarState extends State<GlassTabBar>
         children: [
           AnimatedBuilder(
             animation: Listenable.merge([_lens, _flight, _hold]),
-            builder: (context, child) => Positioned(
-              left: _inset + _lens.position * _slot,
+            builder: (context, child) => PositionedDirectional(
+              start: _inset + _lens.position * _slot,
               top: _inset,
               width: lensSize.width,
               height: lensSize.height,
@@ -532,8 +547,8 @@ class _LensGlass extends StatelessWidget {
         // Squashed along its travel and bulging across it, by speed in
         // tabs per second, saturating at 10.
         final jelly = (speed / 10).clamp(0.0, 1.0) * 0.24;
-        return Positioned(
-          left: _inset + lens.position * slot,
+        return PositionedDirectional(
+          start: _inset + lens.position * slot,
           top: _inset,
           width: size.width,
           height: size.height,
