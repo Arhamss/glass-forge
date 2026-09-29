@@ -584,6 +584,6 @@ class _GlassSliderState extends State<GlassSlider>
         ),
       );
     }
-    return Glass(shape: style.shape, child: size);
+    return Glass(shape: style.shape, material: style.material, child: size);
   }
 }

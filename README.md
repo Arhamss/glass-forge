@@ -102,7 +102,12 @@ controller and never reads it back.
 `GlassButton` resolves `GlassSurfaceRole.control` for its material, shape and
 label colour, and never draws glass on glass: built on content it is real
 glass over `InteractiveGlass`; built under `GlassHostScope` — inside a glass
-toolbar, say — it paints a flat tint with a scale on press instead.
+toolbar, say — it paints a flat tint with a scale on press instead. Its
+glass draws the control role's material, not the enclosing layer's, so the
+label colour is always tuned for the glass it sits on. The slider thumb and
+the segmented pill do the same; the switch knob is always
+`GlassMaterial.dome()`. All controls in one layer share that material's one
+backdrop pass.
 
 ```dart
 GlassButton(
@@ -111,9 +116,11 @@ GlassButton(
 )
 ```
 
-`onPressed: null` disables it. Every control in this package shares
-`GlassControlFrame` for semantics, keyboard activation (Enter and Space) and
-a 44 × 44 minimum hit target that grows the tap area, never the glass.
+`onPressed: null` disables it. Every control in this package except
+`GlassTextField` shares one frame for semantics, keyboard activation (Enter
+and Space) and a 44 × 44 minimum hit target that grows the tap area, never
+the glass. The text field wraps `EditableText` directly, because a tap there
+places the caret.
 
 `GlassSwitch` is a track and a knob: the track is always painted — real
 glass on a 64 × 28 capsule this thin reads as a smear, not a control — and

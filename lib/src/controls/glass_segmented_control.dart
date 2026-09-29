@@ -544,6 +544,10 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
         ),
       );
     }
-    return Glass(shape: style.shape, child: const SizedBox.expand());
+    return Glass(
+      shape: style.shape,
+      material: style.material,
+      child: const SizedBox.expand(),
+    );
   }
 }

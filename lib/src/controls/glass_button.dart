@@ -191,14 +191,22 @@ class GlassButton extends StatelessWidget {
       return enabled ? _PaintedPressScale(child: painted) : painted;
     }
 
+    // The control role's own material, which [labelColor] was resolved
+    // against: inheriting the layer's instead would leave the label's
+    // contrast promise about a surface that is not drawn.
+    final glass = Glass(
+      shape: resolvedShape,
+      material: style.material,
+      child: label,
+    );
     if (!enabled) {
-      return Glass(shape: resolvedShape, child: label);
+      return glass;
     }
 
     return InteractiveGlass(
       pressStretch: pressStretch,
       glow: glow,
-      child: Glass(shape: resolvedShape, child: label),
+      child: glass,
     );
   }
 }
