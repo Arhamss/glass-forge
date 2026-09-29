@@ -92,6 +92,10 @@
   that chrome's full height before their backdrop passes would overlap, and
   driving every edge from one number charged twice that clearance in width.
   Defaults to `gap`, so a sheet floating over nothing is unchanged.
+- Fixed: every layer baked its mattes a second time a few frames after it
+  mounted, when its producer's warm-up settled, although the mattes it held
+  were already the ones a ready producer bakes. The settling now only
+  re-asks a pass that got no matte.
 
 ### Controls
 

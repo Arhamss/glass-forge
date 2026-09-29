@@ -1643,9 +1643,21 @@ class RenderGlassLayer extends RenderProxyBox {
     // Per pass, not per layer, so that moving a shape of one material does
     // not re-bake every other material's matte. Each pass's scene is its
     // own registry and bumps its own revision only when its own shapes move.
+    //
+    // A producer's readiness only matters to a pass it gave nothing. A
+    // producer answers null until it is ready and never a stand-in, so a
+    // matte in hand is the one a ready producer bakes, and the warm-up
+    // settling later changes nothing about it. Re-asking for it anyway cost
+    // one bake per pass a few frames after every layer mounted: the warm-up
+    // settles asynchronously, after the first paints, even when everything
+    // it waits on was loaded long before. (Seen first in the tests as a bake
+    // following a `toImage` readback, whose `runAsync` is the first window
+    // in which a test's warm-up can settle.) Swapping the producer, for a
+    // new tier, drops every pass's matte, so it still re-asks.
     final request = _matteRequestFor(pass.material);
     if (pass.refreshedRevision == pass.scene.revision &&
-        pass.refreshedGeneration == _producerGeneration &&
+        (pass.matte != null ||
+            pass.refreshedGeneration == _producerGeneration) &&
         pass.refreshedRequest == request) {
       return;
     }

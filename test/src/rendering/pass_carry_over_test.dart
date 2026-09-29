@@ -84,7 +84,11 @@ Future<Color> _colorAt(WidgetTester tester, Offset point) async {
   return result;
 }
 
-/// Lets any bake a readback provoked land: a repaint, and a frame after.
+/// Lets whatever a readback's real-async window settled -- the layer's
+/// warm-up -- reach paint: a repaint, and a frame after. Since the warm-up
+/// settling stopped re-baking mattes already in hand (see
+/// `readback_rebake_test.dart`) this bakes nothing, and is kept so a count
+/// after it starts from a layer with nothing left pending.
 Future<void> _settle(WidgetTester tester) async {
   tester
       .renderObject<RenderGlassLayer>(find.byType(GlassLayer))
@@ -172,8 +176,8 @@ void main() {
       );
       await tester.pump();
       final red = await _colorAt(tester, _rect.center);
-      // A readback repaints the layer outside the frame, which it answers
-      // with one fresh bake; let that land before counting.
+      // Let the warm-up the readback's real-async window settled reach
+      // paint before counting.
       await _settle(tester);
 
       GlassRenderCounters.instance.reset();
