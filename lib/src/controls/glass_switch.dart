@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/physics.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
+import 'package:glass_forge/src/controls/track_cutout.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
@@ -23,8 +24,12 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 ///
 /// | | On content | On a glass surface |
 /// |---|---|---|
-/// | Track | painted | painted |
+/// | Track | painted, around the knob | painted |
 /// | Knob | `Glass` (`GlassMaterial.dome()`) | painted |
+///
+/// On content the painted parts leave a hole the shape of the glass
+/// element and follow it as it moves, because a `GlassLayer` draws its
+/// glass under whatever its subtree paints; see [TrackCutoutClipper].
 ///
 /// That keeps the same "never glass on glass" rule `GlassButton` follows —
 /// see [GlassHostScope] — while still giving the one part of a switch that
@@ -285,27 +290,43 @@ class _GlassSwitchState extends State<GlassSwitch>
           onColor,
           _position.value / _travel,
         )!;
-        return ClipPath(
-          clipper: _SwitchShapeClipper(style.shape),
-          child: DecoratedBox(
-            decoration: BoxDecoration(color: trackColor),
-            child: SizedBox(
-              width: _trackWidth,
-              height: _trackHeight,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned(
-                    left: _knobInset,
-                    top: _knobInset,
-                    child: Transform.translate(
-                      offset: Offset(_position.value, 0),
-                      child: child,
-                    ),
+        final knobLeft = _knobInset + _position.value;
+        return SizedBox(
+          width: _trackWidth,
+          height: _trackHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: ClipPath(
+                  // On content the knob is glass, which the layer draws
+                  // under this track's paint: leave a hole where it is.
+                  // See [TrackCutoutClipper].
+                  clipper: TrackCutoutClipper(
+                    shape: style.shape,
+                    hole: onGlass
+                        ? null
+                        : Rect.fromLTWH(
+                            knobLeft,
+                            _knobInset,
+                            _knobWidth,
+                            _knobHeight,
+                          ),
                   ),
-                ],
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(color: trackColor),
+                  ),
+                ),
               ),
-            ),
+              Positioned(
+                left: _knobInset,
+                top: _knobInset,
+                child: Transform.translate(
+                  offset: Offset(_position.value, 0),
+                  child: child,
+                ),
+              ),
+            ],
           ),
         );
       },

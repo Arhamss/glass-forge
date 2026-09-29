@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/physics.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
+import 'package:glass_forge/src/controls/track_cutout.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
@@ -16,8 +17,12 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 ///
 /// | | On content | On a glass surface |
 /// |---|---|---|
-/// | Track and fill | painted | painted |
+/// | Track and fill | painted, around the thumb | painted |
 /// | Thumb | `Glass` | painted |
+///
+/// On content the painted parts leave a hole the shape of the glass
+/// element and follow it as it moves, because a `GlassLayer` draws its
+/// glass under whatever its subtree paints; see [TrackCutoutClipper].
 ///
 /// Dragging anywhere in the 44-point-tall hit area — not only on the thumb
 /// itself — sets the value under the finger; a plain tap jumps straight to
@@ -399,15 +404,32 @@ class _GlassSliderState extends State<GlassSlider>
           final travel = (width - _thumbSize).clamp(0.0, double.infinity);
           final left = _position.value * travel;
           final filled = (left + _thumbSize / 2).clamp(0.0, width);
+          const trackTop = (GlassControlFrame.minimumExtent - _trackHeight) / 2;
+          const thumbTop = (GlassControlFrame.minimumExtent - _thumbSize) / 2;
           return Stack(
             clipBehavior: Clip.none,
             children: [
               Positioned(
                 left: 0,
                 right: 0,
-                top: (GlassControlFrame.minimumExtent - _trackHeight) / 2,
+                top: trackTop,
                 child: ClipPath(
-                  clipper: _SliderTrackClipper(style.shape),
+                  // On content the thumb is glass, which the layer draws
+                  // under the track's and fill's paint: leave a hole where
+                  // it is, following its drag stretch. See
+                  // [TrackCutoutClipper].
+                  clipper: TrackCutoutClipper(
+                    shape: style.shape,
+                    hole: onGlass
+                        ? null
+                        : Rect.fromLTWH(
+                            left,
+                            thumbTop - trackTop,
+                            _thumbSize,
+                            _thumbSize,
+                          ),
+                    holeScale: Offset(_stretch.value, 1 / _stretch.value),
+                  ),
                   child: SizedBox(
                     width: width,
                     height: _trackHeight,
@@ -433,7 +455,7 @@ class _GlassSliderState extends State<GlassSlider>
               ),
               Positioned(
                 left: left,
-                top: (GlassControlFrame.minimumExtent - _thumbSize) / 2,
+                top: thumbTop,
                 child: Transform(
                   alignment: Alignment.center,
                   transform: Matrix4.diagonal3Values(

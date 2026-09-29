@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/physics.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
+import 'package:glass_forge/src/controls/track_cutout.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
@@ -33,8 +34,12 @@ class GlassSegment<T> {
 ///
 /// | | On content | On a glass surface |
 /// |---|---|---|
-/// | Track | painted | painted |
+/// | Track | painted, around the pill | painted |
 /// | Pill | `Glass` | painted |
+///
+/// On content the painted parts leave a hole the shape of the glass
+/// element and follow it as it moves, because a `GlassLayer` draws its
+/// glass under whatever its subtree paints; see [TrackCutoutClipper].
 ///
 /// The pill travels to the selected segment on the theme's `settle` spring,
 /// and can be dragged directly from anywhere in the control — not only from
@@ -332,7 +337,7 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
       alpha: style.material.tintOpacity,
     );
     final segmentWidth = _segmentWidth;
-    final pill = _pill(style: style, onGlass: onGlass, width: segmentWidth);
+    final pill = _pill(style: style, onGlass: onGlass);
 
     final visual = SizedBox(
       width: width,
@@ -340,27 +345,29 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Positioned.fill(
-            child: ClipPath(
-              clipper: _SegmentedTrackClipper(style.shape),
-              child: DecoratedBox(
-                decoration: BoxDecoration(color: trackColor),
-              ),
-            ),
-          ),
           AnimatedBuilder(
             animation: _position,
             builder: (context, child) {
-              final left = _travel * _position.value;
-              return Positioned(
-                left: left,
-                top: _pillInset,
-                bottom: _pillInset,
-                width: (segmentWidth - 2 * _pillInset).clamp(
-                  0.0,
-                  double.infinity,
-                ),
-                child: child!,
+              final pill = _pillRect(segmentWidth);
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(
+                    child: ClipPath(
+                      // On content the pill is glass, which the layer
+                      // draws under the track's paint: leave a hole where
+                      // it is. See [TrackCutoutClipper].
+                      clipper: TrackCutoutClipper(
+                        shape: style.shape,
+                        hole: onGlass ? null : pill,
+                      ),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(color: trackColor),
+                      ),
+                    ),
+                  ),
+                  Positioned.fromRect(rect: pill, child: child!),
+                ],
               );
             },
             child: pill,
@@ -441,25 +448,26 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
     return style.labelColor;
   }
 
-  Widget _pill({
-    required GlassSurfaceStyle style,
-    required bool onGlass,
-    required double width,
-  }) {
-    final size = SizedBox(
-      width: (width - 2 * _pillInset).clamp(0.0, double.infinity),
-      height: _height - 2 * _pillInset,
-    );
+  /// Where the pill is at [_position], in this control's own box: its
+  /// segment slot, inset by [_pillInset] on every side.
+  Rect _pillRect(double segmentWidth) => Rect.fromLTWH(
+    _pillInset + _travel * _position.value,
+    _pillInset,
+    (segmentWidth - 2 * _pillInset).clamp(0.0, double.infinity),
+    _height - 2 * _pillInset,
+  );
+
+  Widget _pill({required GlassSurfaceStyle style, required bool onGlass}) {
     if (onGlass) {
       return ClipPath(
         clipper: _SegmentedTrackClipper(style.shape),
-        child: DecoratedBox(
-          decoration: const BoxDecoration(color: _pillColor),
-          child: size,
+        child: const DecoratedBox(
+          decoration: BoxDecoration(color: _pillColor),
+          child: SizedBox.expand(),
         ),
       );
     }
-    return Glass(shape: style.shape, child: size);
+    return Glass(shape: style.shape, child: const SizedBox.expand());
   }
 }
 

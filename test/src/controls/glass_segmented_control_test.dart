@@ -384,7 +384,8 @@ void main() {
     // The pill is the one Positioned with a non-null `width` (the track
     // itself is a `Positioned.fill`).
     final pill = positioned.firstWhere((p) => p.width != null);
-    expect(pill.left, 160);
+    // The last slot starts at 160; the pill sits 3 px inside it.
+    expect(pill.left, 163);
     expect(selected, 2);
   });
 
@@ -425,7 +426,7 @@ void main() {
       final midLeft = pillOf(tester).left;
       expect(
         midLeft,
-        isNot(anyOf(0, 160)),
+        isNot(anyOf(3, 163)),
         reason:
             'the spring already settled before Reduce Motion turned on '
             '— this test proves nothing without a mid-travel frame',
@@ -435,7 +436,7 @@ void main() {
           const FakeAccessibilityFeatures(disableAnimations: true);
       await tester.pump();
 
-      expect(pillOf(tester).left, 160);
+      expect(pillOf(tester).left, 163);
     },
   );
 
