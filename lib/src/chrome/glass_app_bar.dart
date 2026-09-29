@@ -37,10 +37,11 @@ const double _horizontalPadding = 16;
 /// stacked on this bar's — "always avoid glass on glass."
 ///
 /// Its label colour and text style come from the resolved navigation-bar
-/// surface's [DefaultTextStyle], never a hard-coded colour, and it fades
-/// with the bar's own [GlassPresenceScope] — a `GlassScaffold`'s bar
-/// presence, usually — so covering the bar with a route fades its title,
-/// leading and actions along with the glass beneath them.
+/// surface's [DefaultTextStyle], never a hard-coded colour. Like every
+/// [GlassSurface], it fades with the enclosing [GlassPresence] — a
+/// `GlassScaffold`'s bar presence, usually — so covering the bar with a
+/// route fades its title, leading and actions along with the glass beneath
+/// them.
 class GlassAppBar extends StatelessWidget {
   /// Creates an app bar.
   const GlassAppBar({
@@ -72,9 +73,6 @@ class GlassAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final presence =
-        GlassPresenceScope.maybeOf(context) ?? kAlwaysCompleteAnimation;
-
     final toolbar = NavigationToolbar(
       leading: leading,
       middle: title,
@@ -84,17 +82,11 @@ class GlassAppBar extends StatelessWidget {
     );
 
     final content = GlassHostScope(
-      child: FadeTransition(
-        // Presence reaches only the refraction; the title, leading and
-        // actions left behind on vanished glass would float over whatever
-        // now covers the bar.
-        opacity: presence,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: _horizontalPadding,
-          ),
-          child: toolbar,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: _horizontalPadding,
         ),
+        child: toolbar,
       ),
     );
 

@@ -10,6 +10,7 @@ import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_layer.dart';
+import 'package:glass_forge/src/widgets/glass_presence.dart';
 
 const Color _white = Color(0xFFFFFFFF);
 const Color _black = Color(0xFF000000);
@@ -34,7 +35,60 @@ Color? _labelColorAt(WidgetTester tester, Finder finder) {
   return DefaultTextStyle.of(tester.element(finder)).style.color;
 }
 
+/// How opaque [finder] is actually drawn: every [FadeTransition] above it,
+/// multiplied together.
+double _drawnOpacity(WidgetTester tester, Finder finder) {
+  var opacity = 1.0;
+  for (final widget in tester.widgetList(
+    find.ancestor(of: finder, matching: find.byType(FadeTransition)),
+  )) {
+    opacity *= (widget as FadeTransition).opacity.value;
+  }
+  return opacity;
+}
+
 void main() {
+  group('presence', () {
+    testWidgets(
+      "a surface's content fades with the presence around it, so it never "
+      'floats on glass that has gone',
+      (tester) async {
+        final presence = AnimationController(vsync: tester, value: 0.25);
+        addTearDown(presence.dispose);
+        await _pump(
+          tester,
+          SizedBox(
+            width: 320,
+            height: 120,
+            child: GlassPresence(
+              presence: presence,
+              child: const GlassSurface.card(child: Text('content')),
+            ),
+          ),
+        );
+        expect(_drawnOpacity(tester, find.text('content')), 0.25);
+
+        presence.value = 0;
+        await tester.pump();
+        expect(_drawnOpacity(tester, find.text('content')), 0);
+      },
+    );
+
+    testWidgets('with no presence around it the content is fully drawn', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        const SizedBox(
+          width: 320,
+          height: 120,
+          child: GlassSurface.card(child: Text('content')),
+        ),
+      );
+      expect(_drawnOpacity(tester, find.text('content')), 1);
+    });
+  });
+
   testWidgets('a surface renders its child with no theme in the tree', (
     tester,
   ) async {

@@ -424,55 +424,50 @@ class _GlassTabBarState extends State<GlassTabBar>
     );
     final lit = _hover ?? widget.currentIndex;
 
-    final content = FadeTransition(
-      // Presence reaches only the refraction. Labels left behind on
-      // vanished glass would float over whatever covered the bar.
-      opacity: _barPresence,
-      child: Stack(
-        children: [
-          AnimatedBuilder(
-            animation: Listenable.merge([_lens, _flight, _hold]),
-            builder: (context, child) => PositionedDirectional(
-              start: _inset + _lens.position * _slot,
-              top: _inset,
-              width: lensSize.width,
-              height: lensSize.height,
-              // A held finger swells the painted pill, never the lens: see
-              // [_syncFlight]. Kept inside the bar, a quarter of the lens's
-              // swell.
-              child: Transform.scale(
-                scale:
-                    1 + _maxSwell / 4 * Curves.easeOut.transform(_hold.value),
-                child: Opacity(opacity: 1 - _flight.value, child: child),
-              ),
-            ),
-            child: ClipPath(
-              clipper: GlassShapeClipper(lensStyle.shape),
-              child: ColoredBox(
-                color: bar.labelColor.withValues(alpha: 0.14),
-              ),
+    // The bar's [GlassSurface] fades this with the bar's presence.
+    final content = Stack(
+      children: [
+        AnimatedBuilder(
+          animation: Listenable.merge([_lens, _flight, _hold]),
+          builder: (context, child) => PositionedDirectional(
+            start: _inset + _lens.position * _slot,
+            top: _inset,
+            width: lensSize.width,
+            height: lensSize.height,
+            // A held finger swells the painted pill, never the lens: see
+            // [_syncFlight]. Kept inside the bar, a quarter of the lens's
+            // swell.
+            child: Transform.scale(
+              scale: 1 + _maxSwell / 4 * Curves.easeOut.transform(_hold.value),
+              child: Opacity(opacity: 1 - _flight.value, child: child),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(_inset),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < widget.tabs.length; i++)
-                  Expanded(
-                    child: _TabButton(
-                      tab: widget.tabs[i],
-                      lit: i == lit,
-                      selected: i == widget.currentIndex,
-                      color: bar.labelColor,
-                      onActivate: () => _onTabActivated(i),
-                    ),
+          child: ClipPath(
+            clipper: GlassShapeClipper(lensStyle.shape),
+            child: ColoredBox(
+              color: bar.labelColor.withValues(alpha: 0.14),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(_inset),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < widget.tabs.length; i++)
+                Expanded(
+                  child: _TabButton(
+                    tab: widget.tabs[i],
+                    lit: i == lit,
+                    selected: i == widget.currentIndex,
+                    color: bar.labelColor,
+                    onActivate: () => _onTabActivated(i),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
 
     return Listener(

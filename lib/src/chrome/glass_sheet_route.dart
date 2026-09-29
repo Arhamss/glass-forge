@@ -268,32 +268,28 @@ class _GlassSheet extends StatelessWidget {
       explicitChildNodes: true,
       child: GlassPresence(
         presence: route._presence,
+        // The surface fades its content with this presence.
         child: GlassSurface.sheet(
-          // Presence reaches only the refraction; content left on vanished
-          // glass would float over the page, so it fades with it.
-          child: FadeTransition(
-            opacity: route._presence,
-            child: MediaQuery.removePadding(
-              context: context,
-              removeTop: true,
-              removeBottom: true,
-              removeLeft: true,
-              removeRight: true,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (route.isDismissible)
-                    Builder(
-                      builder: (context) => GlassSheetHandle(
-                        color:
-                            DefaultTextStyle.of(context).style.color ??
-                            const Color(0xFFFFFFFF),
-                      ),
+          child: MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
+            removeBottom: true,
+            removeLeft: true,
+            removeRight: true,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (route.isDismissible)
+                  Builder(
+                    builder: (context) => GlassSheetHandle(
+                      color:
+                          DefaultTextStyle.of(context).style.color ??
+                          const Color(0xFFFFFFFF),
                     ),
-                  Flexible(child: Builder(builder: route.builder)),
-                ],
-              ),
+                  ),
+                Flexible(child: Builder(builder: route.builder)),
+              ],
             ),
           ),
         ),

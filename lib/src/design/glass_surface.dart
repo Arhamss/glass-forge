@@ -5,6 +5,7 @@ import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
+import 'package:glass_forge/src/widgets/glass_presence.dart';
 
 /// One semantic surface, in one line.
 ///
@@ -19,6 +20,10 @@ import 'package:glass_forge/src/widgets/glass.dart';
 /// per distinct material among its shapes, so five roles under one layer
 /// cost five captures however many surfaces play them, where a layer per
 /// surface costs one each.
+///
+/// Under a [GlassPresence], [child] fades with the glass: presence only
+/// reaches the refraction, and a label left drawn on glass that has gone
+/// would float over whatever now covers it.
 class GlassSurface extends StatelessWidget {
   /// Creates a surface for [role].
   const GlassSurface({
@@ -144,13 +149,20 @@ class GlassSurface extends StatelessWidget {
           backdrop: backdrop,
         );
 
-        final content = DefaultTextStyle.merge(
+        var content = DefaultTextStyle.merge(
           style: TextStyle(color: style.labelColor),
           child: IconTheme.merge(
             data: IconThemeData(color: style.labelColor),
             child: child ?? const SizedBox.shrink(),
           ),
         );
+        // Presence reaches only the refraction. Content left drawn on glass
+        // that has faded out would float over whatever now covers it, so it
+        // fades with the same animation.
+        final presence = GlassPresenceScope.maybeOf(context);
+        if (presence != null) {
+          content = FadeTransition(opacity: presence, child: content);
+        }
 
         final glass = Glass(
           shape: style.shape,
