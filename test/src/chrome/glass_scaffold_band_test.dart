@@ -17,6 +17,7 @@ library;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/chrome/glass_scaffold.dart';
+import 'package:glass_forge/src/controls/glass_button.dart';
 import 'package:glass_forge/src/controls/glass_switch.dart';
 import 'package:glass_forge/src/rendering/render_glass_layer.dart';
 import 'package:glass_forge/src/shaders/shader_library.dart';
@@ -136,4 +137,151 @@ void main() {
       );
     },
   );
+
+  /// Pumps a scaffold whose body holds a switch (and, with [button], a
+  /// button in another material) 1000 px down a long list, scrolls the
+  /// switch's top to [switchTop], and returns every pass clip of the
+  /// body's layer there, and what was printed.
+  Future<(List<Rect>, List<String>)> clipsWithSwitchAt(
+    WidgetTester tester, {
+    required double switchTop,
+    Widget? topBar,
+    Widget? bottomBar,
+    double keyboard = 0,
+    bool button = false,
+  }) async {
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    final printed = <String>[];
+    final previous = debugPrint;
+    debugPrint = (message, {wrapWidth}) {
+      if (message != null) {
+        printed.add(message);
+      }
+    };
+    final clips = <Rect>[];
+    try {
+      await tester.pumpWidget(
+        MediaQuery(
+          data: MediaQueryData(
+            size: const Size(800, 600),
+            viewInsets: EdgeInsets.only(bottom: keyboard),
+          ),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: GlassScaffold(
+              topBar: topBar,
+              bottomBar: bottomBar,
+              // Not a lazy list: the switch starts off screen, and must be
+              // built to be found and scrolled to.
+              body: SingleChildScrollView(
+                controller: controller,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 1000),
+                    Row(
+                      children: [
+                        GlassSwitch(value: true, onChanged: (_) {}),
+                        if (button)
+                          GlassButton(
+                            onPressed: () {},
+                            child: const Text('Go'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2000),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      final top = tester.getTopLeft(find.byType(GlassSwitch)).dy;
+      controller.jumpTo(controller.offset + top - switchTop);
+      await tester.pump();
+      await tester.pump();
+      expect(
+        tester.getTopLeft(find.byType(GlassSwitch)).dy,
+        closeTo(switchTop, 0.5),
+      );
+      clips.addAll(_knobLayer(tester).debugPassClips);
+    } finally {
+      debugPrint = previous;
+    }
+    return (clips, printed);
+  }
+
+  const bar = SizedBox(
+    height: _barHeight,
+    child: Glass(shape: GlassOval()),
+  );
+
+  testWidgets('a body switch under the bottom bar has no glass in the bar', (
+    tester,
+  ) async {
+    final (clips, printed) = await clipsWithSwitchAt(
+      tester,
+      bottomBar: bar,
+      switchTop: 600 - _barHeight + 6,
+    );
+    expect(clips, isNotEmpty);
+    for (final clip in clips) {
+      expect(
+        clip.isEmpty || clip.bottom <= 600 - _barHeight,
+        isTrue,
+        reason: 'body glass clipped to $clip reaches into the bottom bar',
+      );
+    }
+    expect(printed.where((line) => line.contains('overlap')), isEmpty);
+  });
+
+  testWidgets('with the bottom bar lifted by the keyboard, body glass '
+      'under it is clipped at its new edge', (tester) async {
+    const keyboard = 200.0;
+    const barTop = 600 - keyboard - _barHeight;
+    final (clips, printed) = await clipsWithSwitchAt(
+      tester,
+      bottomBar: bar,
+      keyboard: keyboard,
+      switchTop: barTop + 6,
+    );
+    expect(clips, isNotEmpty);
+    for (final clip in clips) {
+      expect(
+        clip.isEmpty || clip.bottom <= barTop,
+        isTrue,
+        reason: 'body glass clipped to $clip reaches into the lifted bar',
+      );
+    }
+    expect(printed.where((line) => line.contains('overlap')), isEmpty);
+  });
+
+  testWidgets('a body with two materials clips every one of its passes out '
+      'of the bar', (tester) async {
+    final (clips, printed) = await clipsWithSwitchAt(
+      tester,
+      topBar: bar,
+      button: true,
+      switchTop: 10,
+    );
+    // The switch knob's dome and the button's control material: two passes,
+    // each pushed with its own clip.
+    expect(clips.length, greaterThanOrEqualTo(2));
+    for (final clip in clips) {
+      expect(
+        clip.isEmpty || clip.top >= _barHeight,
+        isTrue,
+        reason: 'body glass clipped to $clip reaches into the bar',
+      );
+    }
+    expect(
+      printed.where(
+        (line) => line.contains('implicit') || line.contains('overlap'),
+      ),
+      isEmpty,
+    );
+  });
 }
