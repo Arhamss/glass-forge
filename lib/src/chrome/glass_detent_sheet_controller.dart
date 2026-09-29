@@ -47,6 +47,14 @@ class GlassDetentSheetController extends Animation<double>
   /// and it is why this is not a hand-written stiffness: a designer who
   /// retunes `GlassMotionDefaults.present` retunes this sheet with it.
   ///
+  /// That spring is the `GlassMotionRole.present` role's, not `settle`'s,
+  /// although a snap between detents is a settle: `GlassSurfaces` gives
+  /// the sheet role `present`, the spring the sheet already rises on, so
+  /// a sheet snaps to a detent the way it arrived rather than with the
+  /// bounce a control settles with. Once a sheet has filled it in, reading
+  /// this answers that spring, not null. Left null outside a sheet, the
+  /// controller runs on the same role's untuned spring.
+  ///
   /// Naming a spring here instead pins it, and the sheet leaves it alone
   /// afterwards — a caller who says which spring they want has said it for a
   /// reason. Assigning takes effect on the next frame of any snap already in
