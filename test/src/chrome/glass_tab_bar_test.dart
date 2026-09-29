@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
+import 'package:glass_forge/src/rendering/render_glass_layer.dart';
 
 const List<GlassTab> _tabs = [
   GlassTab(icon: SizedBox(width: 24, height: 24), label: 'Home'),
@@ -204,7 +207,12 @@ void main() {
     testWidgets('takes a selectionMaterial in place of its own', (
       tester,
     ) async {
-      const material = GlassMaterial(frost: 3, tintOpacity: 0.2);
+      // Clear of every floor, so it is used exactly as passed.
+      const material = GlassMaterial(
+        frost: 3,
+        tintOpacity: 0.2,
+        highlight: 2.5,
+      );
       await tester.pumpWidget(
         _harness(
           bar: GlassTabBar(
@@ -216,6 +224,54 @@ void main() {
         ),
       );
       expect(tester.widget<Glass>(_lens).material, material);
+    });
+
+    testWidgets('by default is lit, faintly white and bends its edge '
+        'hard enough to read over a dark photo', (tester) async {
+      await tester.pumpWidget(_harness(bar: _followingBar(<int>[])));
+      final lens = tester.widget<Glass>(_lens).material!;
+      expect(lens.highlight, greaterThanOrEqualTo(2.5));
+      expect(lens.edgeRefraction, greaterThanOrEqualTo(24));
+      expect(lens.tint.toARGB32() & 0xFFFFFF, 0xFFFFFF);
+      expect(lens.tintOpacity, inInclusiveRange(0.12, 0.16));
+      expect(lens.chromaticAberration, lessThanOrEqualTo(0.4));
+      expect(lens.frost, 0);
+    });
+
+    testWidgets('floors a near-clear material, keeping the rest of it', (
+      tester,
+    ) async {
+      // The example's "Clear" preset, and weaker: a lip of 6, a 2% tint
+      // and a faint rim. Alone it all but vanishes over a dark photo.
+      const clear = GlassMaterial(
+        thickness: 14,
+        edgeRefraction: 6,
+        frost: 0.6,
+        chromaticAberration: 0.03,
+        tint: Color(0xFF5AC8FA),
+        tintOpacity: 0.02,
+        saturation: 1.3,
+        highlight: 0.3,
+      );
+      await tester.pumpWidget(
+        _harness(
+          bar: GlassTabBar(
+            tabs: _tabs,
+            currentIndex: 0,
+            onTap: (_) {},
+            selectionMaterial: clear,
+          ),
+        ),
+      );
+      final lens = tester.widget<Glass>(_lens).material!;
+      expect(lens.highlight, 2);
+      expect(lens.tintOpacity, 0.12);
+      expect(lens.edgeRefraction, 14);
+      // Everything else is the caller's.
+      expect(
+        lens.copyWith(highlight: 0.3, tintOpacity: 0.02, edgeRefraction: 6),
+        clear,
+      );
     });
 
     testWidgets('squashes along its travel, and is its own shape at rest', (
@@ -247,6 +303,69 @@ void main() {
       final landed = _lensRect(tester).size;
       expect(landed.width, closeTo(rest.width, 1e-6));
       expect(landed.height, closeTo(rest.height, 1e-6));
+    });
+
+    testWidgets("as a GlassScaffold's bottomBar, never reaches past the "
+        "bar's clip, however hard it squashes", (tester) async {
+      var index = 0;
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(size: Size(800, 600)),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: StatefulBuilder(
+              builder: (context, setState) => GlassScaffold(
+                body: const SizedBox.expand(),
+                bottomBar: GlassTabBar(
+                  tabs: _tabs,
+                  currentIndex: index,
+                  onTap: (next) => setState(() => index = next),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // The layer the scaffold gave the bar, which clips its glass to its
+      // own bounds.
+      RenderObject? node = tester.renderObject(_lens);
+      while (node is! RenderGlassLayer || !node.clipGlassToBounds) {
+        node = node!.parent;
+      }
+      final layer = node;
+      final clip = MatrixUtils.transformRect(
+        layer.getTransformTo(null),
+        Offset.zero & layer.size,
+      );
+      final body = tester.getRect(_body);
+      expect(clip.contains(body.topLeft), isTrue);
+      expect(clip.contains(body.bottomRight), isTrue);
+      final rest = _lensRect(tester).height;
+
+      var tallest = rest;
+      for (final label in ['Profile', 'Home', 'Profile']) {
+        await tester.tap(find.text(label));
+        await tester.pump();
+        for (var i = 0; i < 90; i++) {
+          await tester.pump(const Duration(milliseconds: 8));
+          final lens = _lensRect(tester);
+          tallest = math.max(tallest, lens.height);
+          // Inside the clip, and a point clear of the painted capsule's
+          // edge, top and bottom, so its rim is never cut.
+          expect(lens.top, greaterThanOrEqualTo(body.top + 1), reason: '$i');
+          expect(
+            lens.bottom,
+            lessThanOrEqualTo(body.bottom - 1),
+            reason: '$i',
+          );
+          expect(lens.left, greaterThanOrEqualTo(clip.left), reason: '$i');
+          expect(lens.right, lessThanOrEqualTo(clip.right), reason: '$i');
+        }
+        await tester.pumpAndSettle();
+      }
+      // It did squash, and hard.
+      expect(tallest, greaterThan(rest * 1.1));
     });
 
     testWidgets("a covered bar's lens has no presence, even mid-flight", (
@@ -445,7 +564,7 @@ void main() {
 
     for (final brightness in Brightness.values) {
       testWidgets("with none, is the role's ${brightness.name} tint at its "
-          'opaque step', (tester) async {
+          'legible step: translucent, well short of opaque', (tester) async {
         final ramp = const GlassTints().of(brightness);
         await tester.pumpWidget(
           GlassTheme(
@@ -455,10 +574,65 @@ void main() {
             ),
           ),
         );
-        expect(
-          _bodyColor(tester),
-          ramp.color.withValues(alpha: ramp.opacityFor(GlassTintStep.opaque)),
+        final fill = _bodyColor(tester)!;
+        expect(fill.toARGB32() | 0xFF000000, ramp.color.toARGB32());
+        expect(fill.a, closeTo(ramp.legible, 1e-6));
+        // At most 54%, so a photo shows through it.
+        expect(fill.a, lessThanOrEqualTo(0.55));
+        expect(fill.a, lessThan(ramp.readable));
+      });
+
+      testWidgets('in ${brightness.name} mode, an unselected label clears '
+          "3:1 over the ramp's worst backdrop", (tester) async {
+        final ramp = const GlassTints().of(brightness);
+        // White is what hurts the dark scheme most, black the light one.
+        final worst = brightness == Brightness.dark
+            ? const Color(0xFFFFFFFF)
+            : const Color(0xFF000000);
+        await tester.pumpWidget(
+          GlassTheme(
+            data: GlassThemeData(brightness: brightness),
+            child: _harness(
+              bar: GlassTabBar(tabs: _tabs, currentIndex: 0, onTap: (_) {}),
+            ),
+          ),
         );
+        final surface = Color.alphaBlend(_bodyColor(tester)!, worst);
+        for (final label in ['Search', 'Profile']) {
+          final ink = tester.widget<Text>(find.text(label)).style!.color!;
+          expect(ink.toARGB32() | 0xFF000000, ramp.label.toARGB32());
+          final drawn = Color.alphaBlend(ink, surface);
+          expect(
+            GlassLegibility.contrastRatio(drawn, surface),
+            greaterThanOrEqualTo(3),
+            reason: label,
+          );
+        }
+      });
+
+      testWidgets('in ${brightness.name} mode, the rim is a hairline that '
+          'shows against the fill', (tester) async {
+        await tester.pumpWidget(
+          GlassTheme(
+            data: GlassThemeData(brightness: brightness),
+            child: _harness(
+              bar: GlassTabBar(tabs: _tabs, currentIndex: 0, onTap: (_) {}),
+            ),
+          ),
+        );
+        final shape =
+            (tester.widget<DecoratedBox>(_body).decoration as ShapeDecoration)
+                    .shape
+                as OutlinedBorder;
+        final rim = shape.side.color;
+        expect(shape.side.width, 1);
+        expect(rim.a, inInclusiveRange(0.1, 0.3));
+        // White on the dark fill, black on the light one: a rim the colour
+        // of its own fill is invisible.
+        final ink = brightness == Brightness.dark ? 1.0 : 0.0;
+        expect(rim.r, ink);
+        expect(rim.g, ink);
+        expect(rim.b, ink);
       });
     }
   });

@@ -17,7 +17,7 @@
   glass, not only the glass.
 - `GlassTabBar`'s bar is painted, not glass: its `material` and
   `minimumTintOpacity` are gone, replaced by `backgroundColor` (null is the
-  navigationBar role's tint at its opaque step). Pass a tuned material as
+  navigationBar role's tint at its legible step). Pass a tuned material as
   `selectionMaterial` to drive the lens instead. `GlassTabBar` is new in
   this release, so this only affects code written against this branch.
 
@@ -166,11 +166,20 @@ stop there. The text field grows instead.
   same pixels. `material` is what a bare `Glass` in either layer inherits.
 - `GlassTabBar` and `GlassTab`, a floating capsule whose selection is
   always a clear glass lens, after the Kibu app's bar. Only the selection
-  is glass: the bar is painted, a semi-opaque capsule in the role's tint at
-  its opaque step (or `backgroundColor`) with a white hairline rim and the
-  role's shadow, and no blur, so the lens is never glass over glass. A
-  bouncy spring moves the lens and it squashes along its travel with its
-  speed. A drag carries it under the finger, clicks once per tab crossed,
+  is glass: the bar is painted, a translucent capsule in the role's tint at
+  its legible step (about 54% in dark mode, 35% in light, or
+  `backgroundColor`) with a hairline rim (white in dark mode, black in
+  light) and the role's shadow, and no blur, so the lens is never glass
+  over glass. The fill is light so the content behind shows through for
+  the lens to bend, and still keeps every label at 3:1 over any backdrop,
+  so unselected labels are no longer dimmed. The default lens is brighter
+  and bends further (highlight 2.8, edge refraction 26, a 14% white tint,
+  chromatic aberration 0.3), and a faint `selectionMaterial` is raised to
+  `minimumSelectionHighlight` (2), `minimumSelectionTintOpacity` (0.12)
+  and `minimumSelectionEdgeRefraction` (14), so a clear preset never hides
+  the selection. A bouncy spring moves the lens and it squashes along its
+  travel with its speed, to at most 116% of its height, so it stays inside
+  the bar and a `GlassScaffold`'s clip of it. A drag carries it under the finger, clicks once per tab crossed,
   and commits the tab under the finger on release; a cancelled drag sends
   it back. Reduce Motion moves it at once, still glass.
   `selectionMaterial` replaces `GlassTabBar.defaultSelectionMaterial`.

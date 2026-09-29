@@ -338,9 +338,10 @@ glass through the same `GlassHostScope` this bar sets up for its children.
 
 `GlassTabBar` is the bottom bar to put in it: a floating capsule with the
 bottom safe area built in, one selectable button per tab. Only its
-selection is glass. The bar itself is painted, a semi-opaque capsule in
+selection is glass. The bar itself is painted, a translucent capsule in
 the navigation-bar tint with a hairline rim and no blur, so labels read
-over any photo and the lens is never glass on glass.
+over any photo, the photo shows through for the lens to bend, and the
+lens is never glass on glass.
 
 ```dart
 GlassTabBar(

@@ -65,13 +65,15 @@ class GlassTab {
 /// )
 /// ```
 ///
-/// Only the selection is glass. The bar itself is painted: a semi-opaque
+/// Only the selection is glass. The bar itself is painted: a translucent
 /// capsule in the navigationBar role's shape and shadow, filled with
 /// [backgroundColor] or the role's tint, with a hairline rim and the bottom
 /// safe-area inset built in. It has no blur and reads no backdrop, so the
 /// lens — a clear glass in a material of its own, [selectionMaterial], one
 /// tab wide — bends the painted bar and whatever shows through it, and is
-/// never a second backdrop pass over other glass.
+/// never a second backdrop pass over other glass. The fill is light enough
+/// that the content behind shows through it, because a lens over a flat
+/// fill has nothing to bend and does not read as glass.
 ///
 /// A bouncy spring — the theme's [GlassMotionRole.settle], SwiftUI's
 /// `.bouncy` unless a theme retunes it — moves the lens, and the lens
@@ -134,27 +136,50 @@ class GlassTabBar extends StatefulWidget {
 
   /// The selection lens's material when [selectionMaterial] is null.
   ///
-  /// Clear glass: no frost, a 10% white tint, a bright rim, a strong colour
-  /// split at the edge and a backdrop saturated half as much again. It is
-  /// fitted by eye to a liquid_glass_renderer lens of refractive index
-  /// 1.15, light intensity 2 and chromatic aberration 0.5. The two
-  /// packages split colour by the same rule — red and blue displaced by
-  /// `1 ± chromaticAberration / 2` of the refraction — so the 0.5 carries
-  /// over as it is. Their refractive indices do not: that package's is a
-  /// physical index over a depth it does not scale with the screen, and
-  /// this one's [GlassMaterial.edgeRefraction] is pixels of displacement.
-  /// The edge refraction here keeps the lens's bend to the bar's in the
-  /// same proportion, (1.15 − 1) / (1.21 − 1) of the fitted bar's 27.42
-  /// points, about 20.
+  /// Clear glass that still reads as glass over the dark half of a photo:
+  ///
+  /// - no frost, so what is behind stays sharp;
+  /// - a 14% white tint, enough to lift the lens off a dark backdrop
+  ///   without greying the photo under it;
+  /// - highlight 2.8, a rim lit near white at its brightest point, where
+  ///   the shader adds `0.35 × highlight` of white at the very edge;
+  /// - an edge refraction of 26 points, which bends the photo visibly at
+  ///   the lens's rim and, since the rim's lit strip scales with it, widens
+  ///   the highlight too;
+  /// - a chromatic aberration of 0.3, a modest colour split at the rim —
+  ///   red and blue displaced by `1 ± 0.15` of the refraction;
+  /// - a backdrop saturated half as much again.
+  ///
+  /// It started as a fit by eye to the Kibu app's liquid_glass_renderer lens
+  /// (refractive index 1.15, light intensity 2, chromatic aberration 0.5)
+  /// and was then pushed brighter and bent further, because that lens is
+  /// seen over a photo and this one also has to read over a dark one.
   static const GlassMaterial defaultSelectionMaterial = GlassMaterial(
-    edgeRefraction: 20,
+    edgeRefraction: 26,
     frost: 0,
-    chromaticAberration: 0.5,
+    chromaticAberration: 0.3,
     tint: Color(0xFFFFFFFF),
-    tintOpacity: 0.1,
+    tintOpacity: 0.14,
     saturation: 1.5,
-    highlight: 2,
+    highlight: 2.8,
   );
+
+  /// The least rim highlight the lens is drawn with, whatever
+  /// [selectionMaterial] asks for.
+  ///
+  /// Below about 2 the rim is lost over a dark backdrop, and a lens with no
+  /// rim, no tint and little bend is invisible — the one thing the
+  /// selection must never be. A material asking for more keeps it.
+  static const double minimumSelectionHighlight = 2;
+
+  /// The least tint the lens is drawn with, in [selectionMaterial]'s own
+  /// tint colour, whatever it asks for.
+  static const double minimumSelectionTintOpacity = 0.12;
+
+  /// The least edge refraction, in points, the lens is drawn with, whatever
+  /// [selectionMaterial] asks for: enough for the backdrop to visibly bend
+  /// at the rim.
+  static const double minimumSelectionEdgeRefraction = 14;
 
   /// The destinations, in reading order: left to right, or right to left
   /// under [TextDirection.rtl], where the lens and a drag mirror with them.
@@ -177,11 +202,21 @@ class GlassTabBar extends StatefulWidget {
   /// The bar's fill, in place of the role's.
   ///
   /// Null is the navigationBar role's tint colour for the scheme in effect
-  /// at its opaque step — `GlassTintStep.opaque`, about 59% white in light
-  /// mode and 84% grey in dark. The ramp's steps are solved against the
-  /// worst backdrop for each scheme with nothing blurred, which is exactly
-  /// what a painted bar is, so that step keeps the role's labels at 7:1 or
-  /// better over any photo, and a dimmed tab's label still clears 3:1.
+  /// at its legible step — `GlassTintStep.legible`, about 54% grey in dark
+  /// mode and 35% white in light — the lightest fill the ramp has. The
+  /// ramp's steps are solved against the worst backdrop for each scheme
+  /// with nothing blurred (pure white under the dark scheme, pure black
+  /// under the light), which is exactly what a painted bar is, so that
+  /// step still keeps every label at 3:1 or better over any photo — WCAG's
+  /// floor for UI components and large text, and what the ramp states as
+  /// `GlassLegibility.labelContrast` at that step. Every tab's label is
+  /// therefore drawn in the role's full label colour; a dimmed one would
+  /// fall under 3:1 on a white backdrop. The selected tab is told apart by
+  /// the lens under it, its heavier weight and its `activeIcon`.
+  ///
+  /// It is translucent on purpose: a lens bends what is under it, and over
+  /// a near-opaque fill there is nothing under it to bend. The opaque step,
+  /// at 84% in dark mode, hid the lens entirely.
   ///
   /// The labels keep the role's colour whatever is passed here, so a
   /// passed colour is the caller's to check against them. Give it some
@@ -192,6 +227,15 @@ class GlassTabBar extends StatefulWidget {
   ///
   /// The lens is the bar's only glass: it bends the painted bar and the
   /// backdrop showing through it.
+  ///
+  /// A material too faint to see is raised to a floor, field by field:
+  /// its highlight to at least [minimumSelectionHighlight], its tint
+  /// opacity to at least [minimumSelectionTintOpacity] and its edge
+  /// refraction to at least [minimumSelectionEdgeRefraction]. The rest of
+  /// it — frost, tint colour, saturation, profile — is drawn as passed, and
+  /// a material already past every floor is drawn exactly as passed. So a
+  /// live material from a tuner can drive the lens without a clear preset
+  /// making the selection vanish.
   final GlassMaterial? selectionMaterial;
 
   /// The widest the bar grows, in logical pixels; wider screens centre it.
@@ -251,23 +295,29 @@ const EdgeInsets _margin = EdgeInsets.fromLTRB(16, 0, 16, 8);
 /// The painted pill's alpha over the bar's label colour, on glass only.
 const double _pillAlpha = 0.14;
 
-/// The bar's rim: a white hairline, as Kibu draws its painted bar.
-const BorderSide _rim = BorderSide(color: Color(0x24FFFFFF));
+/// The bar's rim: a hairline of the label colour, faint — white on the dark
+/// scheme's fill, as Kibu draws its painted bar, and black on the light
+/// scheme's, where a white one disappears into the fill.
+const double _rimAlpha = 0.16;
 
 /// The lens's squash, after Kibu's `_jellyTransform`.
 ///
 /// Measured in alignment units — the lens's position with the first tab
 /// at −1 and the last at 1 — as that transform is: the squash is
-/// `clamp(speed / 10, 0, 1) × 0.8`, the lens narrows by half of it and
-/// grows taller by three tenths of it. At full speed that is 60% of its
-/// width and 124% of its height.
+/// `clamp(speed / 10, 0, 1) × 0.8`, and the lens narrows by half of it, to
+/// 60% of its width at full speed.
+///
+/// It grows taller by a fifth of it, to 116% of its height, where Kibu's
+/// grows by three tenths, to 124%. The lens rests [_inset] inside a bar
+/// [_barHeight] tall, 50 points of a 62-point bar, and grows about its
+/// centre: at 124% it would reach the bar's very edge, which in a
+/// `GlassScaffold` is where the bar's layer clips its glass, and would cut
+/// the lens's lit rim off against the capsule. At 116% it is 58 points
+/// tall, 2 clear of the bar's edge top and bottom.
 const double _jellySpeed = 10;
 const double _maxJelly = 0.8;
 const double _jellyNarrow = 0.5;
-const double _jellyTall = 0.3;
-
-/// An unselected tab's alpha over the bar's label colour.
-const double _unlitAlpha = 0.62;
+const double _jellyTall = 0.2;
 
 /// A tab's icon size, the gap under it, and its label's size and weights:
 /// iOS's own tab-bar metrics.
@@ -519,7 +569,10 @@ class _GlassTabBarState extends State<GlassTabBar>
     final ramp = GlassTheme.of(context).tokens.tint.of(bar.brightness);
     final fill =
         widget.backgroundColor ??
-        ramp.color.withValues(alpha: ramp.opacityFor(GlassTintStep.opaque));
+        ramp.color.withValues(alpha: ramp.opacityFor(GlassTintStep.legible));
+    final rim = BorderSide(
+      color: ramp.label.withValues(alpha: _rimAlpha),
+    );
     final border = bar.shape.toBorder(size);
 
     // Painted, never glass: no blur and no backdrop read, so the lens over
@@ -529,9 +582,7 @@ class _GlassTabBarState extends State<GlassTabBar>
       child: DecoratedBox(
         decoration: ShapeDecoration(
           color: fill,
-          shape: border is OutlinedBorder
-              ? border.copyWith(side: _rim)
-              : border,
+          shape: border is OutlinedBorder ? border.copyWith(side: rim) : border,
         ),
         child: Stack(
           children: [
@@ -607,9 +658,10 @@ class _GlassTabBarState extends State<GlassTabBar>
                 child: IgnorePointer(
                   child: Glass(
                     shape: lensShape,
-                    material:
-                        widget.selectionMaterial ??
-                        GlassTabBar.defaultSelectionMaterial,
+                    material: _floored(
+                      widget.selectionMaterial ??
+                          GlassTabBar.defaultSelectionMaterial,
+                    ),
                   ),
                 ),
               ),
@@ -618,6 +670,30 @@ class _GlassTabBarState extends State<GlassTabBar>
       ),
     );
   }
+}
+
+/// [material], raised to the lens's visibility floors where it falls short
+/// of them: see [GlassTabBar.selectionMaterial].
+GlassMaterial _floored(GlassMaterial material) {
+  if (material.highlight >= GlassTabBar.minimumSelectionHighlight &&
+      material.tintOpacity >= GlassTabBar.minimumSelectionTintOpacity &&
+      material.edgeRefraction >= GlassTabBar.minimumSelectionEdgeRefraction) {
+    return material;
+  }
+  return material.copyWith(
+    highlight: math.max(
+      material.highlight,
+      GlassTabBar.minimumSelectionHighlight,
+    ),
+    tintOpacity: math.max(
+      material.tintOpacity,
+      GlassTabBar.minimumSelectionTintOpacity,
+    ),
+    edgeRefraction: math.max(
+      material.edgeRefraction,
+      GlassTabBar.minimumSelectionEdgeRefraction,
+    ),
+  );
 }
 
 /// The selection, positioned at the lens's place in the bar and squashed
@@ -690,14 +766,15 @@ class _TabButton extends StatelessWidget {
   /// Reported to a screen reader as selected: only the current tab.
   final bool selected;
 
-  /// The bar's label colour.
+  /// The bar's label colour, lit or not: the bar's fill is only as strong
+  /// as keeps it at 3:1 over any backdrop, with nothing to spare for
+  /// dimming an unselected tab. See [GlassTabBar.backgroundColor].
   final Color color;
 
   final VoidCallback onActivate;
 
   @override
   Widget build(BuildContext context) {
-    final tint = lit ? color : color.withValues(alpha: _unlitAlpha);
     return GlassControlFrame(
       onActivate: onActivate,
       selected: selected,
@@ -706,7 +783,7 @@ class _TabButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconTheme.merge(
-            data: IconThemeData(color: tint, size: _iconSize),
+            data: IconThemeData(color: color, size: _iconSize),
             child: lit ? tab.activeIcon ?? tab.icon : tab.icon,
           ),
           const SizedBox(height: _iconLabelGap),
@@ -721,7 +798,7 @@ class _TabButton extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: tint,
+                color: color,
                 fontSize: _labelSize,
                 fontWeight: lit ? _litWeight : _unlitWeight,
               ),
