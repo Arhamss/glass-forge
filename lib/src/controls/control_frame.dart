@@ -6,8 +6,10 @@ import 'package:flutter/widgets.dart';
 /// inside of.
 ///
 /// [child] is drawn at its own natural size, centred inside a box that is
-/// never smaller than [minimumExtent] on either axis: the frame grows the
-/// *hit area*, never the glass or paint a control draws for itself. A
+/// exactly its size, grown to [minimumExtent] on any axis where it is
+/// smaller: the frame grows the *hit area*, never the glass or paint a
+/// control draws for itself, and never past that minimum into whatever
+/// loose space a parent offers. A
 /// control that is already 44 × 44 or bigger — most text buttons — is
 /// unaffected; a small icon button gets extra, invisible margin to tap in.
 ///
@@ -136,7 +138,12 @@ class GlassControlFrame extends StatelessWidget {
         minWidth: minimumExtent,
         minHeight: minimumExtent,
       ),
-      child: Center(child: child),
+      // Size factors of 1: the frame is as big as [child], grown to the
+      // 44 x 44 minimum, and no bigger. A bare `Center` expands to fill
+      // whatever loose space it is offered, which made a button in a
+      // start-aligned column span the whole row and gave a switch in
+      // `Align(topLeft)` the whole screen as its hit area.
+      child: Center(widthFactor: 1, heightFactor: 1, child: child),
     );
 
     result = GestureDetector(
