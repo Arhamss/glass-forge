@@ -65,14 +65,15 @@ Widget _detentSheet(GlassChromeColors chrome) => GlassTheme(
       data: const MediaQueryData(size: Size(400, 800)),
       child: GlassLayer(
         tier: GeometryTier.none,
+        // Not const: the sheet asserts on its detents' length.
         child: Stack(
           children: <Widget>[
             GlassDetentSheet(
-              detents: <GlassDetent>[
+              detents: const <GlassDetent>[
                 GlassDetent.fraction(0.2),
                 GlassDetent.fraction(0.5),
               ],
-              child: SizedBox.expand(),
+              child: const SizedBox.expand(),
             ),
           ],
         ),
