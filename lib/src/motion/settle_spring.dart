@@ -45,6 +45,11 @@ extension SettleSpring on AnimationController {
         target,
         velocity,
         tolerance: motion.tolerance,
+        // Lands exactly on [target] once within tolerance, rather than
+        // wherever the spring happened to be: a sub-pixel remainder is
+        // invisible while moving, but a slider thumb left at a 1.008
+        // stretch stays that way for good.
+        snapToEnd: true,
       ),
     );
   }

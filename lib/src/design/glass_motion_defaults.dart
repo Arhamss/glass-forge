@@ -43,7 +43,8 @@ class GlassMotionDefaults {
     this.follow = const GlassMotion.interactive(),
     this.settle = const GlassMotion.bouncy(),
     this.press = const GlassMotion.snappy(
-      duration: Duration(milliseconds: 320),
+      duration: Duration(milliseconds: 250),
+      extraBounce: 0.1,
     ),
     this.present = const GlassMotion.smooth(
       duration: Duration(milliseconds: 400),
@@ -57,6 +58,9 @@ class GlassMotionDefaults {
   final GlassMotion settle;
 
   /// The spring for [GlassMotionRole.press].
+  ///
+  /// The spring into a press. The way back out is
+  /// `InteractiveGlass.pressReleaseMotion`, which has no role of its own.
   final GlassMotion press;
 
   /// The spring for [GlassMotionRole.present].

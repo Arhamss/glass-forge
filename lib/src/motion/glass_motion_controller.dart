@@ -49,7 +49,12 @@ class GlassMotionController extends Animation<GlassMotionState>
     this.followMotion = const GlassMotion.interactive(),
     this.settleMotion = const GlassMotion.bouncy(),
     this.pressMotion = const GlassMotion.snappy(
-      duration: Duration(milliseconds: 320),
+      duration: Duration(milliseconds: 250),
+      extraBounce: 0.1,
+    ),
+    this.pressReleaseMotion = const GlassMotion.bouncy(
+      duration: Duration(milliseconds: 280),
+      extraBounce: 0.15,
     ),
     this.decay = const GlassDecay(),
     this.overdrag = const GlassOverdrag.none(),
@@ -64,9 +69,13 @@ class GlassMotionController extends Animation<GlassMotionState>
     _followSpring = followMotion.spring;
     _settleSpring = settleMotion.spring;
     _pressSpring = pressMotion.spring;
+    _pressReleaseSpring = pressReleaseMotion.spring;
     _followTolerance = followMotion.tolerance;
     _settleTolerance = settleMotion.tolerance;
     _pressTolerance = pressMotion.scaledTo(_pressTravelPixels).tolerance;
+    _pressReleaseTolerance = pressReleaseMotion
+        .scaledTo(_pressTravelPixels)
+        .tolerance;
     if (respectReduceMotion) {
       GlassReduceMotion.instance.addListener(_onReduceMotionChanged);
     }
@@ -78,8 +87,20 @@ class GlassMotionController extends Animation<GlassMotionState>
   /// The spring that runs once the pointer is gone.
   final GlassMotion settleMotion;
 
-  /// The spring the press channel runs, in both directions.
+  /// The spring the press channel runs into a press.
+  ///
+  /// Snappy, 250 ms with a 0.25 bounce: the surface reaches its pressed
+  /// size in about 150 ms with a small overshoot, as a native iOS 26 button
+  /// does when measured at 120 fps.
   final GlassMotion pressMotion;
+
+  /// The spring the press channel runs back out of a press.
+  ///
+  /// Bouncy, 280 ms with a 0.45 bounce: back through rest quickly, one
+  /// clean undershoot, still by about 250 ms. Apple's own lens springs,
+  /// read out of UIKit (lift 0.27 s at damping 0.625, unlift 0.5 s at
+  /// damping 0.7), land in the same range.
+  final GlassMotion pressReleaseMotion;
 
   /// How a fling decays.
   final GlassDecay decay;
@@ -117,15 +138,17 @@ class GlassMotionController extends Animation<GlassMotionState>
   late final SpringDescription _followSpring;
   late final SpringDescription _settleSpring;
   late final SpringDescription _pressSpring;
+  late final SpringDescription _pressReleaseSpring;
   late final Tolerance _followTolerance;
   late final Tolerance _settleTolerance;
   late final Tolerance _pressTolerance;
+  late final Tolerance _pressReleaseTolerance;
 
   Duration _lastTick = Duration.zero;
   GlassMotionPhase _phase = GlassMotionPhase.idle;
   GlassMotionState _value = GlassMotionState.rest;
   AnimationStatus _status = AnimationStatus.dismissed;
-  Offset _pressAnchor = Offset.zero;
+  Offset _pressDrag = Offset.zero;
 
   @override
   GlassMotionState get value => _value;
@@ -222,21 +245,23 @@ class GlassMotionController extends Animation<GlassMotionState>
     _begin();
   }
 
-  /// Presses the surface toward the layer, or lets it back up.
+  /// Presses the surface, or lets it go.
   void setPressed({required bool pressed}) {
     _press.target = pressed ? 1 : 0;
     _begin();
   }
 
-  /// Records where the finger is, relative to the surface's centre.
+  /// Records how far the finger has moved since it went down.
   ///
   /// Not sprung: it is multiplied by the press depth wherever it is read,
-  /// and that is already sprung. See `GlassPressStretch`.
-  void setPressAnchor(Offset anchor) {
-    if (_pressAnchor == anchor) {
+  /// and that is already sprung. It is kept after the press is released, so
+  /// the stretch rides the release spring down, and cleared once the press
+  /// channel settles at rest. See `GlassPressStretch`.
+  void setPressDrag(Offset drag) {
+    if (_pressDrag == drag) {
       return;
     }
-    _pressAnchor = anchor;
+    _pressDrag = drag;
     _publish();
   }
 
@@ -276,7 +301,7 @@ class GlassMotionController extends Animation<GlassMotionState>
     _x.settleInstantly();
     _y.settleInstantly();
     _press.settleInstantly();
-    _pressAnchor = Offset.zero;
+    _pressDrag = Offset.zero;
     _phase = GlassMotionPhase.idle;
     _publish();
   }
@@ -306,10 +331,14 @@ class GlassMotionController extends Animation<GlassMotionState>
     // Non-short-circuiting on purpose: every channel advances every frame.
     var moving = _x.advance(dt: step, spring: spring, tolerance: tolerance);
     moving |= _y.advance(dt: step, spring: spring, tolerance: tolerance);
+    // Chosen per step by where the press is heading. The axis carries
+    // position and velocity across a change of spring, so a press let go
+    // mid-flight turns around without a seam.
+    final pressing = _press.target > 0;
     moving |= _press.advanceSpring(
       dt: step,
-      spring: _pressSpring,
-      tolerance: _pressTolerance,
+      spring: pressing ? _pressSpring : _pressReleaseSpring,
+      tolerance: pressing ? _pressTolerance : _pressReleaseTolerance,
     );
 
     if (_phase == GlassMotionPhase.flinging &&
@@ -323,6 +352,13 @@ class GlassMotionController extends Animation<GlassMotionState>
       // unscheduled, so a surface at rest schedules no frames at all.
       _phase = GlassMotionPhase.idle;
       _stopTicker();
+      if (_press.target == 0) {
+        // The drag was kept through the release so the stretch could ride
+        // the spring down; with the press at rest it has nothing left to
+        // scale, and leaving it would keep the state from ever reading as
+        // at rest.
+        _pressDrag = Offset.zero;
+      }
     }
     _publish();
   }
@@ -338,7 +374,7 @@ class GlassMotionController extends Animation<GlassMotionState>
       translation: Offset(_x.position, _y.position),
       velocity: Offset(_x.velocity, _y.velocity),
       press: _press.position,
-      pressAnchor: _pressAnchor,
+      pressDrag: _pressDrag,
     );
     if (next != _value) {
       _value = next;

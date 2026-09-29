@@ -22,12 +22,14 @@ class RenderGlassMotion extends RenderProxyBox {
     required this._controller,
     required this._jiggle,
     required this._pressScale,
+    required this._pressGrowth,
     required this._pressStretch,
   });
 
   GlassMotionController _controller;
   GlassJiggle _jiggle;
-  double _pressScale;
+  double? _pressScale;
+  double _pressGrowth;
   GlassPressStretch _pressStretch;
 
   /// The controller driving this surface.
@@ -57,9 +59,10 @@ class RenderGlassMotion extends RenderProxyBox {
     markNeedsPaint();
   }
 
-  /// The scale a fully pressed surface shrinks to.
-  double get pressScale => _pressScale;
-  set pressScale(double value) {
+  /// A fixed ratio a fully pressed surface scales to, overriding
+  /// [pressGrowth]. Null grows it instead.
+  double? get pressScale => _pressScale;
+  set pressScale(double? value) {
     if (_pressScale == value) {
       return;
     }
@@ -67,7 +70,25 @@ class RenderGlassMotion extends RenderProxyBox {
     markNeedsPaint();
   }
 
-  /// How far the surface reaches toward a held finger.
+  /// How many logical pixels a fully pressed surface grows along its
+  /// longest side, when [pressScale] is null.
+  double get pressGrowth => _pressGrowth;
+  set pressGrowth(double value) {
+    if (_pressGrowth == value) {
+      return;
+    }
+    _pressGrowth = value;
+    markNeedsPaint();
+  }
+
+  /// The ratio a fully pressed surface of this size reaches.
+  double get resolvedPressScale => glassPressScaleFor(
+    size,
+    pressGrowth: _pressGrowth,
+    pressScale: _pressScale,
+  );
+
+  /// How far the surface gives under a dragging finger.
   GlassPressStretch get pressStretch => _pressStretch;
   set pressStretch(GlassPressStretch value) {
     if (_pressStretch.intensity == value.intensity &&
@@ -88,7 +109,7 @@ class RenderGlassMotion extends RenderProxyBox {
       state: _controller.value,
       jiggle: _jiggle,
       pressStretch: _pressStretch,
-      pressScale: _pressScale,
+      pressScale: resolvedPressScale,
     );
   }
 

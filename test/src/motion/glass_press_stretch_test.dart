@@ -21,17 +21,18 @@ void main() {
     );
   }
 
-  test('a wide surface stretches toward the finger, not along a diagonal', () {
-    // A finger at the corner of a 200x80 surface is 22 degrees off its long
-    // axis. Normalising the anchor by each half-extent first turns it into
-    // (1, 1) -- 45 degrees -- and stretching a wide surface along a diagonal
-    // it does not have is a shear: the card leans over like a parallelogram.
+  test('a wide surface stretches along the drag, not along a diagonal', () {
+    // A drag toward the corner of a 200x80 surface is 22 degrees off its
+    // long axis. Normalising the drag by each half-extent first turns it
+    // into a 45-degree vector, and stretching a wide surface along a
+    // diagonal it does not have is a shear: the card leans over like a
+    // parallelogram.
     final m = transformFor(
       const GlassMotionState(
         translation: Offset.zero,
         velocity: Offset.zero,
         press: 1,
-        pressAnchor: Offset(100, 40),
+        pressDrag: Offset(100, 40),
       ),
       stretch,
     );
@@ -44,13 +45,13 @@ void main() {
     expect(angle, closeTo(math.atan2(40, 100), 0.02));
   });
 
-  test('a finger at the edge reaches no further than a unit reach', () {
+  test('however far the finger drags, the stretch stops at 1 + intensity', () {
     final m = transformFor(
       const GlassMotionState(
         translation: Offset.zero,
         velocity: Offset.zero,
         press: 1,
-        pressAnchor: Offset(100, 40),
+        pressDrag: Offset(0, 5000),
       ),
       stretch,
     );
@@ -63,7 +64,7 @@ void main() {
     expect(mean + radius, lessThanOrEqualTo(1 + stretch.intensity + 1e-9));
   });
 
-  test('a zero anchor is the identity', () {
+  test('a finger that has not moved is the identity', () {
     final m = transformFor(
       const GlassMotionState(
         translation: Offset.zero,
@@ -78,10 +79,10 @@ void main() {
   test(
     'a surface with no area is identity, not NaN',
     () {
-      // A pointer cannot land on a zero-size box, but an anchor can outlive
+      // A pointer cannot land on a zero-size box, but a drag can outlive
       // the size that accepted it: press a normal surface, then let layout
       // collapse it (an AnimatedSize, a shrinking list item, a constraint
-      // change). Both the anchor and the press depth survive that frame.
+      // change). Both the drag and the press depth survive that frame.
       //
       // Dividing by the resulting zero half-extent yields Infinity, and then
       // Infinity/Infinity is NaN. This asserts the guard rather than the
@@ -98,7 +99,7 @@ void main() {
             translation: Offset.zero,
             velocity: Offset.zero,
             press: 1,
-            pressAnchor: Offset(50, 50),
+            pressDrag: Offset(50, 50),
           ),
           jiggle: const GlassJiggle.none(),
           pressStretch: const GlassPressStretch(),
@@ -123,55 +124,98 @@ void main() {
     },
   );
 
-  test('none() is the identity for any anchor', () {
+  test('none() is the identity for any drag', () {
     final m = transformFor(
       const GlassMotionState(
         translation: Offset.zero,
         velocity: Offset.zero,
         press: 1,
-        pressAnchor: Offset(80, 20),
+        pressDrag: Offset(80, 20),
       ),
       const GlassPressStretch.none(),
     );
     expect(m, equals(Matrix4.identity()));
   });
 
-  test('translation is exactly travel x anchor x press', () {
-    final m = transformFor(
-      const GlassMotionState(
-        translation: Offset.zero,
-        velocity: Offset.zero,
-        press: 1,
-        pressAnchor: Offset(80, 0),
-      ),
-      const GlassPressStretch(intensity: 0, squash: 0),
+  test('translation is travel x the drag past the slop, capped', () {
+    Offset travelled(Offset drag) {
+      final m = transformFor(
+        GlassMotionState(
+          translation: Offset.zero,
+          velocity: Offset.zero,
+          press: 1,
+          pressDrag: drag,
+        ),
+        const GlassPressStretch(intensity: 0, squash: 0),
+      );
+      return Offset(m.getTranslation().x, m.getTranslation().y);
+    }
+
+    // 0.05 of the 57 pt past the 3 pt slop.
+    expect(travelled(const Offset(60, 0)).dx, closeTo(2.85, 1e-9));
+    expect(travelled(const Offset(60, 0)).dy, closeTo(0, 1e-9));
+    // Never more than a few points, however far the finger goes.
+    expect(
+      travelled(const Offset(0, -400)).dy,
+      closeTo(-GlassPressStretch.maxTravel, 1e-9),
     );
-    expect(m.getTranslation().x, closeTo(12, 1e-9)); // 0.15 * 80
-    expect(m.getTranslation().y, closeTo(0, 1e-9));
   });
 
-  test('squash 1 conserves area', () {
+  test('the first 3 pt of movement are ignored', () {
+    for (final drag in const <Offset>[Offset(2, 0), Offset(0, -3)]) {
+      final m = transformFor(
+        GlassMotionState(
+          translation: Offset.zero,
+          velocity: Offset.zero,
+          press: 1,
+          pressDrag: drag,
+        ),
+        stretch,
+      );
+      expect(m, equals(Matrix4.identity()), reason: '$drag moved it');
+    }
+  });
+
+  test('a longer drag gives more, with diminishing returns', () {
+    double along(double distance) => transformFor(
+      GlassMotionState(
+        translation: Offset.zero,
+        velocity: Offset.zero,
+        press: 1,
+        pressDrag: Offset(distance, 0),
+      ),
+      const GlassPressStretch(travel: 0),
+    ).entry(0, 0);
+    final short = along(23) - 1;
+    final twice = along(43) - 1;
+    expect(short, greaterThan(0));
+    expect(twice, greaterThan(short));
+    expect(twice, lessThan(2 * short));
+  });
+
+  test('the default squash of 1 conserves area', () {
     final m = transformFor(
       const GlassMotionState(
         translation: Offset.zero,
         velocity: Offset.zero,
         press: 1,
-        pressAnchor: Offset(60, 25),
+        pressDrag: Offset(60, 25),
       ),
-      const GlassPressStretch(squash: 1, travel: 0),
+      // squash defaults to 1; a large intensity makes the check bite.
+      const GlassPressStretch(intensity: 0.5, travel: 0),
     );
     final determinant =
         m.entry(0, 0) * m.entry(1, 1) - m.entry(0, 1) * m.entry(1, 0);
     expect(determinant, closeTo(1, 1e-6));
   });
 
-  test('an unpressed surface is unstretched however far the anchor is', () {
+  test('an unpressed surface is unstretched however far the drag is', () {
     final m = transformFor(
       const GlassMotionState(
         translation: Offset.zero,
         velocity: Offset.zero,
         press: 0,
-        pressAnchor: Offset(90, 30),
+        pressDrag: Offset(90, 30),
       ),
       stretch,
     );
@@ -179,10 +223,10 @@ void main() {
   });
 
   test(
-    'velocity-stretch and press-anchor at 45 degrees pin the '
+    'velocity-stretch and press-drag at 45 degrees pin the '
     'multiplication order to V·A, not A·V',
     () {
-      // Velocity along x and an anchor at exactly 45 degrees on a square
+      // Velocity along x and a drag at exactly 45 degrees on a square
       // surface: the one non-axis-aligned, non-parallel configuration that
       // still keeps the arithmetic checkable by hand (see the doc comment
       // on glassSurfaceTransform). Axis-aligned choices would make both
@@ -195,11 +239,11 @@ void main() {
         translation: Offset.zero,
         velocity: velocity,
         press: 1,
-        pressAnchor: Offset(50, 50),
+        pressDrag: Offset(100, 100),
       );
 
       final m = glassSurfaceTransform(
-        size: const Size(100, 100),
+        size: const Size(40, 40),
         state: state,
         jiggle: activeJiggle,
         pressStretch: activeStretch,
@@ -212,9 +256,10 @@ void main() {
       final along = velocityStretch;
       final across = 1 / velocityStretch;
 
-      // The anchor is at 45 degrees on a square surface, at its corner: a
-      // reach of (1, 1), capped to 1 because no finger reaches further than
-      // the edge. A (the anchor matrix) has a00 == a11 and a nonzero a01.
+      // The drag is at 45 degrees on a square surface, and long enough that
+      // its rubber-banded give (about 29 pt) passes the 20 pt half-extent:
+      // a reach capped to 1. A (the drag matrix) has a00 == a11 and a
+      // nonzero a01.
       const reachDistance = 1.0;
       final pressAlong = 1 + activeStretch.intensity * reachDistance;
       final pressAcross =

@@ -123,13 +123,6 @@ class KitScene extends StatelessWidget {
   }
 }
 
-/// Tiles give a little under the finger rather than reaching for it: the
-/// default press-stretch is sized for a 44 pt button.
-const GlassPressStretch _tileStretch = GlassPressStretch(
-  intensity: 0.06,
-  travel: 0.03,
-);
-
 const GlassShape _pill = GlassRoundedRectangle(
   radius: BorderRadius.all(Radius.circular(KitScene._tile / 2)),
 );
@@ -229,7 +222,6 @@ class _PillToggleState extends State<_PillToggle> {
     return GlassButton(
       toggled: _on,
       shape: _pill,
-      pressStretch: _tileStretch,
       semanticLabel: widget.title,
       onPressed: () => setState(() => _on = !_on),
       child: Row(
@@ -379,8 +371,6 @@ class _NowPlayingState extends State<_NowPlaying> {
   Widget build(BuildContext context) {
     final photo = PlaygroundScope.of(context).photo;
     return InteractiveGlass(
-      pressScale: 0.98,
-      pressStretch: _tileStretch,
       child: Glass(
         shape: const GlassSuperellipse(
           radius: BorderRadius.all(Radius.circular(30)),

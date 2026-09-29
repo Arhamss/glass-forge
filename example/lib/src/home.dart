@@ -364,7 +364,6 @@ class _PhotoButton extends StatelessWidget {
       button: true,
       label: 'Next photo',
       child: InteractiveGlass(
-        pressScale: 0.88,
         onTap: () {
           unawaited(HapticFeedback.lightImpact());
           PlaygroundScope.read(context).nextPhoto();

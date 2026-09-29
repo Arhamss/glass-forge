@@ -73,7 +73,6 @@ class _LiquidSceneState extends State<LiquidScene>
               scale: 0.2,
               child: InteractiveGlass(
                 drag: GlassDrag(overdrag: GlassOverdrag.none()),
-                pressStretch: GlassPressStretch(intensity: 0.1),
                 child: SizedBox.square(
                   dimension: 128,
                   child: Glass(shape: GlassOval()),

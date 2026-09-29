@@ -46,9 +46,6 @@ class _LensSceneState extends State<LensScene> {
             // rubber band is for dragging *past* a limit, and a lens you
             // are moving about has none.
             drag: const GlassDrag(overdrag: GlassOverdrag.none()),
-            // The default press-stretch is sized for a 44 pt button. On a
-            // 200 pt lens the same fraction is a 100 pt lean.
-            pressStretch: const GlassPressStretch(intensity: 0.08),
             onTap: () => setState(() => _form = (_form + 1) % _forms.length),
             // The morph between forms is a plain tween of size and radius.
             // The shape is re-registered every paint, so the refraction

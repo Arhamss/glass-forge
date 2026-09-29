@@ -90,6 +90,11 @@ InteractiveGlass(
 )
 ```
 
+A press grows the surface by 17 pt and lifts it with a soft glow; only a
+finger that moves while pressing flexes it, by at most 5 %. Set
+`pressScale` for a fixed ratio instead, or `GlassPressStretch.none()` to
+keep the shape still.
+
 Springs are specified the way Apple specifies them — **duration and bounce**,
 not stiffness and damping. `GlassMotion.bouncy/.snappy/.smooth/.interactive`
 cover the common cases.

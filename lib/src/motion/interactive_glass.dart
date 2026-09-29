@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/composition/glass_glow.dart';
+import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/motion/glass_decay.dart';
 import 'package:glass_forge/src/motion/glass_jiggle.dart';
 import 'package:glass_forge/src/motion/glass_motion.dart';
@@ -79,41 +80,71 @@ class GlassDrag {
 /// `RenderGlassShape` reads when it re-registers its geometry each paint. No
 /// part of this rebuilds a widget while a spring is running.
 ///
+/// A press grows the surface by [pressGrowth] points and lights it with a
+/// soft glow; a finger that drags while pressing flexes it a few percent
+/// along the drag ([pressStretch]). The numbers follow Apple's interactive
+/// glass — "scales, bounces and shimmers" (WWDC25) — at the magnitudes
+/// `liquid_glass_widgets` measured on iOS 26 at 120 fps.
+///
 /// Under the platform's Reduce Motion setting every spring here collapses to
-/// an instant settle and [jiggle] stops deforming anything — the surface
-/// still answers the pointer, it just stops springing about it.
+/// an instant settle and [jiggle] and [pressStretch] stop deforming
+/// anything — the surface still answers the pointer, it just stops
+/// springing about it.
 class InteractiveGlass extends StatefulWidget {
   /// Creates an interactive glass surface.
   const InteractiveGlass({
     required this.child,
-    this.pressScale = 0.96,
+    this.pressScale,
+    this.pressGrowth = 17,
     this.pressStretch = const GlassPressStretch(),
     this.drag = const GlassDrag.none(),
     this.jiggle = const GlassJiggle(),
     this.followMotion = const GlassMotion.interactive(),
     this.settleMotion = const GlassMotion.bouncy(),
     this.pressMotion = const GlassMotion.snappy(
-      duration: Duration(milliseconds: 320),
+      duration: Duration(milliseconds: 250),
+      extraBounce: 0.1,
+    ),
+    this.pressReleaseMotion = const GlassMotion.bouncy(
+      duration: Duration(milliseconds: 280),
+      extraBounce: 0.15,
     ),
     this.behavior = HitTestBehavior.opaque,
     this.onTap,
     this.glow = true,
     super.key,
-  }) : assert(pressScale > 0, 'a press scales a surface, it does not erase it');
+  }) : assert(
+         pressScale == null || pressScale > 0,
+         'a press scales a surface, it does not erase it',
+       ),
+       assert(pressGrowth >= 0, 'pressGrowth is logical pixels, at or above 0');
 
   /// The glass this animates. Usually a `Glass`.
   final Widget child;
 
-  /// What a fully pressed surface scales to. `1` disables the press
-  /// response.
+  /// A fixed ratio a fully pressed surface scales to, in place of
+  /// [pressGrowth].
   ///
-  /// Small on purpose. A press on glass reads as the surface settling
-  /// *toward* the layer, not as a button shrinking.
-  final double pressScale;
+  /// Null, the default, grows the surface by [pressGrowth]. Set it to fix
+  /// the ratio whatever the size, to shrink rather than grow (below `1`),
+  /// or to `1` to turn the press scale off.
+  final double? pressScale;
 
-  /// How far the surface reaches toward a held finger.
+  /// How many logical pixels a fully pressed surface grows along its
+  /// longest side. `0` turns the growth off.
   ///
-  /// Resolves to [GlassPressStretch.none] under Reduce Motion.
+  /// Apple's interactive glass grows on press rather than shrinking, by a
+  /// roughly constant 17 pt: 1.3× on a 56 pt circle, about 1.13× on a
+  /// 132 pt pill. The ratio this produces is held between 1.04 and 1.3, so
+  /// a small glyph does not balloon and a full-width card still answers.
+  /// Ignored when [pressScale] is set.
+  final double pressGrowth;
+
+  /// How far the surface gives while a pressing finger drags across it.
+  ///
+  /// Driven by the finger's movement since it went down, never by where it
+  /// rests: a tap or a still press does not stretch at all. Resolves to
+  /// [GlassPressStretch.none] under Reduce Motion.
   final GlassPressStretch pressStretch;
 
   /// Whether and how this surface can be dragged.
@@ -128,8 +159,13 @@ class InteractiveGlass extends StatefulWidget {
   /// The spring that runs once the pointer is gone.
   final GlassMotion settleMotion;
 
-  /// The spring the press response runs.
+  /// The spring the press response runs into a press: snappy, 250 ms,
+  /// bounce 0.25.
   final GlassMotion pressMotion;
+
+  /// The spring the press response runs when the finger lifts: bouncy,
+  /// 280 ms, bounce 0.45 — one clean undershoot back through rest.
+  final GlassMotion pressReleaseMotion;
 
   /// How this surface takes part in hit testing.
   final HitTestBehavior behavior;
@@ -176,12 +212,13 @@ class _InteractiveGlassState extends State<InteractiveGlass>
 
   final Set<int> _pointersDown = <int>{};
 
-  /// Where the surface had travelled to when the current press began.
-  Offset _translationAtDown = Offset.zero;
+  /// The pointer whose movement drives the press-stretch: the one that
+  /// began the press. Null between presses.
+  int? _stretchPointer;
 
-  /// The finger's last position, in the coordinate space of the press's
-  /// pointer-down. Null between presses.
-  Offset? _pointerAtDown;
+  /// Where [_stretchPointer] went down, in the coordinate space of that
+  /// pointer-down.
+  Offset _pointerAtDown = Offset.zero;
 
   /// This surface's own connection to the layer's shared glow channel.
   ///
@@ -215,26 +252,39 @@ class _InteractiveGlassState extends State<InteractiveGlass>
   /// that ramps from zero is unsafe given how the shader floors its
   /// falloff distance.
   ///
-  /// The glow's radius for a surface of [size]: its own longest side,
-  /// within [_glowMinRadius] and [_glowMaxRadius].
+  /// The glow's radius for a surface of [size]: one and a half times its
+  /// longest side, within [_glowMinRadius] and [_glowMaxRadius].
   ///
-  /// The glow is one light per layer, shared by every surface in it, so its
-  /// reach is everyone's problem. It started as a fixed 140, which reached
-  /// no neighbour at all, then went to a fixed 320 so light would arrive on
-  /// the glass nearby, as Apple describes. On a screen of 64 pt tiles that
-  /// 320 washed every tile white for a press on any one of them. Sized to
-  /// the surface, the falloff `(1 - smoothstep(0, radius, distance))^2`
-  /// puts about a quarter of the light at the pressed surface's own edge
-  /// and none one radius out: the surface lights up, a neighbour a gap away
-  /// catches the fringe, and the rest of the screen stays put.
+  /// Apple describes the glow as starting under the fingertip and spreading
+  /// "throughout the element and onto any Liquid Glass elements nearby" —
+  /// an even lift, not a hotspot. At one and a half times the longest side
+  /// every point of the pressed surface is inside the glow wherever the
+  /// finger is, and a neighbour a gap away catches a little of it. That
+  /// reach only works because [_glowLightStrength] is small: at the old
+  /// 0.55 a fixed 320 pt radius washed a screen of 64 pt tiles white.
   static double _glowRadiusFor(Size size) =>
-      size.longestSide.clamp(_glowMinRadius, _glowMaxRadius);
+      (size.longestSide * 1.5).clamp(_glowMinRadius, _glowMaxRadius);
 
   static const double _glowMinRadius = 48;
-  static const double _glowMaxRadius = 320;
+  static const double _glowMaxRadius = 640;
 
-  /// How strongly the glow brightens at its centre at full press, 0 to 1.
-  static const double _glowMaxStrength = 0.55;
+  /// How strongly the glow brightens at its centre at full press, 0 to 1,
+  /// on a light scheme.
+  ///
+  /// 0.10 adds about 25 of 255 at the finger and about 15 averaged over the
+  /// surface, which is the lift `liquid_glass_widgets` measured on a pressed
+  /// iOS 26 button ("about +15 luma with the refraction still showing
+  /// through"). It used to be 0.55, some 140 of 255 — a white flash.
+  static const double _glowLightStrength = 0.10;
+
+  /// The same, on a dark scheme: half, because the same additive light over
+  /// dark glass reads as a flash rather than a lift.
+  static const double _glowDarkStrength = 0.05;
+
+  /// The strength this surface's glow reaches at full press, for the scheme
+  /// it was last built in. Read in [didChangeDependencies], so it follows a
+  /// brightness change without costing a lookup per frame.
+  double _glowMaxStrength = _glowLightStrength;
 
   @override
   void initState() {
@@ -246,6 +296,9 @@ class _InteractiveGlassState extends State<InteractiveGlass>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _glowNotifier = GlassGlowScope.maybeOf(context)?.glow;
+    _glowMaxStrength = GlassTheme.brightnessOf(context) == Brightness.dark
+        ? _glowDarkStrength
+        : _glowLightStrength;
   }
 
   GlassMotionController _createController() => GlassMotionController(
@@ -253,6 +306,7 @@ class _InteractiveGlassState extends State<InteractiveGlass>
     followMotion: widget.followMotion,
     settleMotion: widget.settleMotion,
     pressMotion: widget.pressMotion,
+    pressReleaseMotion: widget.pressReleaseMotion,
     decay: widget.drag.decay,
     overdrag: widget.drag.enabled
         ? widget.drag.overdrag
@@ -270,6 +324,7 @@ class _InteractiveGlassState extends State<InteractiveGlass>
     if (oldWidget.followMotion != widget.followMotion ||
         oldWidget.settleMotion != widget.settleMotion ||
         oldWidget.pressMotion != widget.pressMotion ||
+        oldWidget.pressReleaseMotion != widget.pressReleaseMotion ||
         oldWidget.drag.decay != widget.drag.decay ||
         oldWidget.drag.enabled != widget.drag.enabled ||
         oldWidget.drag.overdrag != widget.drag.overdrag) {
@@ -320,88 +375,53 @@ class _InteractiveGlassState extends State<InteractiveGlass>
   // than left dead.
 
   void _onPointerDown(PointerDownEvent event) {
+    final first = _pointersDown.isEmpty;
     _pointersDown.add(event.pointer);
     // Recorded before the controller is touched: `setPressed` can publish
     // synchronously (Reduce Motion settles instantly), and the glow this
     // triggers needs a position to convert the moment that happens.
     _globalPointerPosition = event.position;
-    _translationAtDown = _controller.value.translation;
-    _pointerAtDown = event.localPosition;
+    if (first) {
+      // Only the finger that began the press drives the stretch. A second
+      // finger landing does not re-zero it, and its own movement, measured
+      // from somewhere else entirely, is not mistaken for a drag.
+      _stretchPointer = event.pointer;
+      _pointerAtDown = event.localPosition;
+      _controller.setPressDrag(Offset.zero);
+    }
     _controller.setPressed(pressed: true);
-    _controller.setPressAnchor(_anchorFor(event.localPosition));
   }
 
   void _onPointerMove(PointerMoveEvent event) {
     _globalPointerPosition = event.position;
-    // Every event after the down is delivered in the coordinate space hit
-    // testing recorded *at* the down, so its local position is measured
-    // from where the surface was then. Subtracting how far the surface has
-    // travelled since puts the finger back relative to the surface as it is
-    // now — without this, a drag reads as the finger getting further and
-    // further away, and the press-stretch pulls the glass into a needle.
-    _pointerAtDown = event.localPosition;
-    _trackAnchor();
-  }
-
-  /// The anchor, from the finger's last position and where the surface is
-  /// *now*.
-  ///
-  /// Run on every pointer move and on every frame of motion. The surface
-  /// follows the finger on a spring, so it is still travelling after the
-  /// finger stops; an anchor computed only on pointer moves would freeze the
-  /// lag of the last move into a permanent stretch.
-  void _trackAnchor() {
-    final pointer = _pointerAtDown;
-    if (pointer == null || _pointersDown.isEmpty) {
+    if (event.pointer != _stretchPointer) {
       return;
     }
-    _controller.setPressAnchor(
-      _anchorFor(
-        pointer - (_controller.value.translation - _translationAtDown),
-      ),
-    );
+    // Every event after the down is delivered in the coordinate space hit
+    // testing recorded *at* the down, so subtracting the down's own local
+    // position gives exactly how far the finger has moved — whether or not
+    // the surface has been dragged along with it since.
+    _controller.setPressDrag(event.localPosition - _pointerAtDown);
   }
 
   void _onMotionChanged() {
-    _trackAnchor();
     _publishGlow();
   }
 
   void _onPointerUp(int pointer) {
     _pointersDown.remove(pointer);
+    if (pointer == _stretchPointer) {
+      // The drag itself is kept: the stretch rides the release spring down
+      // with the press, and the controller clears it once that settles.
+      _stretchPointer = null;
+    }
     if (_pointersDown.isEmpty) {
       // Only when the last finger leaves: a second finger landing on a
       // surface should not un-press it when it lifts again. The glow rides
       // this same spring down to nothing — see `_publishGlow` — rather
       // than being zeroed here directly, so it decays instead of vanishing.
-      _pointerAtDown = null;
-      _controller
-        ..setPressed(pressed: false)
-        ..setPressAnchor(Offset.zero);
+      _controller.setPressed(pressed: false);
     }
-  }
-
-  /// [localPosition], relative to this surface's own centre rather than its
-  /// top-left corner.
-  ///
-  /// `RenderGlassMotion.hitTestChildren` hands every pointer inside it a
-  /// position already put back into the box's laid-out coordinate space —
-  /// that is the whole point of the inverse transform it hit-tests through
-  /// — so this is stable through a drag or a press, not relative to wherever
-  /// the surface currently is on screen.
-  ///
-  /// Clamped to the surface's own extent. A finger past the edge — a
-  /// rubber-banded surface lagging its drag, or a press that slid off —
-  /// reaches as far as a finger *at* the edge and no further, because the
-  /// press-stretch grows with the anchor and has no ceiling of its own.
-  Offset _anchorFor(Offset localPosition) {
-    final size = context.size ?? Size.zero;
-    final halfWidth = size.width / 2;
-    final halfHeight = size.height / 2;
-    return Offset(
-      (localPosition.dx - halfWidth).clamp(-halfWidth, halfWidth),
-      (localPosition.dy - halfHeight).clamp(-halfHeight, halfHeight),
-    );
   }
 
   void _onPanStart(DragStartDetails details) {
@@ -447,7 +467,7 @@ class _InteractiveGlassState extends State<InteractiveGlass>
   ///
   /// Called on every change of [_controller]'s value — a tick of the press
   /// spring, or a synchronous settle under Reduce Motion — which is what
-  /// lets the glow track the same channel `pressAnchor` and press-stretch
+  /// lets the glow track the same channel `pressDrag` and press-stretch
   /// already read, with no ticker of its own. See the class doc comment on
   /// [GlassGlowScope] for the rule this follows when more than one surface
   /// wants the channel at once.
@@ -629,7 +649,7 @@ class _InteractiveGlassState extends State<InteractiveGlass>
       child: result,
     );
 
-    // Reduce Motion neutralises the reach the same way it neutralises every
+    // Reduce Motion neutralises the stretch the same way it neutralises every
     // other spring here: press-stretch is read off `state.press`, and
     // `_settleEverythingNow` snaps that to its target instead of easing it,
     // so without this an under-Reduce-Motion press would deform at full
@@ -645,6 +665,7 @@ class _InteractiveGlassState extends State<InteractiveGlass>
       controller: _controller,
       jiggle: widget.jiggle,
       pressScale: widget.pressScale,
+      pressGrowth: widget.pressGrowth,
       pressStretch: pressStretch,
       child: result,
     );
@@ -656,13 +677,15 @@ class _RawGlassMotion extends SingleChildRenderObjectWidget {
     required this.controller,
     required this.jiggle,
     required this.pressScale,
+    required this.pressGrowth,
     required this.pressStretch,
     required Widget super.child,
   });
 
   final GlassMotionController controller;
   final GlassJiggle jiggle;
-  final double pressScale;
+  final double? pressScale;
+  final double pressGrowth;
   final GlassPressStretch pressStretch;
 
   @override
@@ -671,6 +694,7 @@ class _RawGlassMotion extends SingleChildRenderObjectWidget {
       controller: controller,
       jiggle: jiggle,
       pressScale: pressScale,
+      pressGrowth: pressGrowth,
       pressStretch: pressStretch,
     );
   }
@@ -684,6 +708,7 @@ class _RawGlassMotion extends SingleChildRenderObjectWidget {
       ..controller = controller
       ..jiggle = jiggle
       ..pressScale = pressScale
+      ..pressGrowth = pressGrowth
       ..pressStretch = pressStretch;
   }
 }

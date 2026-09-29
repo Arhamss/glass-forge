@@ -25,7 +25,7 @@ import 'package:glass_forge/src/motion/glass_press_stretch.dart';
 @immutable
 class GlassJiggle {
   /// Creates a jiggle.
-  const GlassJiggle({this.maxStretch = 1.18, this.halfSpeed = 1600})
+  const GlassJiggle({this.maxStretch = 1.08, this.halfSpeed = 2000})
     : assert(maxStretch >= 1, 'maxStretch is a ratio at or above 1'),
       assert(halfSpeed > 0, 'halfSpeed must be positive');
 
@@ -34,8 +34,10 @@ class GlassJiggle {
 
   /// The stretch ratio approached at infinite speed.
   ///
-  /// 1.18 is about as far as a surface can deform before it stops reading as
-  /// the same object.
+  /// 1.08: enough that a fling visibly carries the glass, well short of
+  /// where it stops reading as the same object. Apple publishes no ratio
+  /// here — it names velocity stretch only for sliders and the text loupe —
+  /// so this is judged, not measured, and deliberately on the quiet side.
   final double maxStretch;
 
   /// The speed, in logical pixels per second, at which half the available
@@ -76,11 +78,10 @@ class GlassJiggle {
 ///
 ///  * A squash-and-stretch along the live *velocity* vector (see
 ///    [GlassJiggle]).
-///  * An elongation along the *press anchor* — the finger's offset from the
-///    surface's centre (see [GlassPressStretch]) — scaled to a fraction of
-///    the surface's own half-extent so a finger at the edge of a small
-///    button reaches as far proportionally as one at the edge of a large
-///    one.
+///  * An elongation along the *press drag* — how far the finger has moved
+///    since it went down (see [GlassPressStretch]) — past a small slop,
+///    rubber-banded so it saturates, and taken as a fraction of the
+///    surface's own half-extent in that direction.
 ///
 /// Each is written out as a similarity transform on a 2x2 rather than built
 /// from three [Matrix4]s: `R(theta) · diag(a, b) · R(-theta)` with `cos` and
@@ -89,8 +90,8 @@ class GlassJiggle {
 /// similarity transform of a diagonal by a rotation always is — but their
 /// *product* is not, in general: two symmetric matrices commute (and so
 /// their product stays symmetric) only when they share eigenvectors, which
-/// here would mean the velocity and the press anchor pointing the same way.
-/// A fling and a held finger point in unrelated directions in general, so
+/// here would mean the velocity and the press drag pointing the same way.
+/// A fling and a finger's drag point in unrelated directions in general, so
 /// the product below carries all four entries rather than mirroring one
 /// into the other. The two 2x2s are multiplied by hand, entry by entry,
 /// rather than as two allocated [Matrix4]s, because this runs per frame per
@@ -123,48 +124,66 @@ Matrix4 glassSurfaceTransform({
     v11 = along * sin * sin + across * cos * cos;
   }
 
-  // The press anchor, as a fraction of the surface's own half-extent, so a
-  // finger at the edge of a small button reaches as far proportionally as
-  // one at the edge of a large one.
-  //
   // A surface with no area is guarded rather than divided by. Dart doubles
   // do not throw on division by zero — they produce `Infinity`, and the
-  // `reach.dx / reachDistance` below then evaluates `Infinity / Infinity`,
-  // which is NaN. A NaN transform is much worse than a wrong one: element-
-  // wise `Matrix4.==` compares NaN against itself and reports *not equal*,
-  // so `RenderGlassShape`'s "has this transform changed" check can never
+  // division below then evaluates `Infinity / Infinity`, which is NaN. A
+  // NaN transform is much worse than a wrong one: element-wise
+  // `Matrix4.==` compares NaN against itself and reports *not equal*, so
+  // `RenderGlassShape`'s "has this transform changed" check can never
   // answer no again, and the shape re-registers its geometry and schedules
   // a repaint every frame for as long as the condition lasts. It also
   // survives into `ShapeGeometry.resolve`, whose producer then refuses the
   // non-finite bounds and drops the matte for *every* shape sharing that
-  // material pass. A surface with no area has nothing to reach across
-  // anyway, so identity is both the safe answer and the honest one. The
-  // anchor itself is zeroed rather than just the division guarded, so the
-  // `travel` translation below goes inert with it — a surface with no area
-  // should not slide toward the finger either.
+  // material pass. A surface with no area has nothing to stretch across
+  // anyway, so the drag itself is zeroed, and the `travel` translation
+  // below goes inert with it.
   final halfWidth = size.width / 2;
   final halfHeight = size.height / 2;
   // `!(x > 0)` rather than `x <= 0`, so a NaN extent is degenerate too.
   final hasArea = !(!(halfWidth > 0) || !(halfHeight > 0));
-  final anchor = hasArea ? state.pressAnchor * state.press : Offset.zero;
-  // How far the finger reaches, as a fraction of the surface's extent in
-  // that direction — 1 at the edge, and never more — and which way. The
-  // two are taken separately on purpose. The fraction is measured per axis
-  // so a small button and a large one reach alike; the *direction* is the
-  // finger's own. Taking the direction off the per-axis fraction instead
-  // turns a finger at the corner of a wide card into a 45-degree reach, and
-  // stretching a wide surface along a diagonal it does not have is a shear.
-  final reach = pressStretch.isActive && anchor != Offset.zero
-      ? Offset(anchor.dx / halfWidth, anchor.dy / halfHeight)
+  // The drag rides the press spring in and out. Clamped, because the
+  // release spring undershoots zero, and a negative press would flip the
+  // stretch to point away from the drag for a frame or two.
+  final drag = hasArea && pressStretch.isActive
+      ? state.pressDrag * state.press.clamp(0.0, 1.0)
       : Offset.zero;
-  final reachDistance = math.min(reach.distance, 1);
+  final dragDistance = drag.distance;
+  // Past the slop, rubber-banded: `d / (1 + d / 100)` approaches 100 and
+  // never passes it, and halving it gives the ~50 pt ceiling. Diminishing
+  // returns are the point: the first few points of movement are felt, the
+  // hundredth is not.
+  final moved = dragDistance.isFinite && dragDistance > GlassPressStretch.slop
+      ? dragDistance - GlassPressStretch.slop
+      : 0.0;
+  final give = moved / (1 + moved / _resistance) / 2;
+  // How far that reaches, as a fraction of the surface's extent in the
+  // drag's own direction — 1 at most — and which way. The two are taken
+  // separately on purpose. The fraction is measured per axis so a small
+  // button and a large one give alike; the *direction* is the finger's
+  // own. Taking the direction off the per-axis fraction instead turns a
+  // diagonal drag across a wide card into a 45-degree stretch, and
+  // stretching a wide surface along a diagonal it does not have is a shear.
+  final toward = moved > 0 ? drag / dragDistance : Offset.zero;
+  final reachDistance = moved > 0
+      ? math.min(
+          Offset(
+            toward.dx * give / halfWidth,
+            toward.dy * give / halfHeight,
+          ).distance,
+          1,
+        )
+      : 0.0;
+  final travel = math.min(
+    moved * pressStretch.travel,
+    GlassPressStretch.maxTravel,
+  );
 
   final double m00;
   final double m01;
   final double m10;
   final double m11;
   if (reachDistance == 0 || !reachDistance.isFinite) {
-    // No anchor deformation: the anchor 2x2 is the identity, so the
+    // No drag deformation: the drag 2x2 is the identity, so the
     // product is just the velocity matrix, still symmetric.
     m00 = v00;
     m01 = v01;
@@ -174,9 +193,8 @@ Matrix4 glassSurfaceTransform({
     final pressAlong = 1 + pressStretch.intensity * reachDistance;
     final pressAcross =
         1 / (1 + pressStretch.intensity * reachDistance * pressStretch.squash);
-    final toward = anchor.distance;
-    final cos = anchor.dx / toward;
-    final sin = anchor.dy / toward;
+    final cos = toward.dx;
+    final sin = toward.dy;
     final a00 = pressAlong * cos * cos + pressAcross * sin * sin;
     final a01 = (pressAlong - pressAcross) * cos * sin;
     final a11 = pressAlong * sin * sin + pressAcross * cos * cos;
@@ -192,8 +210,8 @@ Matrix4 glassSurfaceTransform({
   final centreY = size.height / 2;
   return Matrix4.identity()
     ..translateByDouble(
-      state.translation.dx + anchor.dx * pressStretch.travel + centreX,
-      state.translation.dy + anchor.dy * pressStretch.travel + centreY,
+      state.translation.dx + toward.dx * travel + centreX,
+      state.translation.dy + toward.dy * travel + centreY,
       0,
       1,
     )
@@ -206,3 +224,41 @@ Matrix4 glassSurfaceTransform({
     )
     ..translateByDouble(-centreX, -centreY, 0, 1);
 }
+
+/// Where the press-stretch's rubber band saturates, in logical pixels,
+/// before it is halved. `liquid_glass_widgets`' `withResistance(0.01)`.
+const double _resistance = 100;
+
+/// The scale a fully pressed surface of [size] reaches.
+///
+/// [pressScale], when given, is used as it is — the old fixed ratio, and
+/// the way to ask for a shrink. Otherwise the surface grows by
+/// [pressGrowth] logical pixels along its longest side, which is how
+/// Apple's interactive glass behaves: about 17 pt whatever the size, so a
+/// 56 pt circle reaches 1.3 and a 132 pt pill about 1.13. The ratio is
+/// held between [minPressGrowthScale] and [maxPressGrowthScale], so a
+/// 20 pt glyph does not balloon to twice its size and a full-width card
+/// still visibly answers the finger.
+double glassPressScaleFor(
+  Size size, {
+  required double pressGrowth,
+  double? pressScale,
+}) {
+  if (pressScale != null) {
+    return pressScale;
+  }
+  final longest = size.longestSide;
+  if (!(pressGrowth > 0) || !(longest > 0) || !longest.isFinite) {
+    return 1;
+  }
+  return (1 + pressGrowth / longest).clamp(
+    minPressGrowthScale,
+    maxPressGrowthScale,
+  );
+}
+
+/// The smallest ratio a growing press reaches, on a very large surface.
+const double minPressGrowthScale = 1.04;
+
+/// The largest ratio a growing press reaches, on a very small surface.
+const double maxPressGrowthScale = 1.3;

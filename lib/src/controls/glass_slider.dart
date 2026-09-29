@@ -441,7 +441,7 @@ class _GlassSliderState extends State<GlassSlider>
 
   /// [_stretch] is a ratio of the thumb's size, so one unit of it is
   /// [_thumbSize] pixels: unscaled, a 0.5 px tolerance outweighs the whole
-  /// 0.18 stretch and the spring stops before it starts, leaving the thumb
+  /// 0.08 stretch and the spring stops before it starts, leaving the thumb
   /// stretched.
   void _animateStretchTo(double target) {
     _stretch.settleTo(context, target, pixelsPerUnit: _thumbSize);

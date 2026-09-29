@@ -87,7 +87,7 @@ class GlassButton extends StatelessWidget {
   /// offers — flip or thicken the tint until its label clears contrast.
   final Color? backdrop;
 
-  /// How far this button reaches toward a held finger.
+  /// How far this button gives while a pressing finger drags across it.
   ///
   /// Only meaningful on content, where this is real glass: the painted
   /// stand-in drawn under [GlassHostScope] scales on press and never
@@ -234,8 +234,13 @@ class _PaintedPressScale extends StatefulWidget {
 }
 
 class _PaintedPressScaleState extends State<_PaintedPressScale> {
-  /// What a pressed painted button scales to: the same small settle
-  /// toward the surface `InteractiveGlass.pressScale` gives the glass one.
+  /// What a pressed painted button scales to.
+  ///
+  /// A shrink, on purpose, where real glass grows (see
+  /// `InteractiveGlass.pressGrowth`). This body is a flat tint drawn inside
+  /// another glass surface, not glass of its own: growing it would push it
+  /// past the container it sits in and into its neighbours, and a flat
+  /// tint has no lens to lift.
   static const double _pressedScale = 0.96;
 
   /// How long the painted press takes. Quicker than a spring, because a

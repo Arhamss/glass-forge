@@ -16,6 +16,15 @@
 - A `GlassSurface` inside a `GlassPresence` now fades its content with the
   glass, not only the glass.
 
+- `InteractiveGlass.pressScale` is now `double?` and defaults to null, which
+  grows the surface by the new `pressGrowth` (17 pt). Passing a ratio still
+  works as before and wins over `pressGrowth`; code that reads the field as
+  a `double` needs a null check.
+- `GlassMotionState.pressAnchor` is now `pressDrag` and
+  `GlassMotionController.setPressAnchor` is now `setPressDrag`. The value
+  is the finger's movement since pointer-down, no longer its offset from
+  the surface's centre.
+
 ### Changed
 
 - Fixed: the edge band drew a hard ring inset from every shape's edge,
@@ -29,11 +38,35 @@
   normalised per axis and that normalised vector used as the stretch
   direction, so a finger at the corner of a wide card stretched it along a
   45-degree diagonal. The direction is now the finger's own, and the reach
-  is capped at the edge.
-- `InteractiveGlass`'s touch glow is sized to the pressed surface (its
-  longest side, 48 to 320) instead of a fixed 320. The glow is one light
-  per layer, so a fixed 320 washed a whole screen of tiles white for a
-  press on any one of them.
+  is capped.
+- `InteractiveGlass`'s touch response is retuned to Apple's Liquid Glass,
+  from `liquid_glass_widgets`' 120 fps measurements of iOS 26 and the
+  springs read out of UIKit:
+  - Press-stretch comes from how far the finger has **moved** since it went
+    down, not from where it rests. A tap or a still press, even at the very
+    edge, no longer deforms the glass. The first 3 pt of movement are
+    ignored and the rest is rubber-banded, so it saturates.
+  - `GlassPressStretch` defaults are now intensity 0.05, squash 1 (area
+    kept) and travel 0.05 of the drag, capped at 4 pt: at most 5 % of
+    elongation, where the old 0.5 / 0.3 / 0.15 reached 1.5×.
+  - A press **grows** the surface by 17 pt on its longest side
+    (`pressGrowth`), held to a ratio of 1.04 to 1.3, instead of shrinking
+    it to 0.96.
+  - The press runs on snappy 250 ms / bounce 0.25 and lets go on its own
+    spring, bouncy 280 ms / bounce 0.45 (`pressReleaseMotion`, new).
+    `GlassMotionDefaults.press` follows. `settleMotion` and the tab bar's
+    spring are unchanged.
+  - The touch glow is a soft lift, not a flash: 0.10 at the finger (0.05 in
+    dark mode) instead of 0.55, over a radius of one and a half times the
+    surface's longest side (48 to 640) instead of a fixed 320, so it covers
+    the pressed surface and only fringes its neighbours.
+  - Dragging a surface no longer stretches it into a needle: the stretch
+    saturates however far the finger carries it.
+  - `GlassJiggle` defaults to a 1.08 ceiling at a 2000 px/s half-speed
+    (was 1.18 at 1600), which quiets the slider thumb's stretch too.
+- Controls' settle springs land exactly on their target. They used to stop
+  wherever they were once within half a pixel, which left a slider thumb
+  visibly stretched after the jiggle ceiling came down.
 - The debug warning for glass shapes overlapping across backdrop passes
   prints once per pair of passes instead of on every frame. An overlap that
   lasted printed about sixty times a second and buried the rest of the log.
@@ -43,12 +76,6 @@
 - `GlassDetentSheet.material` replaces the sheet role's material for an app
   with a look of its own. Null keeps the role's, so nothing changes by
   default; label colour, shadows and motion still come from the role.
-- Fixed: dragging an `InteractiveGlass` stretched it into a needle toward
-  the finger. Pointer moves arrive in the coordinate space of the
-  pointer-down, so the press anchor grew with the drag distance and the
-  press-stretch with it. The anchor is now measured against where the
-  surface is, recomputed as it springs after the finger, and clamped to the
-  surface's own extent.
 
 - `GlassDetentSheet.bottomGap` separates the floating sheet's bottom inset
   from its side ones. A sheet that floats over other glass has to clear

@@ -60,7 +60,7 @@ const GlassMaterial _inert = GlassMaterial(
 /// The press-stretch tests below opt into a real one explicitly.
 Widget _harness({
   GlassDrag drag = const GlassDrag.none(),
-  double pressScale = 0.96,
+  double? pressScale,
   GlassJiggle jiggle = const GlassJiggle(),
   GlassPressStretch pressStretch = const GlassPressStretch.none(),
   bool glow = true,
@@ -112,7 +112,7 @@ Matrix4 _transformOf(RenderGlassMotion motion) => glassSurfaceTransform(
   state: motion.controller.value,
   jiggle: motion.jiggle,
   pressStretch: motion.pressStretch,
-  pressScale: motion.pressScale,
+  pressScale: motion.resolvedPressScale,
 );
 
 Future<void> _settle(WidgetTester tester, RenderGlassMotion motion) async {
@@ -406,15 +406,14 @@ void main() {
   });
 
   testWidgets(
-    'a held pointer stretches the surface toward it, and releasing '
-    'returns it to identity',
+    'a dragging pointer stretches the surface along the drag, and '
+    'releasing returns it to identity',
     (tester) async {
       await tester.pumpWidget(
         // pressStretch is turned on explicitly (the harness defaults it
-        // off) and pressScale: 1 isolates the reach from the surface's
-        // separate, unrelated press-depth scale, the same way the existing
-        // drag and hit-testing tests above isolate the channel they are
-        // about.
+        // off) and pressScale: 1 isolates the stretch from the surface's
+        // separate, unrelated press growth, the same way the drag and
+        // hit-testing tests above isolate the channel they are about.
         _harness(
           size: const Size(200, 80),
           pressScale: 1,
@@ -424,27 +423,33 @@ void main() {
       final motion = _motionOf(tester);
 
       final centre = tester.getCenter(find.byType(InteractiveGlass));
-      final gesture = await tester.startGesture(centre + const Offset(80, 0));
-      await tester.pump();
+      final gesture = await tester.startGesture(centre);
       await tester.pump(const Duration(milliseconds: 160));
+      expect(
+        _transformOf(motion),
+        equals(Matrix4.identity()),
+        reason: 'a finger that has not moved stretched the surface',
+      );
+      for (var i = 0; i < 6; i++) {
+        await gesture.moveBy(const Offset(10, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
 
-      // Elongated along x, the anchor's own axis, rather than checked via
-      // raw translation: scaling about the surface's centre moves its
-      // top-left the *opposite* way it grows, so `getTranslation().x` for
-      // this default `GlassPressStretch` is negative throughout the press
-      // even though the surface is visibly reaching toward the finger.
-      // `glass_press_stretch_test.dart` only gets a clean, positive
-      // translation by isolating `travel` with `intensity: 0`; the default
-      // used here carries both.
-      expect(_transformOf(motion).entry(0, 0), greaterThan(1));
+      // Longer along x, the drag's own axis, and shorter across it.
+      final m = _transformOf(motion);
+      expect(m.entry(0, 0), greaterThan(1));
+      expect(m.entry(1, 1), lessThan(1));
 
       await gesture.up();
       await _settle(tester, motion);
       expect(_transformOf(motion), equals(Matrix4.identity()));
+      expect(motion.controller.value.pressDrag, Offset.zero);
     },
   );
 
-  testWidgets('Reduce Motion stretches nothing while held', (tester) async {
+  testWidgets('Reduce Motion stretches nothing while dragged', (
+    tester,
+  ) async {
     // The singleton caches the last value it saw, so a test value left set
     // would be visible to whichever test ran next.
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
@@ -461,13 +466,16 @@ void main() {
     final motion = _motionOf(tester);
 
     final centre = tester.getCenter(find.byType(InteractiveGlass));
-    final gesture = await tester.startGesture(centre + const Offset(80, 0));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 160));
+    final gesture = await tester.startGesture(centre);
+    for (var i = 0; i < 6; i++) {
+      await gesture.moveBy(const Offset(10, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
 
     // Without the explicit `GlassPressStretch.none()` resolution under
     // Reduce Motion, `press` would still snap straight to 1 while the
-    // anchor is live, and this would come back stretched, not identity.
+    // drag is live, and this would come back stretched, not identity.
+    expect(motion.controller.value.pressDrag, isNot(Offset.zero));
     expect(_transformOf(motion), equals(Matrix4.identity()));
 
     await gesture.up();
@@ -475,7 +483,7 @@ void main() {
   });
 
   testWidgets(
-    'the press anchor reaches the render object without rebuilding a '
+    'the press drag reaches the render object without rebuilding a '
     'widget',
     (tester) async {
       await tester.pumpWidget(_harness(size: const Size(200, 80)));
@@ -483,12 +491,13 @@ void main() {
       final buildsAfterFirstFrame = _BuildCounterState.builds;
 
       final centre = tester.getCenter(find.byType(InteractiveGlass));
-      final gesture = await tester.startGesture(centre + const Offset(80, 0));
+      final gesture = await tester.startGesture(centre);
+      await gesture.moveBy(const Offset(30, 0));
       await tester.pump();
 
-      // The anchor is not sprung, so it reaches the controller's published
+      // The drag is not sprung, so it reaches the controller's published
       // state on the very next frame — no extra pump, no rebuild.
-      expect(motion.controller.value.pressAnchor, const Offset(80, 0));
+      expect(motion.controller.value.pressDrag, const Offset(30, 0));
 
       var frames = 0;
       while (motion.controller.isAnimating && frames < 400) {
@@ -504,19 +513,20 @@ void main() {
   );
 
   testWidgets(
-    'dragging a surface does not stretch it toward where the drag began',
+    'carrying a surface a long way stretches it no more than the cap',
     (tester) async {
-      // Pointer events after the first are delivered in the coordinate space
-      // hit testing recorded at pointer-down, so a raw local position is
-      // measured from where the surface *was*. Taken as the anchor, a drag of
-      // 300 px on a 100 px surface reads as a finger six half-widths away and
-      // stretches the glass into a needle pointing at the finger.
+      // The surface follows the finger, so the finger's travel is large
+      // however little it moves relative to the glass. The rubber band on
+      // the drag is what keeps a 300 px carry from pulling the glass into
+      // a needle.
       await tester.pumpWidget(
         _harness(
           drag: const GlassDrag(
             returnsHome: false,
             overdrag: GlassOverdrag.none(),
           ),
+          pressScale: 1,
+          jiggle: const GlassJiggle.none(),
           pressStretch: const GlassPressStretch(),
         ),
       );
@@ -535,9 +545,10 @@ void main() {
 
       final state = motion.controller.value;
       expect(state.translation.dx, greaterThan(250), reason: 'never dragged');
-      // Grabbed at the centre and carried: the finger is still over the
-      // centre, so there is nothing to reach toward.
-      expect(state.pressAnchor.distance, lessThan(10));
+      expect(state.pressDrag.dx, closeTo(300, 1e-6));
+      final m = _transformOf(motion);
+      expect(m.entry(0, 0), greaterThan(1));
+      expect(m.entry(0, 0), lessThanOrEqualTo(1.05 + 1e-9));
 
       await gesture.up();
       await _settle(tester, motion);
@@ -548,9 +559,9 @@ void main() {
     tester,
   ) async {
     // The glow is one light per layer, shared by every surface in it. At a
-    // fixed 320 px it washed a whole screen of 64 px tiles white for a
-    // press on any one of them. Sized to the pressed surface, it lights
-    // that surface and spills only a little past it.
+    // fixed 320 px and 0.55 it washed a whole screen of 64 px tiles white
+    // for a press on any one of them. Sized to the pressed surface and
+    // soft, it lifts that surface evenly and spills only a little past it.
     await tester.pumpWidget(_harness(size: const Size(64, 64)));
     final glow = tester.widget<GlassGlowScope>(find.byType(GlassGlowScope));
     final gesture = await tester.startGesture(
@@ -560,7 +571,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 16));
     }
     expect(glow.glow.value.strength, greaterThan(0), reason: 'no glow');
-    expect(glow.glow.value.radius, lessThanOrEqualTo(64));
+    expect(glow.glow.value.strength, lessThanOrEqualTo(0.12));
+    expect(glow.glow.value.radius, greaterThanOrEqualTo(64));
+    expect(glow.glow.value.radius, lessThanOrEqualTo(96));
     await gesture.up();
     await _settle(tester, _motionOf(tester));
   });
@@ -580,35 +593,6 @@ void main() {
     await gesture.up();
     await _settle(tester, _motionOf(tester));
     expect(glow.glow.value.strength, 0);
-  });
-
-  testWidgets('a finger past the edge reaches no further than the edge', (
-    tester,
-  ) async {
-    // A rubber-banded surface lags its finger without bound; the stretch
-    // toward it must not grow with that lag.
-    await tester.pumpWidget(
-      _harness(
-        drag: const GlassDrag(overdrag: GlassOverdrag(limit: 20)),
-        pressStretch: const GlassPressStretch(),
-      ),
-    );
-    final motion = _motionOf(tester);
-
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.byType(InteractiveGlass)),
-    );
-    for (var i = 0; i < 40; i++) {
-      await gesture.moveBy(const Offset(10, 0));
-      await tester.pump(const Duration(milliseconds: 16));
-    }
-
-    final anchor = motion.controller.value.pressAnchor;
-    expect(anchor.dx, lessThanOrEqualTo(50));
-    expect(anchor.dx, greaterThan(40), reason: 'the reach was lost entirely');
-
-    await gesture.up();
-    await _settle(tester, motion);
   });
 }
 
