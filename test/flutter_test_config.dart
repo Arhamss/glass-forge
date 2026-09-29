@@ -43,10 +43,42 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
     )..createSync(recursive: true);
     for (final entity in bareShaders.listSync()) {
       if (entity is File) {
-        final name = entity.uri.pathSegments.last;
-        entity.copySync('${mirror.path}/$name');
+        _mirror(entity, File('${mirror.path}/${entity.uri.pathSegments.last}'));
       }
     }
   }
   await testMain();
+}
+
+/// Puts a copy of [source] at [target] without ever leaving [target] empty
+/// or half-written.
+///
+/// `flutter test` runs test files in parallel, one process each, and every
+/// one of them runs [testExecutable]. A plain `copySync` truncates the
+/// target before writing it, so a process loading a shader while another
+/// was re-copying it read an empty file: "manifest could not be decoded:
+/// Payload is null or empty", the intermittent `setUpAll` failure in the
+/// Impeller lane. Copying under a name no other process uses and renaming
+/// it into place is atomic, so a reader sees the old file or the new one;
+/// a target that already matches is left alone.
+void _mirror(File source, File target) {
+  final bytes = source.readAsBytesSync();
+  if (target.existsSync() && _same(target.readAsBytesSync(), bytes)) {
+    return;
+  }
+  File('${target.path}.$pid.${DateTime.now().microsecondsSinceEpoch}.tmp')
+    ..writeAsBytesSync(bytes, flush: true)
+    ..renameSync(target.path);
+}
+
+bool _same(List<int> a, List<int> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) {
+      return false;
+    }
+  }
+  return true;
 }

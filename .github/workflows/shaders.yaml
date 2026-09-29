@@ -78,7 +78,16 @@ jobs:
       # cross-producer parity tests in gpu_geometry_producer_test.dart
       # skipped. With it, the lane is 85 passed, 0 skipped, 0 failed
       # (macOS, Flutter 3.47.2).
+      #
+      # `-j 1`: one test file at a time. Run in parallel, the Impeller lane
+      # intermittently failed a shared `setUpAll(ShaderLibrary.warmUp)` with
+      # "manifest could not be decoded: Payload is null or empty". Every
+      # test process re-copies the shaders into the `packages/glass_forge/`
+      # mirror in test/flutter_test_config.dart, and a process could read a
+      # shader while another had it truncated. That copy is now atomic; the
+      # lane stays serial anyway, because these tests share one GPU and the
+      # failure was only ever seen here.
       - name: flutter test (impeller)
         run: >-
           flutter test --tags impeller --run-skipped --enable-impeller
-          --enable-flutter-gpu
+          --enable-flutter-gpu -j 1
