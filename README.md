@@ -27,19 +27,25 @@ GlassLayer(
 )
 ```
 
-The [example app](example/) is a playground: three live scenes — a lens you
-drag and reshape, drops that melt together, and a set of everyday controls —
-under a sheet with a knob for every field of `GlassMaterial`, presets that
-morph into one another, a quality-tier pin, and a button that copies the
-material you ended up with as Dart.
+The [example app](example/) is a playground: three live scenes behind a
+`GlassTabBar` — a lens you drag and reshape, drops that melt together, and
+a Control Center-style kit of the package's own `GlassButton`,
+`GlassSwitch` and `GlassSlider` — under a `GlassDetentSheet` with a knob
+for every field of `GlassMaterial`, presets that morph into one another, a
+quality-tier pin, and a button that copies the material you ended up with
+as Dart. A settings page shows the chrome together: a `GlassScaffold` with
+a `GlassAppBar`, controls and text fields in the body, and a rename sheet
+from `showGlassSheet`.
 
 ## How it works, in one paragraph
 
 A `GlassLayer` captures the backdrop behind it once. Every `Glass` inside it
 registers a shape into a shared signed-distance field, which is baked into a
 compact RGBA8 **matte** — surface normal, edge distance and displacement
-magnitude, one texel per pixel. A single `BackdropFilter` per material then
-reads that matte and bends the captured backdrop along the normals, inside a
+magnitude, one texel per pixel. Shapes far enough apart that their mattes
+cannot meet are baked as separate clusters, so a material can carry any
+number of them. A single `BackdropFilter` per material then reads that
+matte and bends the captured backdrop along the normals, inside a
 narrow band at each shape's edge. The interior is left undistorted, which is
 what Apple's material does and what makes it read as glass rather than as a
 lens.
@@ -118,9 +124,17 @@ GlassButton(
 
 `onPressed: null` disables it. Every control in this package except
 `GlassTextField` shares one frame for semantics, keyboard activation (Enter
-and Space) and a 44 × 44 minimum hit target that grows the tap area, never
-the glass. The text field wraps `EditableText` directly, because a tap there
-places the caret.
+and Space), a focus ring under keyboard focus, and a 44 × 44 minimum hit
+target that grows the tap area, never the glass. The text field wraps
+`EditableText` directly, because a tap there places the caret.
+
+Every control takes `autofocus`, and all but the segmented control take a
+`focusNode`. A disabled control dims its glass along with its paint. A
+control moves the moment it is touched, then reports. If the owner does not
+rebuild with the new value, the control goes back to the one it was given.
+In a right-to-left layout the controls mirror the way Flutter's own do.
+The switch's "on" side is on the left, and a slider's minimum is on the
+right.
 
 `GlassSwitch` is a track and a knob: the track is always painted — real
 glass on a 64 × 28 capsule this thin reads as a smear, not a control — and
@@ -187,7 +201,9 @@ GlassTextField(
 
 Focus reads as the glass lighting up: the material's highlight and tint
 opacity animate brighter on the theme's `settle` spring, never a painted
-ring on top. The caret and selection are painted above the glass as a
+ring on top. The brightening is a uniform on the field's backdrop pass,
+driven the way `GlassPresence` drives a fade, so the animation rebakes
+nothing. The caret and selection are painted above the glass as a
 `Stack` sibling, never inside it, so they are never refracted, and a
 focused field inside a scroll view calls `Scrollable.ensureVisible` to
 track the keyboard's own show/hide animation clear of it. With no Material
@@ -262,6 +278,11 @@ Surfaces adapt by size, following Apple: small elements like a control flip
 light/dark against their background, large ones like a sheet adapt without
 flipping. The gate is thinness, not area.
 
+Every `GlassSurface` constructor, `GlassAppBar`, `GlassTabBar`,
+`GlassDetentSheet` and `showGlassSheet` take a `material` for an app with a
+look of its own; null keeps the role's. A surface placed on glass paints
+its tint instead of drawing a second glass.
+
 ## Chrome
 
 `GlassScaffold` makes the composition rules the default instead of
@@ -328,8 +349,10 @@ GlassTabBar(
 At rest the selection is a painted pill on the bar's glass. While it moves
 — a tap, or a drag along the bar that it chases under your finger — a glass
 lens rises out of the pill, swells a little past the bar's edges, and sinks
-back as it lands, so there is never glass on glass at rest. It fades with
-the bar, and Reduce Motion replaces it with an instant pill.
+back as it lands, so there is never glass on glass at rest. A finger
+resting on a tab swells the pill but raises no lens. It fades with the bar,
+and Reduce Motion replaces it with an instant pill. `GlassTabBar.height`
+and `GlassTabBar.margin` are public for laying out content around the bar.
 
 `showGlassSheet` presents a modal glass sheet from the bottom edge and
 completes with whatever it is popped with.
@@ -381,6 +404,17 @@ harness marks such a run untrustworthy rather than letting it quietly pass.
 - The budgets shipped in `benchmark/budgets.json` are **seed values, not
   measured data**. No profile-mode capture on real hardware has been taken
   yet.
+- `kMaxShapes` (8) is a limit per cluster, not per material. Shapes whose
+  mattes could meet, and every shape in one blend group, share a cluster.
+  Past eight in one cluster the extras are not drawn, and a debug warning
+  says so.
+- The tab-bar lens is glass over the bar's glass while it travels. That is
+  the one overlap this package allows on purpose, and it has not yet been
+  checked on a physical iPhone for [flutter#187820].
+- Holding a tab differs from iOS: the pill swells and no lens rises.
+- `GlassSwitch` and `GlassSegmentedControl` dimensions are not yet measured
+  against an iOS capture. The controls pick some of their own colours,
+  such as the switch's green track and white knob.
 - `containsChild` on `Glass` is accepted and not yet wired.
 - Backdrop luminance for surface adaptation is caller-supplied; nothing
   samples it automatically yet.
@@ -389,8 +423,8 @@ harness marks such a run untrustworthy rather than letting it quietly pass.
   overlapping surfaces in one material or one blend group.
 - `flutter test` cannot rasterise a backdrop filter faithfully, so rendering
   is verified on the Impeller lane
-  (`flutter test --tags impeller --run-skipped --enable-impeller`) rather
-  than through `toImage()`.
+  (`flutter test --tags impeller --run-skipped --enable-impeller
+  --enable-flutter-gpu -j 1`) rather than through `toImage()`.
 
 ## Requirements
 
