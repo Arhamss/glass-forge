@@ -34,6 +34,7 @@ Widget _harness({
   required Widget child,
   bool onGlass = false,
   bool supportsSystemContextMenu = false,
+  TextDirection textDirection = TextDirection.ltr,
 }) {
   final content = onGlass
       ? Glass(
@@ -42,7 +43,7 @@ Widget _harness({
         )
       : Center(child: child);
   return Directionality(
-    textDirection: TextDirection.ltr,
+    textDirection: textDirection,
     child: MediaQuery(
       data: MediaQueryData(
         supportsShowingSystemContextMenu: supportsSystemContextMenu,
@@ -354,4 +355,39 @@ void main() {
       expect(800 - fieldBottom, greaterThanOrEqualTo(299));
     },
   );
+
+  group('right to left', () {
+    Widget rtl() => _harness(
+      textDirection: TextDirection.rtl,
+      child: const SizedBox(
+        width: 200,
+        child: GlassTextField(
+          placeholder: 'Search',
+          leading: SizedBox(key: Key('leading'), width: 16, height: 16),
+          trailing: SizedBox(key: Key('trailing'), width: 16, height: 16),
+        ),
+      ),
+    );
+
+    testWidgets('the placeholder sits at the start edge, with the caret', (
+      tester,
+    ) async {
+      await tester.pumpWidget(rtl());
+      final placeholder = tester.getRect(find.text('Search'));
+      final editable = tester.getRect(find.byType(EditableText));
+      expect(placeholder.right, editable.right);
+      expect(placeholder.left, greaterThan(editable.left));
+    });
+
+    testWidgets('leading is on the right and trailing on the left', (
+      tester,
+    ) async {
+      await tester.pumpWidget(rtl());
+      final leading = tester.getRect(find.byKey(const Key('leading')));
+      final trailing = tester.getRect(find.byKey(const Key('trailing')));
+      final editable = tester.getRect(find.byType(EditableText));
+      expect(leading.left, greaterThan(editable.right));
+      expect(trailing.right, lessThan(editable.left));
+    });
+  });
 }

@@ -419,7 +419,7 @@ class _GlassTextFieldState extends State<GlassTextField>
   Widget _editableStack(GlassSurfaceStyle style) {
     final placeholder = widget.placeholder;
     return Stack(
-      alignment: Alignment.centerLeft,
+      alignment: AlignmentDirectional.centerStart,
       children: [
         if (placeholder != null)
           ExcludeSemantics(
