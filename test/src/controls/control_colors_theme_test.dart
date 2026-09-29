@@ -191,8 +191,11 @@ void main() {
           controls: palette,
         ),
       );
+      // The focus manager applies a request in a microtask. The test
+      // binding's pump draws no frame unless one was already scheduled, so
+      // apply it first: the ring must then be on the very next frame.
       node.requestFocus();
-      await tester.pump();
+      FocusManager.instance.applyFocusChangesIfNeeded();
       await tester.pump();
       expect(
         tester.renderObject(find.byType(GlassSwitch)),

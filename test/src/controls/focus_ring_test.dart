@@ -34,12 +34,16 @@ void main() {
       isNot(paints..rrect(style: PaintingStyle.stroke)),
     );
 
+    // The focus manager applies a change in a microtask, and the test
+    // binding's pump draws no frame unless one was already scheduled. Apply
+    // each change first, so one pump is the frame that must show it.
     node.requestFocus();
+    FocusManager.instance.applyFocusChangesIfNeeded();
     await tester.pump();
     expect(control, paints..rrect(style: PaintingStyle.stroke));
 
     node.unfocus();
-    await tester.pump();
+    FocusManager.instance.applyFocusChangesIfNeeded();
     await tester.pump();
     expect(
       control,
@@ -62,6 +66,7 @@ void main() {
       ),
     );
     node.requestFocus();
+    FocusManager.instance.applyFocusChangesIfNeeded();
     await tester.pump();
     expect(
       tester.renderObject(find.byType(GlassButton)),
