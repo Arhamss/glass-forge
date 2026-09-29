@@ -213,15 +213,21 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
                   presence: _barPresence,
                   child: Arrive(
                     delay: const Duration(milliseconds: 200),
-                    child: GlassTabBar(
-                      material: chromeMaterial,
-                      tabs: _tabs,
-                      currentIndex: _scene,
-                      onTap: (i) {
-                        if (i != _scene) {
-                          unawaited(_select(i));
-                        }
-                      },
+                    // The tuned material, read live from the layer so the
+                    // bar morphs with every preset. It still fades on its
+                    // own: a pass is keyed by material *and* presence
+                    // scope, and the bar sits under its own presence.
+                    child: Builder(
+                      builder: (context) => GlassTabBar(
+                        material: GlassLayerScope.maybeOf(context)?.material,
+                        tabs: _tabs,
+                        currentIndex: _scene,
+                        onTap: (i) {
+                          if (i != _scene) {
+                            unawaited(_select(i));
+                          }
+                        },
+                      ),
                     ),
                   ),
                 ),
@@ -365,11 +371,9 @@ class _PhotoButton extends StatelessWidget {
         },
         child: const SizedBox.square(
           dimension: 50,
-          // Chrome, so the chrome's material — which also keeps it out of
-          // the scene's pass, whose Kit buttons already fill most of the
-          // eight shapes a cluster carries.
+          // No material of its own: it takes the layer's tuned one, so it
+          // morphs with the presets like everything else on screen.
           child: Glass(
-            material: chromeMaterial,
             shape: GlassOval(),
             child: Glyph(
               Glyphs.photo,
