@@ -601,6 +601,123 @@ void main() {
     }
   });
 
+  group('a change of segments', () {
+    Rect pillOf(WidgetTester tester) => tester.getRect(
+      find.descendant(
+        of: find.byType(GlassSegmentedControl<int>),
+        matching: find.byType(Glass),
+      ),
+    );
+
+    Rect holeOf(WidgetTester tester) {
+      final clip = find.descendant(
+        of: find.byType(GlassSegmentedControl<int>),
+        matching: find.byWidgetPredicate(
+          (w) => w is ClipPath && w.clipper is TrackCutoutClipper,
+        ),
+      );
+      final clipper =
+          tester.widget<ClipPath>(clip).clipper! as TrackCutoutClipper;
+      return clipper.hole!.shift(tester.getTopLeft(clip));
+    }
+
+    void expectPillUnder(WidgetTester tester, String label) {
+      final centre = tester.getCenter(find.text(label)).dx;
+      final pill = pillOf(tester);
+      expect(pill.left, lessThan(centre));
+      expect(pill.right, greaterThan(centre));
+      expect(holeOf(tester), pill);
+    }
+
+    Widget control(List<GlassSegment<int>> segments, int selected) => _harness(
+      child: GlassSegmentedControl<int>(
+        segments: segments,
+        selected: selected,
+        onChanged: (_) {},
+      ),
+    );
+
+    const five = [
+      GlassSegment(value: 0, label: Text('Day')),
+      GlassSegment(value: 1, label: Text('Week')),
+      GlassSegment(value: 3, label: Text('Quarter')),
+      GlassSegment(value: 4, label: Text('Year')),
+      GlassSegment(value: 2, label: Text('Month')),
+    ];
+
+    testWidgets('more segments, same index: the pill stays under it', (
+      tester,
+    ) async {
+      await tester.pumpWidget(control(_threeSegments, 1));
+      expectPillUnder(tester, 'Week');
+
+      await tester.pumpWidget(control(five, 1));
+      await tester.pumpAndSettle();
+      expectPillUnder(tester, 'Week');
+    });
+
+    testWidgets('fewer segments, same index: the pill stays under it', (
+      tester,
+    ) async {
+      await tester.pumpWidget(control(five, 3));
+      expectPillUnder(tester, 'Quarter');
+
+      await tester.pumpWidget(
+        control(const [
+          GlassSegment(value: 0, label: Text('Day')),
+          GlassSegment(value: 1, label: Text('Week')),
+          GlassSegment(value: 3, label: Text('Quarter')),
+        ], 3),
+      );
+      await tester.pumpAndSettle();
+      expectPillUnder(tester, 'Quarter');
+    });
+
+    testWidgets('the selection moves index: the pill follows it', (
+      tester,
+    ) async {
+      await tester.pumpWidget(control(_threeSegments, 2));
+      expectPillUnder(tester, 'Month');
+
+      await tester.pumpWidget(control(five, 2));
+      await tester.pumpAndSettle();
+      expectPillUnder(tester, 'Month');
+    });
+
+    testWidgets('after a change of count, arrow keys step from the pill', (
+      tester,
+    ) async {
+      final reported = <int>[];
+      await tester.pumpWidget(
+        _harness(
+          child: GlassSegmentedControl<int>(
+            segments: five,
+            selected: 4,
+            onChanged: reported.add,
+          ),
+        ),
+      );
+      await tester.pumpWidget(
+        _harness(
+          child: GlassSegmentedControl<int>(
+            segments: _threeSegments,
+            selected: 1,
+            onChanged: reported.add,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      FocusManager.instance.rootScope.descendants
+          .firstWhere((node) => node.canRequestFocus)
+          .requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(reported, [2]);
+    });
+  });
+
   group('the owner rejects the change', () {
     // An `onChanged` that neither rebuilds nor stores. The pill must settle
     // back under `selected`, and only that segment reports itself selected.

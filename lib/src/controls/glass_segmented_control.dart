@@ -220,6 +220,17 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
   @override
   void didUpdateWidget(GlassSegmentedControl<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!_dragging && oldWidget.segments.length != widget.segments.length) {
+      // [_position] is a fraction of [_lastIndex], so a new segment count
+      // moves every index under it: 0.5 is index 1 of three but index 2 of
+      // five. The pill's width changes in the same frame, so it jumps to
+      // the selected segment's new fraction rather than springing there.
+      final index = _indexOf(widget.selected);
+      if (index != -1) {
+        _targetIndex = index;
+        _position.value = _fractionOf(index);
+      }
+    }
     _followSelected();
   }
 
