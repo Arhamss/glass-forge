@@ -127,6 +127,10 @@ class GlassTabBar extends StatefulWidget {
 
   /// The bar's total height, not counting the safe-area inset below it —
   /// what a layout hard-coding the bar's height should read instead.
+  ///
+  /// It does not change with the text size: tab labels follow the reader's
+  /// text scale up to 1.5× and stop there, and a label too long for its
+  /// tab ends in an ellipsis.
   static const double height = _barHeight;
 
   @override
@@ -138,6 +142,15 @@ const double _barHeight = 62;
 
 /// The gap between the bar's edge and the selection inside it.
 const double _inset = 6;
+
+/// The most a tab's label grows with the reader's text size.
+///
+/// The bar keeps one height at every text size, as iOS's tab bar does,
+/// which leaves room under a 24-point icon for an 11-point label scaled by
+/// about 1.8 at most. iOS itself does not scale tab labels at all, and
+/// offers its large-content viewer instead; this package lets them grow a
+/// little, to 16.5 points, and no further.
+const double _maxLabelScale = 1.5;
 
 /// Clear space kept between the bar and the screen's edges, where the
 /// safe area asks for less.
@@ -621,14 +634,21 @@ class _TabButton extends StatelessWidget {
             child: lit ? tab.activeIcon ?? tab.icon : tab.icon,
           ),
           const SizedBox(height: 2),
-          Text(
-            tab.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: tint,
-              fontSize: 11,
-              fontWeight: lit ? FontWeight.w600 : FontWeight.w500,
+          // Scaled with the reader's text size only up to [_maxLabelScale]:
+          // the bar is a fixed height, and past that the label no longer
+          // fits under the icon. A long label is cut short with an
+          // ellipsis rather than wrapped.
+          MediaQuery.withClampedTextScaling(
+            maxScaleFactor: _maxLabelScale,
+            child: Text(
+              tab.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: tint,
+                fontSize: 11,
+                fontWeight: lit ? FontWeight.w600 : FontWeight.w500,
+              ),
             ),
           ),
         ],

@@ -382,6 +382,58 @@ void main() {
     expect(tester.getSize(surface).height, GlassTabBar.height);
   });
 
+  group('large text', () {
+    for (final scale in [1.0, 2.0, 3.0, 5.0]) {
+      testWidgets('at ${scale}x the tabs fit the bar without overflow', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: GlassLayer(
+                tier: GeometryTier.none,
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: GlassTabBar(
+                    tabs: const [
+                      GlassTab(
+                        icon: SizedBox(width: 24, height: 24),
+                        label: 'Home',
+                      ),
+                      GlassTab(
+                        icon: SizedBox(width: 24, height: 24),
+                        label: 'Notifications',
+                      ),
+                      GlassTab(
+                        icon: SizedBox(width: 24, height: 24),
+                        label: 'Profile',
+                      ),
+                    ],
+                    currentIndex: 0,
+                    onTap: (_) {},
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        expect(tester.takeException(), isNull);
+        final bar = tester.getRect(find.byType(GlassTabBar));
+        for (final label in ['Home', 'Notifications', 'Profile']) {
+          final text = tester.getRect(find.text(label));
+          expect(text.bottom, lessThanOrEqualTo(bar.bottom));
+          expect(text.top, greaterThanOrEqualTo(bar.top));
+          // The test font's line is exactly its size: 11 pt, scaled by the
+          // reader's text size up to 1.5 and no further.
+          expect(text.height, closeTo(11 * (scale < 1.5 ? scale : 1.5), 1));
+        }
+      });
+    }
+  });
+
   group('the owner rejects the change', () {
     /// The painted pill: the last clip the bar builds.
     Rect pillOf(WidgetTester tester) => tester.getRect(
