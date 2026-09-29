@@ -62,9 +62,9 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 /// throughout.
 ///
 /// `onChanged: null` disables it: no tap, no drag, and the callback never
-/// runs — see [GlassControlFrame], which every control in this package
-/// shares for semantics, keyboard activation and the 44 × 44 minimum hit
-/// target.
+/// runs. Like every control in this package except `GlassTextField`, it
+/// shares one internal frame for semantics, keyboard activation and the
+/// 44 × 44 minimum hit target.
 class GlassSwitch extends StatefulWidget {
   /// Creates a switch.
   const GlassSwitch({

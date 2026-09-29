@@ -94,9 +94,9 @@ class GlassControlFrame extends StatelessWidget {
   /// of this frame beyond the shared 44 × 44 hit target and focus handling.
   ///
   /// A slider has no single "activate" — see [onActivate], always null for
-  /// it — so [_enabled] falls back to [onIncrease] and [onDecrease] when
-  /// this is set, rather than requiring a callback this control has no use
-  /// for.
+  /// it — so the frame counts as enabled while [onIncrease] or
+  /// [onDecrease] is set, rather than requiring a callback this control has
+  /// no use for.
   final bool slider;
 
   /// The accessible value read for a slider, alongside [semanticLabel].

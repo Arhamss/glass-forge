@@ -53,7 +53,8 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 ///
 /// `onChanged: null` disables it: no tap, no drag, no keyboard step, and the
 /// callback never runs. Focus and the increase/decrease semantics actions
-/// come from [GlassControlFrame] — the left/right (or down/up) arrow keys
+/// come from the frame every control shares — the left/right (or down/up)
+/// arrow keys
 /// step by one [divisions] or, without divisions, by a tenth of the range.
 ///
 /// Under [TextDirection.rtl] the slider mirrors, as `Slider` does: [min] is

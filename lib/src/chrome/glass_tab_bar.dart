@@ -84,7 +84,8 @@ class GlassTab {
 /// Under Reduce Motion there is no lens at all and the pill moves
 /// instantly.
 ///
-/// Each tab is its own selectable button through [GlassControlFrame] —
+/// Each tab is its own selectable button through the frame every control
+/// shares —
 /// semantics, keyboard focus, Enter and Space, a 44 × 44 minimum hit
 /// target — and exactly the one at [currentIndex] reports itself selected.
 class GlassTabBar extends StatefulWidget {

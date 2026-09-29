@@ -77,7 +77,8 @@ class GlassSegment<T> {
 ///
 /// `onChanged: null` disables it: no tap, no drag, no arrow-key step, and
 /// the callback never runs. Each segment is its own selectable button —
-/// [GlassControlFrame] gives it semantics, focus, a 44 × 44 minimum hit
+/// the frame every control shares gives it semantics, focus, a 44 × 44
+/// minimum hit
 /// target and Enter/Space activation — and reports
 /// `SemanticsFlag.isSelected` for exactly the one whose [GlassSegment.value]
 /// equals [selected]. Each is named by its [GlassSegment.label] text, or by

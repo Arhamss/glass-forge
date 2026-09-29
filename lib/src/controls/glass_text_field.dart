@@ -20,8 +20,8 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 ///
 /// Unlike every other control in this package, focus here is not a state a
 /// consumer reaches through a press: it is where the system keyboard's
-/// input goes. That is why this widget departs from
-/// [GlassControlFrame] — a tap has to place the caret, not merely toggle a
+/// input goes. That is why this widget departs from the frame every other
+/// control shares — a tap has to place the caret, not merely toggle a
 /// value — and instead wraps [EditableText] directly, through the same
 /// [TextSelectionGestureDetectorBuilder] `TextField` and `CupertinoTextField`
 /// build on, so tap-to-place-caret, double-tap-to-select-word,

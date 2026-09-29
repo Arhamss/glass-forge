@@ -26,9 +26,9 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 /// ```
 ///
 /// `onPressed: null` disables it: 40% label opacity, no press response, and
-/// the callback never runs — see [GlassControlFrame], which every control
-/// in this package shares for that behaviour, plus semantics, keyboard
-/// activation and the 44 × 44 minimum hit target.
+/// the callback never runs. Like every control in this package except
+/// `GlassTextField`, it shares one internal frame for that behaviour, plus
+/// semantics, keyboard activation and the 44 × 44 minimum hit target.
 class GlassButton extends StatelessWidget {
   /// Creates a button around [child].
   const GlassButton({
@@ -117,8 +117,8 @@ class GlassButton extends StatelessWidget {
   /// mute, bold, favourite — rather than running a one-off action.
   ///
   /// Null — the default — reports no toggle state at all, which is right
-  /// for an ordinary button. A non-null value is handed to
-  /// [GlassControlFrame.toggled], so a screen reader announces the button
+  /// for an ordinary button. A non-null value sets the toggled semantics
+  /// flag, so a screen reader announces the button
   /// as on or off rather than leaving the state to its looks alone. This
   /// only reports the state: flipping it on press, and drawing it, stay
   /// with the caller, which owns the value.
