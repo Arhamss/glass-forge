@@ -9,14 +9,15 @@ RenderGlassLayer _layerOf(WidgetTester tester) =>
 
 Widget _surface({
   Key? key,
-  // Defaults match `InteractiveGlass`'s own; a test that wants to isolate
-  // the glow from the unrelated depth-scale and press-stretch channels
-  // (which really do deform geometry, and really do cost a fresh matte
-  // once their own spring actually ticks) passes `pressScale: 1` and
+  // Defaults match `InteractiveGlass`'s own (a null `pressScale` grows the
+  // surface by `pressGrowth`); a test that wants to isolate the glow from
+  // the unrelated press-scale and press-stretch channels (which really do
+  // deform geometry, and really do cost a fresh matte once their own
+  // spring actually ticks) passes `pressScale: 1` and
   // `pressStretch: const GlassPressStretch.none()` explicitly, the same
   // isolation `interactive_glass_test.dart` uses for the channels it is
   // about.
-  double pressScale = 0.96,
+  double? pressScale,
   GlassPressStretch pressStretch = const GlassPressStretch(),
 }) => InteractiveGlass(
   key: key,
@@ -78,6 +79,23 @@ void main() {
   testWidgets('Reduce Motion keeps a static glow, not a spreading one', (
     tester,
   ) async {
+    // The peak to expect, read off a press held to rest under normal
+    // motion rather than restated here: it tracks the glow's configured
+    // strength for this brightness, whatever that is tuned to.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(child: Center(child: _surface())),
+      ),
+    );
+    final reference = await tester.startGesture(
+      tester.getCenter(find.byType(Glass)),
+    );
+    await tester.pumpAndSettle();
+    final peak = _layerOf(tester).glow.strength;
+    expect(peak, greaterThan(0), reason: 'the reference press never glowed');
+    await reference.up();
+    await tester.pumpAndSettle();
+
     // The singleton caches the last value it saw, so a test value left set
     // would leak into whichever test runs next.
     addTearDown(
@@ -97,17 +115,17 @@ void main() {
     final gesture = await tester.startGesture(
       tester.getCenter(find.byType(Glass)),
     );
-    // One frame, not a ramp: the glow is at (close to) full strength
+    // One frame, not a ramp: the glow is at full strength
     // immediately, not partway through an animation.
     await tester.pump();
     final glow = _layerOf(tester).glow;
     expect(glow.isActive, isTrue);
     expect(
       glow.strength,
-      greaterThan(0.4),
+      closeTo(peak, 1e-9),
       reason:
           'under Reduce Motion the press channel settles instantly, so '
-          'strength should already be at (close to) its full value on the '
+          'strength should already be at its full value on the '
           'very first frame rather than partway through a ramp',
     );
 
