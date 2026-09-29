@@ -168,6 +168,28 @@ void main() {
     expect(reported, closeTo(0.75, 0.001));
   });
 
+  testWidgets('a tap brackets its change with one start and one end', (
+    tester,
+  ) async {
+    final events = <String>[];
+    await tester.pumpWidget(
+      _harness(
+        child: GlassSlider(
+          value: 0,
+          onChanged: (next) => events.add('change $next'),
+          onChangeStart: (v) => events.add('start $v'),
+          onChangeEnd: (v) => events.add('end $v'),
+        ),
+      ),
+    );
+
+    final anchor = _anchor(tester, find.byType(GlassSlider));
+    await tester.tapAt(anchor + Offset(_xFor(1), 0));
+    await tester.pumpAndSettle();
+
+    expect(events, ['start 0.0', 'change 1.0', 'end 1.0']);
+  });
+
   testWidgets('min == max does not divide by zero and holds its value', (
     tester,
   ) async {
@@ -532,6 +554,91 @@ void main() {
       expect(reported, [closeTo(0.35, 0.001)]);
       expectAtQuarter(tester);
       handle.dispose();
+    });
+  });
+
+  group('inside a vertical scroll view', () {
+    // A settings list: the slider shares the arena with the list's own
+    // vertical drag. Touch, not mouse — the pointer a phone list sees.
+    Widget inList(ValueChanged<double> onChanged, ScrollController scroll) =>
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: GlassLayer(
+            tier: GeometryTier.none,
+            material: _inert,
+            child: ListView(
+              controller: scroll,
+              children: [
+                const SizedBox(height: 200),
+                Center(
+                  child: SizedBox(
+                    width: _width,
+                    child: GlassSlider(value: 0, onChanged: onChanged),
+                  ),
+                ),
+                const SizedBox(height: 2000),
+              ],
+            ),
+          ),
+        );
+
+    testWidgets('a tap sets the value', (tester) async {
+      final scroll = ScrollController();
+      addTearDown(scroll.dispose);
+      final reported = <double>[];
+      await tester.pumpWidget(inList(reported.add, scroll));
+
+      final anchor = _anchor(tester, find.byType(GlassSlider));
+      await tester.tapAt(anchor + Offset(_xFor(0.75), 0));
+      await tester.pumpAndSettle();
+
+      expect(reported, [closeTo(0.75, 0.001)]);
+      expect(scroll.offset, 0);
+    });
+
+    testWidgets('a horizontal drag sets the value and does not scroll', (
+      tester,
+    ) async {
+      final scroll = ScrollController();
+      addTearDown(scroll.dispose);
+      final reported = <double>[];
+      await tester.pumpWidget(inList(reported.add, scroll));
+
+      final anchor = _anchor(tester, find.byType(GlassSlider));
+      final gesture = await tester.startGesture(
+        anchor + Offset(_xFor(0.1), 0),
+      );
+      for (var i = 1; i <= 10; i++) {
+        await gesture.moveTo(
+          anchor + Offset(_xFor(0.1 + 0.05 * i), 0),
+        );
+        await tester.pump();
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(reported, isNotEmpty);
+      expect(reported.last, closeTo(0.6, 0.001));
+      expect(scroll.offset, 0);
+    });
+
+    testWidgets('a vertical drag scrolls and leaves the value alone', (
+      tester,
+    ) async {
+      final scroll = ScrollController();
+      addTearDown(scroll.dispose);
+      final reported = <double>[];
+      await tester.pumpWidget(inList(reported.add, scroll));
+
+      final anchor = _anchor(tester, find.byType(GlassSlider));
+      await tester.dragFrom(
+        anchor + Offset(_xFor(0.5), 0),
+        const Offset(0, -150),
+      );
+      await tester.pumpAndSettle();
+
+      expect(reported, isEmpty);
+      expect(scroll.offset, greaterThan(0));
     });
   });
 

@@ -27,7 +27,8 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 ///
 /// Dragging anywhere in the 44-point-tall hit area — not only on the thumb
 /// itself — sets the value under the finger; a plain tap jumps straight to
-/// that position. [divisions], when given, snaps both to evenly spaced
+/// that position, inside a scroll view too, where a vertical drag still
+/// scrolls. [divisions], when given, snaps both to evenly spaced
 /// steps. The thumb stretches along the track while it is dragged fast,
 /// through [GlassJiggle], the same deformation `InteractiveGlass` reads off
 /// its own live velocity — this widget has no render-tree velocity to read,
@@ -97,10 +98,12 @@ class GlassSlider extends StatefulWidget {
   /// continuous value.
   final int? divisions;
 
-  /// Called once, with the value at that moment, when a drag begins.
+  /// Called once, with the value at that moment, when a drag begins or a
+  /// tap lands.
   final ValueChanged<double>? onChangeStart;
 
-  /// Called once, with the final value, when a drag ends or is cancelled.
+  /// Called once, with the final value, when a drag ends or is cancelled,
+  /// or after a tap has set the value.
   final ValueChanged<double>? onChangeEnd;
 
   /// What is behind this slider, for the same adaptation `GlassSurface`
@@ -321,9 +324,28 @@ class _GlassSliderState extends State<GlassSlider>
   }
 
   void _onDragCancel() {
+    // Also called when a drag that never started loses the arena — to a
+    // tap, or to a scroll view's vertical drag. Nothing to end then.
+    if (!_dragging) {
+      return;
+    }
     _dragging = false;
     widget.onChangeEnd?.call(_currentValue);
     _animateStretchTo(1);
+    _followValueAfterFrame();
+  }
+
+  /// A tap sets the value under it, bracketed by the same start and end
+  /// callbacks a drag gets.
+  ///
+  /// Its own recognizer, not a drag that never moved: a drag recognizer
+  /// only wins a stationary pointer when it is alone in the arena, and
+  /// inside a scroll view it never is — the list's vertical drag is there
+  /// too, and neither claims a pointer that does not move.
+  void _onTapUp(TapUpDetails details) {
+    widget.onChangeStart?.call(_currentValue);
+    _updateFromLocalX(details.localPosition.dx);
+    widget.onChangeEnd?.call(_currentValue);
     _followValueAfterFrame();
   }
 
@@ -430,6 +452,7 @@ class _GlassSliderState extends State<GlassSlider>
             // and a tap-to-set slider especially needs first contact to
             // register, not only movement past a threshold.
             dragStartBehavior: DragStartBehavior.down,
+            onTapUp: enabled ? _onTapUp : null,
             onHorizontalDragStart: enabled ? _onDragStart : null,
             onHorizontalDragUpdate: enabled ? _onDragUpdate : null,
             onHorizontalDragEnd: enabled ? _onDragEnd : null,
