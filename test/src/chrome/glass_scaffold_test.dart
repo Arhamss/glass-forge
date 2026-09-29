@@ -8,34 +8,97 @@ const ValueKey<String> _backgroundKey = ValueKey('background');
 
 void main() {
   testWidgets(
-    'exactly one GlassLayer; background outside it, bars inside it',
+    'two GlassLayers: the body in one, the bars alone in the other, the '
+    'background in neither',
     (tester) async {
+      const bodyKey = ValueKey<String>('body');
       await tester.pumpWidget(
         const MaterialApp(
           home: GlassScaffold(
             background: SizedBox.expand(key: _backgroundKey),
             topBar: SizedBox(key: _topBarKey, height: 44),
             bottomBar: SizedBox(key: _bottomBarKey, height: 44),
-            body: SizedBox.expand(),
+            body: SizedBox.expand(key: bodyKey),
           ),
         ),
       );
 
-      expect(find.byType(GlassLayer), findsOneWidget);
+      final layers = find.byType(GlassLayer);
+      expect(layers, findsNWidgets(2));
 
-      final layer = find.byType(GlassLayer);
+      final bodyLayer = find.ancestor(
+        of: find.byKey(bodyKey),
+        matching: layers,
+      );
+      final barLayer = find.ancestor(
+        of: find.byKey(_topBarKey),
+        matching: layers,
+      );
+      expect(bodyLayer, findsOneWidget);
+      expect(barLayer, findsOneWidget);
       expect(
-        find.descendant(of: layer, matching: find.byKey(_backgroundKey)),
+        tester.widget(bodyLayer),
+        isNot(same(tester.widget(barLayer))),
+      );
+      expect(
+        find.descendant(of: barLayer, matching: find.byKey(_bottomBarKey)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: barLayer, matching: find.byKey(bodyKey)),
         findsNothing,
-        reason: 'what glass refracts must be painted behind the layer',
+        reason: 'what the bars refract must be painted behind their layer',
       );
       expect(
-        find.descendant(of: layer, matching: find.byKey(_topBarKey)),
-        findsOneWidget,
+        find.descendant(of: layers, matching: find.byKey(_backgroundKey)),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'glass controls in the body share the body layer: no implicit layers',
+    (tester) async {
+      final printed = <String>[];
+      final previous = debugPrint;
+      // Restored in a `finally`: flutter_test checks `debugPrint` was put
+      // back before any tear-down runs.
+      debugPrint = (message, {wrapWidth}) {
+        if (message != null) {
+          printed.add(message);
+        }
+      };
+      try {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: GlassScaffold(
+              topBar: const GlassAppBar(title: Text('Settings')),
+              body: ListView(
+                children: [
+                  for (var i = 0; i < 3; i++)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: GlassSwitch(value: i.isEven, onChanged: (_) {}),
+                    ),
+                  GlassButton(onPressed: () {}, child: const Text('Save')),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+      } finally {
+        debugPrint = previous;
+      }
+
+      expect(find.byType(GlassLayer), findsNWidgets(2));
+      expect(
+        printed.where((line) => line.contains('implicit')),
+        isEmpty,
       );
       expect(
-        find.descendant(of: layer, matching: find.byKey(_bottomBarKey)),
-        findsOneWidget,
+        printed.where((line) => line.contains('overlap')),
+        isEmpty,
       );
     },
   );

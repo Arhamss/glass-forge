@@ -257,10 +257,13 @@ flipping. The gate is thinness, not area.
 
 ## Chrome
 
-`GlassScaffold` makes the one-`GlassLayer` composition rule the default
-instead of something to get right by hand: your background and body paint
-behind the layer, your bars are the only glass inside it, and the body gets
-padding back so a `ListView` clears the bars on its own.
+`GlassScaffold` makes the composition rules the default instead of
+something to get right by hand: your background and body paint behind the
+bars' layer, the bars are the only glass inside it, and the body gets
+padding back so a `ListView` clears the bars on its own. Glass in the body
+(a switch in a settings list) shares one layer of the body's own, which
+only draws glass between the bars: a control scrolled under a bar is cut
+off at the bar's edge, never stacked under the bar's glass.
 
 ```dart
 GlassScaffold(

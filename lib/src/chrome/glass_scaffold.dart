@@ -7,11 +7,20 @@ import 'package:glass_forge/src/widgets/glass_presence.dart';
 
 /// The composition rules every glass screen obeys, made the default.
 ///
-/// What glass refracts is painted **behind** the one [GlassLayer] a screen
-/// owns, never inside it: [background] and [body] sit under the layer,
-/// [topBar] and [bottomBar] are the only glass inside it. Getting that
+/// What glass refracts is painted **behind** the layer that draws it, never
+/// inside it. The scaffold owns two layers: one for [body], and one above
+/// it that carries only [topBar] and [bottomBar]. [background] and [body]
+/// paint under the bars' layer, so the bars refract them. Getting that
 /// arrangement right by hand is easy to get backwards once a screen has
 /// more than one bar; this widget makes it the only arrangement there is.
+///
+/// Glass inside [body] (a `GlassSwitch` in a settings list, a
+/// `GlassButton`) all shares the body's one layer rather than each control
+/// building an implicit layer of its own. That layer only draws glass in
+/// the band between the bars: a body control scrolled under a bar is cut
+/// off at the bar's edge rather than rendered as a second backdrop filter
+/// beneath the bar's (flutter#187820). The body's plain content is not
+/// clipped, and keeps scrolling under the bars for them to refract.
 ///
 /// Both bars carry their own safe-area inset, and [body] is handed that
 /// same space back through `MediaQuery.padding` — the way Material's
@@ -51,10 +60,13 @@ class GlassScaffold extends StatelessWidget {
 
   /// The screen's content.
   ///
-  /// Spans the full screen behind the layer, so it keeps painting — and
-  /// scrolling — under [topBar] and [bottomBar] for them to refract. Use
-  /// [MediaQuery.paddingOf] (most scrollables already do, automatically) to
-  /// keep the content itself clear of the bars.
+  /// Spans the full screen behind the bars' layer, so it keeps painting —
+  /// and scrolling — under [topBar] and [bottomBar] for them to refract.
+  /// Use [MediaQuery.paddingOf] (most scrollables already do,
+  /// automatically) to keep the content itself clear of the bars.
+  ///
+  /// Glass in here renders in the body's own layer, and only between the
+  /// bars; see the class doc.
   final Widget body;
 
   /// What sits behind [body], in the same full-screen stacking position.
@@ -64,13 +76,13 @@ class GlassScaffold extends StatelessWidget {
   /// backdrop.
   final Widget? background;
 
-  /// Glass pinned to the top edge, inside this widget's one [GlassLayer].
+  /// Glass pinned to the top edge, in the bars' [GlassLayer].
   final Widget? topBar;
 
   /// Glass pinned to the bottom edge, inside the same layer.
   final Widget? bottomBar;
 
-  /// The layer's material. Null takes [GlassLayer]'s own default.
+  /// Both layers' material. Null takes [GlassLayer]'s own default.
   final GlassMaterial? material;
 
   @override
@@ -187,62 +199,82 @@ class _GlassScaffoldBodyState extends State<_GlassScaffoldBody> {
       child: widget.body,
     );
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        if (widget.background != null) widget.background!,
-        body,
-        // The screen's one `GlassLayer`. Its own `Stack` below only ever
-        // carries the bars — glass, and the only glass this widget builds.
-        GlassLayer(
-          material: widget.material ?? const GlassMaterial(),
-          child: Stack(
-            children: [
-              if (topBar != null)
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: GlassPresence(
-                    presence: _presence,
-                    child: _MeasureSize(
-                      onChange: _handleTopBarSize,
-                      child: SafeArea(
-                        bottom: false,
-                        left: false,
-                        right: false,
-                        child: topBar,
-                      ),
-                    ),
-                  ),
-                ),
-              if (bottomBar != null)
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: GlassPresence(
-                    presence: _presence,
-                    child: _MeasureSize(
-                      onChange: _handleBottomBarSize,
-                      // Rides the keyboard: as `viewInsets.bottom` grows
-                      // this bar lifts by the same amount, clear of it,
-                      // rather than being covered the way a bar fixed to
-                      // the screen's edge would be.
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          bottom: media.viewInsets.bottom,
-                        ),
+    final material = widget.material ?? const GlassMaterial();
+    return LayoutBuilder(
+      builder: (context, constraints) => Stack(
+        fit: StackFit.expand,
+        children: [
+          if (widget.background != null) widget.background!,
+          // The body's own layer, for any glass inside it — a switch in a
+          // settings list — so that glass shares one layer instead of each
+          // control building an implicit one. Its passes are clipped to
+          // the band between the bars: body glass scrolled under a bar is
+          // cut away there, never a second backdrop filter under the
+          // bar's. The body's content itself is not clipped and keeps
+          // painting under the bars for them to refract.
+          GlassLayerClip(
+            rect: Rect.fromLTRB(
+              Rect.largest.left,
+              topBar == null ? Rect.largest.top : _topBarHeight,
+              Rect.largest.right,
+              bottomBar == null
+                  ? Rect.largest.bottom
+                  : constraints.maxHeight - _bottomBarHeight,
+            ),
+            child: GlassLayer(material: material, child: body),
+          ),
+          // The bars' layer. Its own `Stack` below only ever carries the
+          // bars.
+          GlassLayer(
+            material: material,
+            child: Stack(
+              children: [
+                if (topBar != null)
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: GlassPresence(
+                      presence: _presence,
+                      child: _MeasureSize(
+                        onChange: _handleTopBarSize,
                         child: SafeArea(
-                          top: false,
+                          bottom: false,
                           left: false,
                           right: false,
-                          child: bottomBar,
+                          child: topBar,
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
+                if (bottomBar != null)
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: GlassPresence(
+                      presence: _presence,
+                      child: _MeasureSize(
+                        onChange: _handleBottomBarSize,
+                        // Rides the keyboard: as `viewInsets.bottom` grows
+                        // this bar lifts by the same amount, clear of it,
+                        // rather than being covered the way a bar fixed to
+                        // the screen's edge would be.
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            bottom: media.viewInsets.bottom,
+                          ),
+                          child: SafeArea(
+                            top: false,
+                            left: false,
+                            right: false,
+                            child: bottomBar,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -310,6 +310,39 @@ class RenderGlassLayer extends RenderProxyBox {
     }
   }
 
+  /// The only part of this layer, in its own local logical space, where its
+  /// glass may draw, or null for the whole layer.
+  ///
+  /// Restricts the backdrop passes and nothing else: the subtree still
+  /// paints everywhere it would. `GlassScaffold` gives its body's layer the
+  /// band between its bars, so body glass scrolled under a bar is clipped
+  /// away rather than rendered as a second backdrop filter under the bar's
+  /// (flutter#187820), while the body's content keeps painting under the
+  /// bars for them to refract.
+  ///
+  /// Setting one moves a single pass off its unclipped arrangement onto
+  /// the one several passes use (see [_pushBackdropPasses]): each pass
+  /// pushed empty inside its own clip, the subtree painted over them all.
+  /// That is what lets a pass be clipped without clipping the subtree.
+  Rect? get glassClip => _glassClip;
+  Rect? _glassClip;
+  set glassClip(Rect? value) {
+    if (_glassClip == value) {
+      return;
+    }
+    _glassClip = value;
+    markNeedsPaint();
+  }
+
+  /// Where each backdrop pass was last clipped, in this layer's local
+  /// logical space, in push order. Test-only.
+  ///
+  /// A pass on the unclipped single-pass arrangement reports the layer's
+  /// own clip, which is where it draws.
+  @visibleForTesting
+  List<Rect> get debugPassClips => List.unmodifiable(_debugPassClips);
+  final List<Rect> _debugPassClips = <Rect>[];
+
   /// Physical pixels per logical pixel.
   double get devicePixelRatio => _devicePixelRatio;
   set devicePixelRatio(double value) {
@@ -785,6 +818,7 @@ class RenderGlassLayer extends RenderProxyBox {
       }
     }
     if (passes.isEmpty) {
+      _debugPassClips.clear();
       // No shapes, nothing any of their materials would draw, or every
       // capable pass is currently at presence 0. Upstream pushes a full
       // backdrop even when its blur is zero.
@@ -1089,7 +1123,9 @@ class RenderGlassLayer extends RenderProxyBox {
   ) {
     final pushed = <BackdropFilterLayer>[];
     final clips = <ClipRectLayer>[];
-    final stacks = passes.length > 1;
+    // A [glassClip] needs each pass in a clip of its own, and the subtree
+    // outside them, which is the several-pass arrangement even for one.
+    final stacks = passes.length > 1 || _glassClip != null;
     // The layer's own clip, which is what wraps all of this anyway. Used as
     // each pass's provisional clip because the real one cannot be known yet
     // -- see the narrowing below -- and because it is the behaviour this had
@@ -1145,8 +1181,19 @@ class RenderGlassLayer extends RenderProxyBox {
     // legal for the same reason assigning `filter` is: a layer tree is not
     // handed to the compositor until the end of the frame, and the setter
     // calls `markNeedsAddToScene` itself.
+    _debugPassClips.clear();
+    final glassClip = _glassClip;
     for (var i = 0; i < clips.length; i++) {
-      clips[i].clipRect = _passClip(passes[i]).shift(offset);
+      var clip = _passClip(passes[i]);
+      if (glassClip != null) {
+        final within = clip.intersect(glassClip);
+        clip = within.width > 0 && within.height > 0 ? within : Rect.zero;
+      }
+      _debugPassClips.add(clip);
+      clips[i].clipRect = clip.shift(offset);
+    }
+    if (clips.isEmpty) {
+      _debugPassClips.add(layerClip);
     }
 
     // Checked here, not earlier in `paint`, for the same reason the filters

@@ -99,7 +99,14 @@ class _GlassLayerState extends State<GlassLayer> {
           material: effective,
           tier: geometry,
           glow: _glow,
-          child: _RepaintOnScroll(child: widget.child),
+          glassClip: GlassLayerClip.maybeOf(context),
+          // Reset for this layer's subtree: the clip belongs to the one
+          // layer built directly under it, in that layer's own coordinates,
+          // and means nothing to a layer nested further down.
+          child: GlassLayerClip(
+            rect: null,
+            child: _RepaintOnScroll(child: widget.child),
+          ),
         ),
       ),
     );
@@ -213,25 +220,52 @@ class _RepaintOnScroll extends StatelessWidget {
   }
 }
 
+/// Limits where the next [GlassLayer] below it may draw glass. Internal to
+/// this package, and hidden from its public exports.
+///
+/// [rect] is in that layer's own local logical space and becomes its
+/// render object's `RenderGlassLayer.glassClip`: the layer's backdrop
+/// passes are clipped to it, and its subtree still paints everywhere.
+/// `GlassScaffold` uses it to keep body glass out from under its bars.
+class GlassLayerClip extends InheritedWidget {
+  /// Limits the next [GlassLayer] below to [rect], or lifts any limit when
+  /// [rect] is null.
+  const GlassLayerClip({required this.rect, required super.child, super.key});
+
+  /// Where the layer's glass may draw; null for anywhere.
+  final Rect? rect;
+
+  /// The [rect] in effect at [context], or null.
+  static Rect? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<GlassLayerClip>()?.rect;
+
+  @override
+  bool updateShouldNotify(GlassLayerClip oldWidget) => rect != oldWidget.rect;
+}
+
 class _RawGlassLayer extends SingleChildRenderObjectWidget {
   const _RawGlassLayer({
     required this.material,
     required this.tier,
     required this.glow,
+    required this.glassClip,
     required Widget super.child,
   });
 
   final GlassMaterial material;
   final GeometryTier tier;
   final ValueNotifier<GlassGlow> glow;
+  final Rect? glassClip;
 
   @override
   RenderGlassLayer createRenderObject(BuildContext context) {
     return RenderGlassLayer(
-      material: material,
-      tier: tier,
-      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-    )..glowListenable = glow;
+        material: material,
+        tier: tier,
+        devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+      )
+      ..glowListenable = glow
+      ..glassClip = glassClip;
   }
 
   @override
@@ -251,6 +285,7 @@ class _RawGlassLayer extends SingleChildRenderObjectWidget {
       // assignment — the render object was already listening to it
       // directly, which is how the glow reaches paint without going
       // through build at all.
-      ..glowListenable = glow;
+      ..glowListenable = glow
+      ..glassClip = glassClip;
   }
 }
