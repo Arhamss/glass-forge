@@ -46,7 +46,10 @@
   between schemes. `GlassSurface`, `GlassAppBar`, `GlassTabBar`,
   `GlassDetentSheet` and every control use it when no `backdrop` is given.
   An explicit `backdrop` still wins. Nothing is sampled where the tier
-  renders no glass, under Reduce Transparency, or on glass.
+  renders no glass, under Reduce Transparency, or on glass. A repaint
+  behind a repaint boundary inside the source goes unseen until
+  `markNeedsSample`, and a surface that moves while nothing repaints or
+  scrolls keeps its last reading.
 
 ### Changed
 
@@ -203,9 +206,9 @@ stop there. The text field grows instead.
   and `minimumSelectionEdgeRefraction` (14), so a clear preset never hides
   the selection. A bouncy spring moves the lens and it squashes along its
   travel with its speed, to at most 116% of its height, so it stays inside
-  the bar and a `GlassScaffold`'s clip of it. A drag carries it under the finger, clicks once per tab crossed,
-  and commits the tab under the finger on release; a cancelled drag sends
-  it back. Reduce Motion moves it at once, still glass.
+  the bar and a `GlassScaffold`'s clip of it. A drag carries it under the
+  finger, clicks once per tab crossed, and commits the tab under the finger
+  on release; a cancelled drag sends it back. Reduce Motion moves it at once, still glass.
   `selectionMaterial` replaces `GlassTabBar.defaultSelectionMaterial`.
   `GlassTabBar.height` and `GlassTabBar.margin` are
   public for laying out around it. `GlassTab.semanticLabel` names icon-only

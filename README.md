@@ -342,8 +342,8 @@ its tint instead of drawing a second glass.
 
 `GlassScaffold` makes the composition rules the default instead of
 something to get right by hand: your background and body paint behind the
-bars' layer, the bars are the only glass inside it, and the body gets
-padding back so a `ListView` clears the bars on its own. Glass in the body
+bars, each bar is glass in a layer of its own clipped to the bar, and the
+body gets padding back so a `ListView` clears the bars on its own. Glass in the body
 (a switch in a settings list) shares one layer of the body's own, which
 only draws glass between the bars: a control scrolled under a bar is cut
 off at the bar's edge, never stacked under the bar's glass.
@@ -417,7 +417,8 @@ bar, and under Reduce Motion it moves at once, still glass. Pass
 `backgroundColor` to fill the bar yourself; the labels keep the role's
 colour, so check them against it.
 `GlassTabBar.height` and `GlassTabBar.margin` are public for laying out
-content around the bar.
+content around the bar. On a wide screen the bar stays a centred capsule,
+no wider than `maxWidth` (`GlassTabBar.defaultMaxWidth`, 480 points).
 
 `showGlassSheet` presents a modal glass sheet from the bottom edge and
 completes with whatever it is popped with.
@@ -474,11 +475,12 @@ harness marks such a run untrustworthy rather than letting it quietly pass.
   Past eight in one cluster the extras are not drawn, and a debug warning
   says so.
 - `GlassSwitch` and `GlassSegmentedControl` dimensions are not yet measured
-  against an iOS capture. The controls pick some of their own colours,
-  such as the switch's green track and white knob.
+  against an iOS capture.
 - `GlassBackdropSampler` sees a source repaint only when it reaches the
   source's own paint. An animation behind a repaint boundary of its own —
   a video, a platform view — needs `GlassBackdropSampler.markNeedsSample`.
+  A surface that moves without anything repainting or scrolling keeps its
+  last reading until something does.
 - Where two materials' shapes overlap, the later pass samples the earlier
   one's glass. Apple's own guidance is not to stack glass on glass; put
   overlapping surfaces in one material or one blend group.
