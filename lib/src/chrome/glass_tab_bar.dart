@@ -164,7 +164,8 @@ const EdgeInsets _margin = EdgeInsets.fromLTRB(16, 0, 16, 8);
 const Duration _rise = Duration(milliseconds: 160);
 const Duration _sink = Duration(milliseconds: 280);
 
-/// How long a finger's press takes to swell the lens, and to let it go.
+/// How long a finger's press takes to swell the painted pill (and, while
+/// the selection is travelling, the lens already up), and to let it go.
 const Duration _holdIn = Duration(milliseconds: 200);
 const Duration _holdOut = Duration(milliseconds: 360);
 
@@ -182,7 +183,8 @@ class _GlassTabBarState extends State<GlassTabBar>
   /// 1 while a finger is down on the bar.
   late final AnimationController _hold;
 
-  /// 1 while the lens is up: the selection is moving or held.
+  /// 1 while the lens is up, which is only while the selection is moving;
+  /// a still finger never raises it. See [_syncFlight].
   late final AnimationController _flight;
 
   /// The bar's presence, from the enclosing [GlassPresence] — a
@@ -472,8 +474,9 @@ class _GlassTabBarState extends State<GlassTabBar>
     );
 
     return Listener(
-      // A raw listener, not a tap handler: it lifts the lens on any press
-      // without joining the arena the tabs and the drag compete in.
+      // A raw listener, not a tap handler: it tracks a press, which swells
+      // the painted pill, without joining the arena the tabs and the drag
+      // compete in. A press alone never raises the lens.
       onPointerDown: (_) => _press(true),
       onPointerUp: (_) {
         if (_hover == null) {
@@ -526,8 +529,11 @@ class _GlassTabBarState extends State<GlassTabBar>
   }
 }
 
-/// The glass lens, positioned over the selection and swollen by its speed
-/// and by a finger's hold.
+/// The glass lens, positioned over the selection and swollen by its speed.
+///
+/// It is only up while the selection travels (see
+/// `_GlassTabBarState._syncFlight`). A finger's hold adds to the swell
+/// while it is up, but never raises it.
 class _LensGlass extends StatelessWidget {
   const _LensGlass({
     required this.lens,
@@ -564,8 +570,9 @@ class _LensGlass extends StatelessWidget {
       child: GlassPresence(presence: presence, child: glass),
       builder: (context, child) {
         final speed = lens.velocity.abs();
-        // Swells up out of the bar whenever it is pressed or moving, so
-        // every touch visibly picks it up.
+        // Swells out of the bar with its speed, and with a finger's hold
+        // while it is already up. A still press never raises it; the
+        // painted pill swells for that instead.
         final swell =
             1 +
             _maxSwell *
