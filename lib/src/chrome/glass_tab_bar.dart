@@ -195,6 +195,43 @@ const Duration _holdOut = Duration(milliseconds: 360);
 /// 66, a little past the 62-point bar.
 const double _maxSwell = 0.32;
 
+/// How far past the first or last tab a dragging finger may pull the
+/// selection, in tabs: a little give at either end, not a hard stop.
+const double _fingerOvershoot = 0.2;
+
+/// The painted pill's alpha over the bar's label colour.
+const double _pillAlpha = 0.14;
+
+/// The speed, in tabs per second, at which the lens has swollen about
+/// two-thirds of the way ([_maxSwell] × (1 − 1/e)).
+const double _swellSpeed = 2.5;
+
+/// The speed, in tabs per second, at which the lens's jelly squash is at
+/// its most, and how far that squashes it: up to 24% narrower and 24%
+/// taller.
+const double _jellySpeed = 10;
+const double _maxJelly = 0.24;
+
+/// An unselected tab's alpha over the bar's label colour.
+const double _unlitAlpha = 0.62;
+
+/// A tab's icon size, the gap under it, and its label's size and weights:
+/// iOS's own tab-bar metrics.
+const double _iconSize = 24;
+const double _iconLabelGap = 2;
+const double _labelSize = 11;
+const FontWeight _litWeight = FontWeight.w600;
+const FontWeight _unlitWeight = FontWeight.w500;
+
+/// The longest step the lens's spring takes, in seconds: a quarter of a
+/// 60 Hz frame, short enough to stay stable at its stiffness.
+const double _substep = 1 / 240;
+
+/// Within these of its target, in tabs and tabs per second, the lens's
+/// spring counts as landed.
+const double _restDistance = 1e-3;
+const double _restVelocity = 1e-2;
+
 /// How far a release carries the selection per tab-per-second of throw.
 const double _throw = 0.08;
 
@@ -394,7 +431,10 @@ class _GlassTabBarState extends State<GlassTabBar>
     // The finger in tabs, allowed a little past either end, measured from
     // the edge tab 0 sits on.
     final fromStart = _rtl ? _width - dx : dx;
-    _finger = ((fromStart - _inset) / _slot - 0.5).clamp(-0.2, _last + 0.2);
+    _finger = ((fromStart - _inset) / _slot - 0.5).clamp(
+      -_fingerOvershoot,
+      _last + _fingerOvershoot,
+    );
     _aim(_finger);
     final hover = _finger.round().clamp(0, _last);
     if (hover != _hover) {
@@ -529,7 +569,7 @@ class _GlassTabBarState extends State<GlassTabBar>
           child: ClipPath(
             clipper: GlassShapeClipper(lensStyle.shape),
             child: ColoredBox(
-              color: bar.labelColor.withValues(alpha: 0.14),
+              color: bar.labelColor.withValues(alpha: _pillAlpha),
             ),
           ),
         ),
@@ -669,11 +709,11 @@ class _LensGlass extends StatelessWidget {
             _maxSwell *
                 math.max(
                   Curves.easeOut.transform(hold.value),
-                  1 - math.exp(-speed / 2.5),
+                  1 - math.exp(-speed / _swellSpeed),
                 );
         // Squashed along its travel and bulging across it, by speed in
         // tabs per second, saturating at 10.
-        final jelly = (speed / 10).clamp(0.0, 1.0) * 0.24;
+        final jelly = (speed / _jellySpeed).clamp(0.0, 1.0) * _maxJelly;
         return PositionedDirectional(
           start: _inset + lens.position * slot,
           top: _inset,
@@ -716,7 +756,7 @@ class _TabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tint = lit ? color : color.withValues(alpha: 0.62);
+    final tint = lit ? color : color.withValues(alpha: _unlitAlpha);
     return GlassControlFrame(
       onActivate: onActivate,
       selected: selected,
@@ -725,10 +765,10 @@ class _TabButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconTheme.merge(
-            data: IconThemeData(color: tint, size: 24),
+            data: IconThemeData(color: tint, size: _iconSize),
             child: lit ? tab.activeIcon ?? tab.icon : tab.icon,
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: _iconLabelGap),
           // Scaled with the reader's text size only up to [_maxLabelScale]:
           // the bar is a fixed height, and past that the label no longer
           // fits under the icon. A long label is cut short with an
@@ -741,8 +781,8 @@ class _TabButton extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: tint,
-                fontSize: 11,
-                fontWeight: lit ? FontWeight.w600 : FontWeight.w500,
+                fontSize: _labelSize,
+                fontWeight: lit ? _litWeight : _unlitWeight,
               ),
             ),
           ),
@@ -829,14 +869,15 @@ class _Lens extends ChangeNotifier {
     _last = elapsed;
     // A long frame is stepped in small pieces, or the spring explodes.
     while (dt > 0) {
-      final h = math.min(dt, 1 / 240);
+      final h = math.min(dt, _substep);
       final force =
           -_spring.stiffness * (position - target) - _spring.damping * velocity;
       velocity += force / _spring.mass * h;
       position += velocity * h;
       dt -= h;
     }
-    if ((position - target).abs() < 1e-3 && velocity.abs() < 1e-2) {
+    if ((position - target).abs() < _restDistance &&
+        velocity.abs() < _restVelocity) {
       position = target;
       velocity = 0;
       _ticker.stop();

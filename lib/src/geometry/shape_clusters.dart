@@ -79,7 +79,13 @@ class ShapeCluster {
 /// surfaces the caller never blended. Drawn apart, each dome steers by its
 /// own proxy, as a separate surface should. Blended shapes are unaffected:
 /// a blend group is always one cluster.
-double clusterPadding(MatteRequest request) => request.antialiasWidth + 3;
+double clusterPadding(MatteRequest request) =>
+    request.antialiasWidth + _clusterPaddingPixels;
+
+/// The three whole pixels [clusterPadding] adds past the coverage ramp:
+/// the filtered read, the normal's central difference, and the margin
+/// between two sides of a gap, one each, as its doc lists them.
+const double _clusterPaddingPixels = 3;
 
 /// The most [clusterShapes] widens one shape's padding for anisotropy.
 ///

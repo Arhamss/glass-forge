@@ -234,6 +234,14 @@ class _PaintedPressScale extends StatefulWidget {
 }
 
 class _PaintedPressScaleState extends State<_PaintedPressScale> {
+  /// What a pressed painted button scales to: the same small settle
+  /// toward the surface `InteractiveGlass.pressScale` gives the glass one.
+  static const double _pressedScale = 0.96;
+
+  /// How long the painted press takes. Quicker than a spring, because a
+  /// flat tint has no refraction to carry the motion.
+  static const Duration _pressDuration = Duration(milliseconds: 120);
+
   bool _pressed = false;
 
   void _setPressed({required bool value}) {
@@ -250,10 +258,8 @@ class _PaintedPressScaleState extends State<_PaintedPressScale> {
       onPointerUp: (_) => _setPressed(value: false),
       onPointerCancel: (_) => _setPressed(value: false),
       child: AnimatedScale(
-        scale: _pressed ? 0.96 : 1,
-        duration: reduceMotion
-            ? Duration.zero
-            : const Duration(milliseconds: 120),
+        scale: _pressed ? _pressedScale : 1,
+        duration: reduceMotion ? Duration.zero : _pressDuration,
         curve: Curves.easeOut,
         child: widget.child,
       ),

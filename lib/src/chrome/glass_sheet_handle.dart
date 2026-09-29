@@ -12,19 +12,28 @@ class GlassSheetHandle extends StatelessWidget {
   /// The surface's label colour; drawn at low alpha.
   final Color color;
 
+  /// The grabber's size, iOS's own: 36 × 5 points, fully rounded.
+  static const Size _size = Size(36, 5);
+
+  /// The grabber's alpha over the label colour. Apple's own indicator is a
+  /// low-contrast fill, not the label colour at full strength: it is an
+  /// affordance, not content.
+  static const double _alpha = 0.3;
+
+  /// Clear space above and below the grabber.
+  static const double _verticalPadding = 8;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: _verticalPadding),
       child: Center(
         child: Container(
-          width: 36,
-          height: 5,
+          width: _size.width,
+          height: _size.height,
           decoration: BoxDecoration(
-            // Apple's own indicator is a low-contrast fill, not the label
-            // colour at full strength: it is an affordance, not content.
-            color: color.withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(2.5),
+            color: color.withValues(alpha: _alpha),
+            borderRadius: BorderRadius.circular(_size.height / 2),
           ),
         ),
       ),
