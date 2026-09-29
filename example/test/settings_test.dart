@@ -39,13 +39,13 @@ void main() {
     expect(find.byType(GlassSlider), findsOneWidget);
     expect(find.byType(GlassSegmentedControl<int>), findsOneWidget);
     expect(find.byType(GlassTextField), findsNWidgets(2));
-    // The body's layer and the bars' layer, and no implicit ones.
+    // The body's layer and one for each bar, and no implicit ones.
     expect(
       find.descendant(
         of: find.byType(GlassScaffold),
         matching: find.byType(GlassLayer),
       ),
-      findsNWidgets(2),
+      findsNWidgets(3),
     );
 
     await tester.tap(_button('Back'));
