@@ -6,16 +6,18 @@ ledgers under `.superpowers/sdd/` (gitignored).
 
 ## Branch state
 
-All of this work is on **`feat/open-items`**, in the worktree
-`glass_forge-open-items`, branched from `main` at `2a62763`. It is **not
-merged**. It waits on Arham's go. `main` has nothing newer than `2a62763`.
+**Merged and pushed on 2026-09-29.** `feat/open-items` was fast-forwarded
+into `main` (`2a62763..5ad189c`) and pushed; CI (`shaders`) is green on it.
+The full suite passed on the merged result: 905 package tests, 111 on the
+Impeller lane, 16 in the example, analyze clean.
 
-The ledger for the branch, with every decision made along the way
-(Arham's included), is
-`.superpowers/sdd/2026-09-28-open-items/progress.md`. The review and audit
-reports and each fix batch's report are beside it.
+The branch's ledger, with every decision made along the way (Arham's
+included), is `.superpowers/sdd/2026-09-28-open-items/progress.md` in the
+worktree `../glass_forge-open-items`, beside the review, audit and fix-batch
+reports. Those files are gitignored; the worktree is kept until they are no
+longer wanted.
 
-## What shipped on the branch
+## What shipped
 
 The nine widgets from the widget spec are in: `GlassButton`, `GlassSwitch`,
 `GlassSlider`, `GlassSegmentedControl`, `GlassTextField`, `GlassScaffold`,
