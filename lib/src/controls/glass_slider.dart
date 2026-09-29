@@ -48,6 +48,11 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 /// with it by the next frame, gets the thumb back where [value] says, and
 /// semantics report [value] throughout.
 ///
+/// [onChanged] runs only when the value changes: a drag within one
+/// division, or a keyboard step at a bound, reports nothing. With [min]
+/// equal to [max] the slider is fixed at [min]: the thumb sits at the start
+/// of the track, nothing is ever reported, and no step is offered.
+///
 /// `onChanged: null` disables it: no tap, no drag, no keyboard step, and the
 /// callback never runs. Focus and the increase/decrease semantics actions
 /// come from [GlassControlFrame] — the left/right (or down/up) arrow keys
@@ -81,8 +86,9 @@ class GlassSlider extends StatefulWidget {
   /// bug this widget does not paper over.
   final double value;
 
-  /// Called with the new value as it changes, during a drag, on a tap, and
-  /// on a keyboard step. Null renders this slider disabled.
+  /// Called with the new value when it changes, during a drag, on a tap,
+  /// and on a keyboard step — never with the value it already has. Null
+  /// renders this slider disabled.
   final ValueChanged<double>? onChanged;
 
   /// The value at the far (leading) end of the track.
@@ -284,15 +290,27 @@ class _GlassSliderState extends State<GlassSlider>
     return value.toStringAsFixed(2);
   }
 
-  void _step(double direction) {
+  /// The value one keyboard or semantics step from the current one, toward
+  /// [GlassSlider.max] for a positive [direction], or null when the value
+  /// is already at that bound and a step would change nothing.
+  double? _steppedValue(double direction) {
     final stepSize = _stepSize;
     if (stepSize == 0) {
-      return;
+      return null;
     }
-    final next = (_currentValue + direction * stepSize).clamp(
+    final current = _currentValue;
+    final next = (current + direction * stepSize).clamp(
       widget.min,
       widget.max,
     );
+    return next == current ? null : next;
+  }
+
+  void _step(double direction) {
+    final next = _steppedValue(direction);
+    if (next == null) {
+      return;
+    }
     _position.value = _fractionOf(next);
     widget.onChanged?.call(next);
     _followValueAfterFrame();
@@ -355,7 +373,6 @@ class _GlassSliderState extends State<GlassSlider>
     // moving the thumb from raw pointer geometry alone, ignoring `_range`
     // entirely, would still move a thumb whose value can never change.
     if (_range <= 0) {
-      widget.onChanged?.call(widget.min);
       return;
     }
     final travel = (_trackWidth - _thumbSize).clamp(0.0, double.infinity);
@@ -366,7 +383,13 @@ class _GlassSliderState extends State<GlassSlider>
     final rawFraction = travel == 0
         ? 0.0
         : (fromStart - _thumbSize / 2).clamp(0.0, travel) / travel;
-    _position.value = _snap(rawFraction);
+    final fraction = _snap(rawFraction);
+    // Reported only when it changes: a drag within one division, or a
+    // finger held still, is not a stream of the same value.
+    if (fraction == _position.value) {
+      return;
+    }
+    _position.value = fraction;
     widget.onChanged?.call(_currentValue);
   }
 
@@ -423,6 +446,10 @@ class _GlassSliderState extends State<GlassSlider>
   Widget build(BuildContext context) {
     final enabled = widget.onChanged != null;
     final currentValue = _currentValue;
+    // Null at a bound, so a screen reader is not offered a step that does
+    // nothing.
+    final up = enabled ? _steppedValue(1) : null;
+    final down = enabled ? _steppedValue(-1) : null;
     _textDirection = Directionality.of(context);
     return GlassControlFrame(
       onActivate: null,
@@ -430,18 +457,10 @@ class _GlassSliderState extends State<GlassSlider>
       button: false,
       slider: true,
       value: _formatValue(currentValue),
-      increasedValue: enabled
-          ? _formatValue(
-              (currentValue + _stepSize).clamp(widget.min, widget.max),
-            )
-          : null,
-      decreasedValue: enabled
-          ? _formatValue(
-              (currentValue - _stepSize).clamp(widget.min, widget.max),
-            )
-          : null,
-      onIncrease: enabled ? _increase : null,
-      onDecrease: enabled ? _decrease : null,
+      increasedValue: up == null ? null : _formatValue(up),
+      decreasedValue: down == null ? null : _formatValue(down),
+      onIncrease: up == null ? null : _increase,
+      onDecrease: down == null ? null : _decrease,
       child: LayoutBuilder(
         builder: (context, constraints) {
           _trackWidth = constraints.maxWidth;

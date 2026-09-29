@@ -557,6 +557,92 @@ void main() {
     });
   });
 
+  group('reports only a change', () {
+    void focusIt() => FocusManager.instance.rootScope.descendants
+        .firstWhere((node) => node.canRequestFocus)
+        .requestFocus();
+
+    testWidgets('a drag within one division reports it once', (
+      tester,
+    ) async {
+      final reported = <double>[];
+      await tester.pumpWidget(
+        _harness(
+          child: GlassSlider(value: 0, divisions: 4, onChanged: reported.add),
+        ),
+      );
+
+      await _dragThrough(tester, find.byType(GlassSlider), [
+        _xFor(0.45),
+        _xFor(0.48),
+        _xFor(0.52),
+        _xFor(0.55),
+      ]);
+
+      expect(reported, [0.5]);
+    });
+
+    testWidgets('min == max never reports', (tester) async {
+      final reported = <double>[];
+      await tester.pumpWidget(
+        _harness(
+          child: GlassSlider(
+            value: 5,
+            min: 5,
+            max: 5,
+            onChanged: reported.add,
+          ),
+        ),
+      );
+
+      await _dragThrough(tester, find.byType(GlassSlider), [
+        _xFor(0),
+        _xFor(0.5),
+        _xFor(1),
+      ]);
+
+      expect(reported, isEmpty);
+    });
+
+    testWidgets('an arrow key at a bound reports nothing', (tester) async {
+      final reported = <double>[];
+      await tester.pumpWidget(
+        _harness(child: GlassSlider(value: 1, onChanged: reported.add)),
+      );
+      focusIt();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+
+      expect(reported, isEmpty);
+    });
+
+    testWidgets('semantics offer no step past a bound', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _harness(
+          child: GlassSlider(
+            value: 1,
+            onChanged: (_) {},
+            semanticLabel: 'Volume',
+          ),
+        ),
+      );
+
+      expect(
+        tester.getSemantics(find.byType(GlassSlider)),
+        isSemantics(
+          label: 'Volume',
+          isSlider: true,
+          hasIncreaseAction: false,
+          hasDecreaseAction: true,
+        ),
+      );
+      handle.dispose();
+    });
+  });
+
   group('inside a vertical scroll view', () {
     // A settings list: the slider shares the arena with the list's own
     // vertical drag. Touch, not mouse — the pointer a phone list sees.
