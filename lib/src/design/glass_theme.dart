@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:glass_forge/src/design/glass_control_colors.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_tokens.dart';
@@ -177,6 +178,14 @@ class GlassTheme extends InheritedWidget {
   /// The spring [role] resolves to at [context].
   static GlassMotion motionOf(BuildContext context, GlassMotionRole role) =>
       of(context).motion.of(role);
+
+  /// The control colours for [brightness] — the scheme a control's surface
+  /// resolved in, so its accent and its tint always agree — from the theme
+  /// at [context].
+  static GlassControlColors controlColorsOf(
+    BuildContext context,
+    Brightness brightness,
+  ) => of(context).tokens.controls.of(brightness);
 
   /// [role], resolved against [size] and the scheme at [context].
   static GlassSurfaceStyle surfaceOf(

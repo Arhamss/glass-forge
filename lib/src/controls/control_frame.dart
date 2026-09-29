@@ -169,12 +169,6 @@ class GlassControlFrame extends StatelessWidget {
   /// The opacity a disabled control draws its label and paint at.
   static const double disabledOpacity = 0.4;
 
-  /// The colour of a control's moving element — a switch knob, a slider
-  /// thumb, a segmented pill — where it is painted rather than glass, on a
-  /// glass surface. White in both schemes, the one part of an iOS control
-  /// that never flips.
-  static const Color paintedElementColor = Color(0xFFFFFFFF);
-
   bool get _enabled =>
       onActivate != null || onIncrease != null || onDecrease != null;
 
@@ -330,11 +324,14 @@ class _FocusRingState extends State<_FocusRing> {
     if (!show) {
       return widget.child;
     }
-    final color = GlassTheme.surfaceOf(
+    final style = GlassTheme.surfaceOf(
       context,
       GlassSurfaceRole.control,
       size: const Size.square(GlassControlFrame.minimumExtent),
-    ).labelColor;
+    );
+    final color =
+        GlassTheme.controlColorsOf(context, style.brightness).focus ??
+        style.labelColor;
     return CustomPaint(
       foregroundPainter: _FocusRingPainter(color),
       child: widget.child,

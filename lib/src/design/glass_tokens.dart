@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
+import 'package:glass_forge/src/design/glass_control_colors.dart';
 import 'package:glass_forge/src/design/glass_tint.dart';
 
 /// A named step on the blur scale.
@@ -421,6 +422,7 @@ class GlassTokens {
     this.radius = const GlassRadiusScale(),
     this.depth = const GlassDepthScale(),
     this.tint = const GlassTints(),
+    this.controls = const GlassControlPalette(),
     this.flipMaxShortSide = 96,
   });
 
@@ -435,6 +437,10 @@ class GlassTokens {
 
   /// The two tint ramps.
   final GlassTints tint;
+
+  /// The controls' own colours — the accent, the painted knob — per
+  /// scheme.
+  final GlassControlPalette controls;
 
   /// The shorter side, in logical pixels, at or below which a surface is
   /// small enough to flip its whole scheme.
@@ -462,6 +468,7 @@ class GlassTokens {
     GlassRadiusScale? radius,
     GlassDepthScale? depth,
     GlassTints? tint,
+    GlassControlPalette? controls,
     double? flipMaxShortSide,
   }) {
     return GlassTokens(
@@ -469,6 +476,7 @@ class GlassTokens {
       radius: radius ?? this.radius,
       depth: depth ?? this.depth,
       tint: tint ?? this.tint,
+      controls: controls ?? this.controls,
       flipMaxShortSide: flipMaxShortSide ?? this.flipMaxShortSide,
     );
   }
@@ -483,9 +491,11 @@ class GlassTokens {
         other.radius == radius &&
         other.depth == depth &&
         other.tint == tint &&
+        other.controls == controls &&
         other.flipMaxShortSide == flipMaxShortSide;
   }
 
   @override
-  int get hashCode => Object.hash(blur, radius, depth, tint, flipMaxShortSide);
+  int get hashCode =>
+      Object.hash(blur, radius, depth, tint, controls, flipMaxShortSide);
 }

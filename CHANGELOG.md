@@ -37,6 +37,13 @@
 
 ### Changed
 
+- The controls' own colours come from the theme: `GlassTokens.controls`,
+  a `GlassControlPalette` of light and dark `GlassControlColors` — `accent`
+  (the switch's on-track), `knob` (the knob, thumb and pill painted on
+  glass), and `fill` and `focus` (the slider's fill and the focus ring,
+  null for the label colour). The defaults are the old green and white, so
+  nothing changes until a theme sets them; `GlassSwitch.activeTrackColor`
+  still wins for one switch.
 - Fixed: the edge band drew a hard ring inset from every shape's edge,
   which read as a bezel. The convex squircle the band is built on is the
   glass's *height*; it was being used directly as the displacement, which
@@ -129,8 +136,8 @@ The controls:
 - `GlassButton` and `GlassButton.icon`, with `toggled` for a button that
   reports an on/off state, `pressStretch`, `glow` and `semanticLabel`.
 - `GlassSwitch`: a painted track and a glass knob that drags, flicks and
-  settles to the side it ends up past. `activeTrackColor` defaults to an
-  approximate system green.
+  settles to the side it ends up past. `activeTrackColor` defaults to the
+  theme's accent, an approximate system green.
 - `GlassSlider`, with `min`, `max`, `divisions`, `onChangeStart`,
   `onChangeEnd` and `semanticValueFormatter`. It can be dragged from
   anywhere in its hit area, a tap sets it (in a scroll view too), and it

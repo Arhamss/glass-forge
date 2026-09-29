@@ -3,9 +3,9 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/disabled_glass.dart';
+import 'package:glass_forge/src/design/glass_legibility.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
-import 'package:glass_forge/src/design/glass_tint.dart';
 import 'package:glass_forge/src/motion/settle_spring.dart';
 import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
@@ -429,7 +429,11 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
       alpha: style.material.tintOpacity,
     );
     final segmentWidth = _segmentWidth;
-    final pill = _pill(style: style, onGlass: onGlass);
+    final pill = _pill(
+      style: style,
+      onGlass: onGlass,
+      knobColor: GlassTheme.controlColorsOf(context, style.brightness).knob,
+    );
 
     final visual = SizedBox(
       width: width,
@@ -540,22 +544,28 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
   /// surface: off a glass host it is a real [Glass] drawn in the control
   /// role's material, so `style.labelColor` is still the right label; on a
   /// glass host — where a second backdrop pass is refused (flutter#187820)
-  /// — the pill in [_pill] paints flat instead, in
-  /// [GlassControlFrame.paintedElementColor], always white, the same
-  /// deliberate choice the switch knob and slider thumb make. That fixed
-  /// white surface is decoupled from whichever material `style.labelColor`
-  /// was tuned against, so a dark scheme's white label would land on it
-  /// invisibly. The selected label on that one surface
-  /// takes the light scheme's own label colour instead — pure black, the ink
-  /// [GlassTintRamp.appleLight] already guarantees reads against a light
-  /// surface, and the painted pill is exactly that.
+  /// — the pill in [_pill] paints flat instead, in the theme's
+  /// `GlassControlColors.knob`, white by default, the same colour the
+  /// switch knob and slider thumb take. That flat surface is decoupled from
+  /// whichever material `style.labelColor` was tuned against, so a dark
+  /// scheme's white label would land on a white pill invisibly. The
+  /// selected label on that one surface takes whichever of the theme's two
+  /// scheme labels contrasts more with the pill instead — on the default
+  /// white pill, the light scheme's pure black.
   Color _labelColorFor({
     required GlassSurfaceStyle style,
     required bool onGlass,
     required bool selected,
   }) {
     if (selected && onGlass) {
-      return GlassTintRamp.appleLight.label;
+      final tokens = GlassTheme.of(context).tokens;
+      final pill = tokens.controls.of(style.brightness).knob;
+      final dark = tokens.tint.dark.label;
+      final light = tokens.tint.light.label;
+      return GlassLegibility.contrastRatio(pill, dark) >
+              GlassLegibility.contrastRatio(pill, light)
+          ? dark
+          : light;
     }
     return style.labelColor;
   }
@@ -574,15 +584,17 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
     _height - 2 * _pillInset,
   );
 
-  Widget _pill({required GlassSurfaceStyle style, required bool onGlass}) {
+  Widget _pill({
+    required GlassSurfaceStyle style,
+    required bool onGlass,
+    required Color knobColor,
+  }) {
     if (onGlass) {
       return ClipPath(
         clipper: GlassShapeClipper(style.shape),
-        child: const DecoratedBox(
-          decoration: BoxDecoration(
-            color: GlassControlFrame.paintedElementColor,
-          ),
-          child: SizedBox.expand(),
+        child: DecoratedBox(
+          decoration: BoxDecoration(color: knobColor),
+          child: const SizedBox.expand(),
         ),
       );
     }

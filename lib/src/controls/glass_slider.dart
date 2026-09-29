@@ -503,8 +503,13 @@ class _GlassSliderState extends State<GlassSlider>
     final trackColor = style.material.tint.withValues(
       alpha: style.material.tintOpacity,
     );
-    final fillColor = style.labelColor;
-    final thumb = _thumb(style: style, onGlass: onGlass);
+    final colors = GlassTheme.controlColorsOf(context, style.brightness);
+    final fillColor = colors.fill ?? style.labelColor;
+    final thumb = _thumb(
+      style: style,
+      onGlass: onGlass,
+      knobColor: colors.knob,
+    );
 
     final visual = SizedBox(
       width: width,
@@ -594,15 +599,17 @@ class _GlassSliderState extends State<GlassSlider>
         : Opacity(opacity: GlassControlFrame.disabledOpacity, child: visual);
   }
 
-  Widget _thumb({required GlassSurfaceStyle style, required bool onGlass}) {
+  Widget _thumb({
+    required GlassSurfaceStyle style,
+    required bool onGlass,
+    required Color knobColor,
+  }) {
     const size = SizedBox(width: _thumbSize, height: _thumbSize);
     if (onGlass) {
       return ClipPath(
         clipper: GlassShapeClipper(style.shape),
-        child: const DecoratedBox(
-          decoration: BoxDecoration(
-            color: GlassControlFrame.paintedElementColor,
-          ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(color: knobColor),
           child: size,
         ),
       );

@@ -283,6 +283,30 @@ Surfaces adapt by size, following Apple: small elements like a control flip
 light/dark against their background, large ones like a sheet adapt without
 flipping. The gate is thinness, not area.
 
+The controls take their own colours from the theme too: the switch's
+on-track (`accent`), the knob, thumb and pill painted on glass (`knob`),
+the slider's fill and the focus ring (`fill`, `focus`, which default to the
+label colour). The defaults are Apple's green and white; one override
+recolours every control beneath it, and `GlassSwitch.activeTrackColor`
+still wins for one switch.
+
+```dart
+GlassTheme(
+  data: const GlassThemeData(
+    tokens: GlassTokens(
+      controls: GlassControlPalette(
+        light: GlassControlColors(accent: Color(0xFF007AFF)),
+        dark: GlassControlColors(accent: Color(0xFF0A84FF)),
+      ),
+    ),
+  ),
+  child: GlassSwitch(
+    value: on,
+    onChanged: (next) => setState(() => on = next),
+  ),
+)
+```
+
 Every `GlassSurface` constructor, `GlassAppBar`, `GlassDetentSheet` and
 `showGlassSheet` take a `material` for an app with a
 look of its own; null keeps the role's. A surface placed on glass paints

@@ -203,6 +203,33 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the control-accent example builds', (tester) async {
+    var on = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlassLayer(
+          child: StatefulBuilder(
+            builder: (context, setState) => GlassTheme(
+              data: const GlassThemeData(
+                tokens: GlassTokens(
+                  controls: GlassControlPalette(
+                    light: GlassControlColors(accent: Color(0xFF007AFF)),
+                    dark: GlassControlColors(accent: Color(0xFF0A84FF)),
+                  ),
+                ),
+              ),
+              child: GlassSwitch(
+                value: on,
+                onChanged: (next) => setState(() => on = next),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   test('GlassSuperellipse is a real shape the README can name', () {
     expect(
       const GlassSuperellipse(

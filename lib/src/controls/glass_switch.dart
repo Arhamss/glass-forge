@@ -88,10 +88,9 @@ class GlassSwitch extends StatefulWidget {
 
   /// The track's colour when [value] is true.
   ///
-  /// Null resolves to an approximation of Apple's own system green — this
-  /// package has no accent-colour system of its own yet, so this is the one
-  /// hard-coded colour in this widget, the same way `CupertinoSwitch`
-  /// hard-codes its own default rather than deriving one.
+  /// Null resolves to the theme's accent, `GlassControlColors.accent` for
+  /// the scheme the switch resolves in — by default an approximation of
+  /// Apple's own system green.
   final Color? activeTrackColor;
 
   /// What is behind this switch, for the same adaptation `GlassSurface`
@@ -126,10 +125,6 @@ class _GlassSwitchState extends State<GlassSwitch>
 
   /// How far the knob's left edge travels between off and on.
   static const double _travel = _trackWidth - _knobWidth - 2 * _knobInset;
-
-  /// Apple's system green, light and dark. See [GlassSwitch.activeTrackColor].
-  static const Color _activeTrackColorLight = Color(0xFF34C759);
-  static const Color _activeTrackColorDark = Color(0xFF30D158);
 
   /// The knob's left-edge offset from [_knobInset], in logical pixels: the
   /// spring's own domain, chosen so `GlassMotion`'s pixel-stated tolerance
@@ -316,12 +311,9 @@ class _GlassSwitchState extends State<GlassSwitch>
     final offColor = style.material.tint.withValues(
       alpha: style.material.tintOpacity,
     );
-    final onColor =
-        widget.activeTrackColor ??
-        (style.brightness == Brightness.dark
-            ? _activeTrackColorDark
-            : _activeTrackColorLight);
-    final knob = _knob(style: style, onGlass: onGlass);
+    final colors = GlassTheme.controlColorsOf(context, style.brightness);
+    final onColor = widget.activeTrackColor ?? colors.accent;
+    final knob = _knob(style: style, onGlass: onGlass, knobColor: colors.knob);
 
     final visual = AnimatedBuilder(
       animation: _position,
@@ -384,15 +376,17 @@ class _GlassSwitchState extends State<GlassSwitch>
         : Opacity(opacity: GlassControlFrame.disabledOpacity, child: visual);
   }
 
-  Widget _knob({required GlassSurfaceStyle style, required bool onGlass}) {
+  Widget _knob({
+    required GlassSurfaceStyle style,
+    required bool onGlass,
+    required Color knobColor,
+  }) {
     if (onGlass) {
       return ClipPath(
         clipper: GlassShapeClipper(style.shape),
-        child: const DecoratedBox(
-          decoration: BoxDecoration(
-            color: GlassControlFrame.paintedElementColor,
-          ),
-          child: SizedBox(width: _knobWidth, height: _knobHeight),
+        child: DecoratedBox(
+          decoration: BoxDecoration(color: knobColor),
+          child: const SizedBox(width: _knobWidth, height: _knobHeight),
         ),
       );
     }
