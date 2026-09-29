@@ -326,6 +326,46 @@ void main() {
     );
   });
 
+  testWidgets('the thumb relaxes back to round after a fast drag', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(child: GlassSlider(value: 0, onChanged: (_) {})),
+    );
+    double stretch() => tester
+        .widget<Transform>(
+          find.descendant(
+            of: find.byType(GlassSlider),
+            matching: find.byType(Transform),
+          ),
+        )
+        .transform
+        .getColumn(0)
+        .x;
+
+    final anchor = _anchor(tester, find.byType(GlassSlider));
+    final gesture = await tester.startGesture(
+      anchor + Offset(_xFor(0), 0),
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.moveTo(
+      anchor + Offset(_xFor(0.5), 0),
+      timeStamp: const Duration(milliseconds: 16),
+    );
+    await gesture.moveTo(
+      anchor + Offset(_xFor(1), 0),
+      timeStamp: const Duration(milliseconds: 32),
+    );
+    await tester.pump();
+    expect(stretch(), greaterThan(1.05), reason: 'the drag was not fast');
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    // The spring's pixel tolerance must not stop it short in a ratio
+    // domain, where the whole stretch is under 0.2.
+    expect(stretch(), closeTo(1, 0.005));
+  });
+
   testWidgets('Reduce Motion applies no stretch to a fast drag', (
     tester,
   ) async {

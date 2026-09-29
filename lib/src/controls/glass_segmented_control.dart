@@ -308,14 +308,27 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
       _position.value = target;
       return;
     }
+    final travel = _travel;
+    if (travel <= 0) {
+      _position.value = target;
+      return;
+    }
     final motion = GlassTheme.motionOf(context, GlassMotionRole.settle);
+    // The motion's tolerance is in pixels and [_position] is a fraction of
+    // [travel]: rescaled, or a 0.5 px tolerance reads as half the track and
+    // the spring stops well short of the segment.
+    final tolerance = motion.tolerance;
     _position.animateWith(
       SpringSimulation(
         motion.spring,
         _position.value,
         target,
         velocity,
-        tolerance: motion.tolerance,
+        tolerance: Tolerance(
+          distance: tolerance.distance / travel,
+          time: tolerance.time,
+          velocity: tolerance.velocity / travel,
+        ),
       ),
     );
   }

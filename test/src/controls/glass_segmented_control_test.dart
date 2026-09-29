@@ -601,6 +601,38 @@ void main() {
     }
   });
 
+  testWidgets('a tap springs the pill all the way onto the segment', (
+    tester,
+  ) async {
+    var selected = 0;
+    await tester.pumpWidget(
+      StatefulBuilder(
+        builder: (context, setState) => _harness(
+          child: GlassSegmentedControl<int>(
+            segments: _threeSegments,
+            selected: selected,
+            onChanged: (next) => setState(() => selected = next),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Month'));
+    await tester.pumpAndSettle();
+
+    final pill = tester
+        .widgetList<Positioned>(
+          find.descendant(
+            of: find.byType(GlassSegmentedControl<int>),
+            matching: find.byType(Positioned),
+          ),
+        )
+        .firstWhere((p) => p.width != null);
+    // The last slot starts at 160; the pill sits 3 px inside it. The
+    // spring's pixel tolerance must not stop it short in a fraction domain.
+    expect(pill.left, closeTo(163, 0.5));
+  });
+
   group('a change of segments', () {
     Rect pillOf(WidgetTester tester) => tester.getRect(
       find.descendant(

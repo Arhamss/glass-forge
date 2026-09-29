@@ -368,13 +368,22 @@ class _GlassSliderState extends State<GlassSlider>
       return;
     }
     final motion = GlassTheme.motionOf(context, GlassMotionRole.settle);
+    // The motion's tolerance is in pixels and [_stretch] is a ratio of the
+    // thumb's size: rescaled, or a 0.5 px tolerance outweighs the whole
+    // 0.18 stretch and the spring stops before it starts, leaving the
+    // thumb stretched.
+    final tolerance = motion.tolerance;
     _stretch.animateWith(
       SpringSimulation(
         motion.spring,
         _stretch.value,
         target,
         0,
-        tolerance: motion.tolerance,
+        tolerance: Tolerance(
+          distance: tolerance.distance / _thumbSize,
+          time: tolerance.time,
+          velocity: tolerance.velocity / _thumbSize,
+        ),
       ),
     );
   }
