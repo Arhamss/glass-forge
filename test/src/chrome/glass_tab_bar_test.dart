@@ -1,4 +1,5 @@
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
@@ -583,6 +584,107 @@ void main() {
 
       await tester.pumpAndSettle();
       expectUnder(lensOf(tester), Offset(profile, 0));
+    });
+  });
+
+  group('keyboard and hit targets', () {
+    List<FocusNode> tabNodes() => FocusManager.instance.rootScope.descendants
+        .where((node) => node.canRequestFocus)
+        .toList();
+
+    testWidgets('Enter and Space activate the focused tab', (tester) async {
+      final taps = <int>[];
+      await tester.pumpWidget(_harness(bar: _followingBar(taps)));
+      tabNodes()[2].requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      tabNodes()[1].requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      expect(taps, [2, 1]);
+    });
+
+    testWidgets('the arrow keys move focus along the tabs, not the '
+        'selection', (tester) async {
+      final taps = <int>[];
+      await tester.pumpWidget(
+        WidgetsApp(
+          color: const Color(0xFF000000),
+          builder: (context, _) => _harness(bar: _followingBar(taps)),
+        ),
+      );
+      final nodes = tabNodes();
+      nodes[0].requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      expect(nodes[1].hasPrimaryFocus, isTrue);
+      expect(taps, isEmpty);
+    });
+
+    testWidgets('every tab is at least 44 x 44', (tester) async {
+      await tester.pumpWidget(_harness(bar: _followingBar([])));
+      for (final label in ['Home', 'Search', 'Profile']) {
+        final frame = find.ancestor(
+          of: find.text(label),
+          matching: find.byType(GlassControlFrame),
+        );
+        final size = tester.getSize(frame);
+        expect(size.width, greaterThanOrEqualTo(44), reason: label);
+        expect(size.height, greaterThanOrEqualTo(44), reason: label);
+      }
+    });
+
+    testWidgets('too many tabs for 44 pt each is reported, not silently '
+        'shrunk', (tester) async {
+      tester.view.physicalSize = const Size(375, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        _harness(
+          bar: GlassTabBar(
+            tabs: [
+              for (var i = 0; i < 8; i++)
+                GlassTab(
+                  icon: const SizedBox(width: 24, height: 24),
+                  label: 'Tab $i',
+                ),
+            ],
+            currentIndex: 0,
+            onTap: (_) {},
+          ),
+        ),
+      );
+      final error = tester.takeException();
+      expect(error, isA<FlutterError>());
+      expect('$error', contains('44'));
+    });
+
+    testWidgets("a tab's semanticLabel names it in place of its label", (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _harness(
+          bar: GlassTabBar(
+            tabs: const [
+              GlassTab(
+                icon: SizedBox(width: 24, height: 24),
+                label: 'In',
+                semanticLabel: 'Inbox',
+              ),
+              GlassTab(icon: SizedBox(width: 24, height: 24), label: 'Out'),
+            ],
+            currentIndex: 0,
+            onTap: (_) {},
+          ),
+        ),
+      );
+      expect(find.bySemanticsLabel('Inbox'), findsOneWidget);
+      expect(find.bySemanticsLabel('Out'), findsOneWidget);
+      handle.dispose();
     });
   });
 }

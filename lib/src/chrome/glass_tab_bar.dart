@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -22,7 +23,12 @@ import 'package:glass_forge/src/widgets/glass_presence.dart';
 @immutable
 class GlassTab {
   /// Creates a tab.
-  const GlassTab({required this.icon, required this.label, this.activeIcon});
+  const GlassTab({
+    required this.icon,
+    required this.label,
+    this.activeIcon,
+    this.semanticLabel,
+  });
 
   /// Drawn while this tab is not the selected one — and while it is, too,
   /// when [activeIcon] is null.
@@ -31,8 +37,14 @@ class GlassTab {
   /// Drawn in place of [icon] while this tab is selected. Null keeps [icon].
   final Widget? activeIcon;
 
-  /// The tab's visible label, and the name a screen reader reads for it.
+  /// The tab's visible label, and the name a screen reader reads for it
+  /// unless [semanticLabel] is given.
   final String label;
+
+  /// The name a screen reader reads for this tab, in place of [label]: for
+  /// a short or abbreviated label that needs a fuller name. Null reads
+  /// [label].
+  final String? semanticLabel;
 }
 
 /// A floating glass capsule of tabs whose selection turns to glass while it
@@ -83,6 +95,15 @@ class GlassTab {
 ///
 /// Under Reduce Motion there is no lens at all and the pill moves
 /// instantly.
+///
+/// The arrow keys move keyboard focus from tab to tab, through the app's
+/// ordinary directional focus traversal; Enter or Space then selects the
+/// focused tab. They do not change the selection themselves, because
+/// selecting a tab navigates.
+///
+/// Every tab gets an equal share of the bar's width. Use at most five, as
+/// iOS does: with more tabs than leave each one 44 points, the bar reports
+/// an error in debug builds.
 ///
 /// Each tab is its own selectable button through the frame every control
 /// shares —
@@ -385,6 +406,38 @@ class _GlassTabBarState extends State<GlassTabBar>
     }
   }
 
+  /// Whether [_debugCheckTabWidth] has already reported this bar.
+  bool _debugReportedNarrowTabs = false;
+
+  /// Reports, once, a bar too narrow to give every tab the 44-point hit
+  /// target every control in this package promises.
+  ///
+  /// Each tab gets an equal share of the bar, and that share cannot grow
+  /// past it, so with too many tabs for the width the minimum silently
+  /// fails. iOS shows at most five tabs, and a sixth goes behind a "More"
+  /// tab; this bar does not do that for you. Reported rather than asserted,
+  /// the way an overflowing `Row` is: the bar still lays out.
+  void _debugCheckTabWidth() {
+    if (_debugReportedNarrowTabs || _slot >= GlassControlFrame.minimumExtent) {
+      return;
+    }
+    _debugReportedNarrowTabs = true;
+    final fits = ((_width - 2 * _inset) / GlassControlFrame.minimumExtent)
+        .floor();
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: FlutterError(
+          'GlassTabBar gives each of its ${widget.tabs.length} tabs '
+          '${_slot.toStringAsFixed(1)} pt, under the 44 pt minimum hit '
+          'target.\n'
+          'At ${_width.toStringAsFixed(0)} pt wide the bar fits $fits tabs. '
+          'iOS shows at most five, with the rest behind a "More" tab.',
+        ),
+        library: 'glass_forge',
+      ),
+    );
+  }
+
   void _onTabActivated(int index) {
     unawaited(HapticFeedback.selectionClick());
     widget.onTap(index);
@@ -403,6 +456,9 @@ class _GlassTabBarState extends State<GlassTabBar>
             final width = constraints.maxWidth;
             _width = width;
             _slot = (width - 2 * _inset) / widget.tabs.length;
+            if (kDebugMode) {
+              _debugCheckTabWidth();
+            }
             return _bar(context, Size(width, _barHeight));
           },
         ),
@@ -629,7 +685,7 @@ class _TabButton extends StatelessWidget {
     return GlassControlFrame(
       onActivate: onActivate,
       selected: selected,
-      semanticLabel: tab.label,
+      semanticLabel: tab.semanticLabel ?? tab.label,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
