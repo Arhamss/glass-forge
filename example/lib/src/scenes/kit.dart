@@ -414,75 +414,30 @@ class _NowPlayingState extends State<_NowPlaying> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const _Press(
-                    label: 'Previous',
-                    icon: Glyphs.previous,
+                  // The package's own button: on this glass tile it paints,
+                  // with a 44-point target and Reduce Motion handled. The
+                  // compact tile carries play and skip only, as Control
+                  // Center's small media tile does: three 44-point targets
+                  // do not fit its width.
+                  GlassButton.icon(
+                    onPressed: () {
+                      unawaited(HapticFeedback.lightImpact());
+                      setState(() => _playing = !_playing);
+                    },
+                    icon: Glyph(
+                      _playing ? Glyphs.pause : Glyphs.play,
+                      color: Tone.primary,
+                    ),
+                    semanticLabel: _playing ? 'Pause' : 'Play',
                   ),
-                  _Press(
-                    label: _playing ? 'Pause' : 'Play',
-                    icon: _playing ? Glyphs.pause : Glyphs.play,
-                    onTap: () => setState(() => _playing = !_playing),
+                  GlassButton.icon(
+                    onPressed: () => unawaited(HapticFeedback.lightImpact()),
+                    icon: const Glyph(Glyphs.next, color: Tone.primary),
+                    semanticLabel: 'Next',
                   ),
-                  const _Press(label: 'Next', icon: Glyphs.next),
                 ],
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A painted icon button that squeezes under the finger. No glass of its
-/// own: it sits on a tile that already is glass.
-class _Press extends StatefulWidget {
-  const _Press({required this.label, required this.icon, this.onTap});
-
-  final String label;
-  final String icon;
-  final VoidCallback? onTap;
-
-  @override
-  State<_Press> createState() => _PressState();
-}
-
-class _PressState extends State<_Press> {
-  bool _down = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: widget.label,
-      excludeSemantics: true,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => setState(() => _down = true),
-        onTapCancel: () => setState(() => _down = false),
-        onTapUp: (_) => setState(() => _down = false),
-        onTap: () {
-          unawaited(HapticFeedback.lightImpact());
-          widget.onTap?.call();
-        },
-        child: AnimatedScale(
-          scale: _down ? 0.8 : 1,
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutBack,
-          child: SizedBox.square(
-            dimension: 30,
-            child: Center(
-              child: AnimatedSwitcher(
-                duration: motion(context, const Duration(milliseconds: 200)),
-                transitionBuilder: (child, animation) =>
-                    ScaleTransition(scale: animation, child: child),
-                child: Glyph(
-                  widget.icon,
-                  key: ValueKey(widget.icon),
-                  color: Tone.primary,
-                ),
-              ),
-            ),
           ),
         ),
       ),

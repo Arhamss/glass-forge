@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart' show Scaffold;
+import 'package:flutter/material.dart' show MaterialPageRoute, Scaffold;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/glass_forge.dart';
@@ -12,6 +12,7 @@ import 'package:glass_forge_example/src/presets.dart';
 import 'package:glass_forge_example/src/scenes/kit.dart';
 import 'package:glass_forge_example/src/scenes/lens.dart';
 import 'package:glass_forge_example/src/scenes/liquid.dart';
+import 'package:glass_forge_example/src/settings.dart';
 import 'package:glass_forge_example/src/tuner.dart';
 import 'package:glass_forge_example/src/ui.dart';
 
@@ -23,9 +24,9 @@ const List<GlassTab> _tabs = [
   GlassTab(icon: Glyph(Glyphs.kit, size: 22), label: 'Kit'),
 ];
 
-/// How wide the bar is: a comfortable thumb's width per tab, not the whole
-/// screen.
-const double _barWidth = 92.0 * 3 + 12;
+/// How wide the bar is: a comfortable thumb's width per tab, about 96
+/// points each, not the whole screen.
+const double _barWidth = 288;
 
 const List<String> _captions = [
   'Pick it up and move it. Tap to change shape.',
@@ -198,8 +199,8 @@ class _HomeState extends State<Home> with TickerProviderStateMixin {
           bottom: 0,
           child: Center(
             child: SizedBox(
-              // The bar keeps 16 clear of the screen's edges itself.
-              width: _barWidth + 32,
+              // The bar keeps its own margin clear of the screen's edges.
+              width: _barWidth + GlassTabBar.margin.horizontal,
               // It builds the safe area in, keeping at least 8 below it;
               // above a home indicator, 8 more lifts it clear of the line.
               child: Padding(
@@ -323,6 +324,20 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
+        Arrive(
+          delay: const Duration(milliseconds: 90),
+          scale: 0.3,
+          child: GlassButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => const SettingsScreen(),
+              ),
+            ),
+            icon: const Glyph(Glyphs.settings, size: 22, color: Tone.primary),
+            semanticLabel: 'Settings',
+          ),
+        ),
+        const SizedBox(width: 10),
         const Arrive(
           delay: Duration(milliseconds: 120),
           scale: 0.3,
