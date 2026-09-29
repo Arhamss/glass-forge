@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
+import 'package:glass_forge/src/controls/disabled_glass.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/motion/glass_jiggle.dart';
@@ -596,6 +597,9 @@ class _GlassSliderState extends State<GlassSlider>
         ),
       );
     }
-    return Glass(shape: style.shape, material: style.material, child: size);
+    return DisabledGlassPresence(
+      disabled: widget.onChanged == null,
+      child: Glass(shape: style.shape, material: style.material, child: size),
+    );
   }
 }

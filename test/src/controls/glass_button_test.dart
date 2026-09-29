@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/controls/glass_button.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
-import 'package:glass_forge/src/motion/interactive_glass.dart';
 import 'package:glass_forge/src/rendering/render_glass_layer.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
@@ -63,7 +62,7 @@ void main() {
   });
 
   testWidgets(
-    'a disabled button never fires and never builds a press response',
+    'a disabled button never fires and never presses',
     (tester) async {
       await tester.pumpWidget(
         _harness(
@@ -71,10 +70,10 @@ void main() {
         ),
       );
 
-      // No `InteractiveGlass` at all: a disabled button has nothing that
-      // could scale on press, rather than one that scales and is merely
-      // told not to.
-      expect(find.byType(InteractiveGlass), findsNothing);
+      // `InteractiveGlass` stays mounted, so enabling the button later does
+      // not remount its glass, but it takes no pointer: a held press never
+      // scales or stretches the glass.
+      final atRest = tester.getRect(find.byType(Glass));
 
       // Neither a synthetic tap nor a raw pointer down-and-up throws —
       // there is no `onTap` and no `onActivate` registered to call.
@@ -85,7 +84,8 @@ void main() {
         tester.getCenter(find.byType(GlassButton)),
       );
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tester.getRect(find.byType(Glass)), atRest);
       await gesture.up();
       await tester.pump();
 

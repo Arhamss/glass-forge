@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
+import 'package:glass_forge/src/controls/disabled_glass.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/motion/glass_press_stretch.dart';
@@ -191,19 +192,25 @@ class GlassButton extends StatelessWidget {
     // The control role's own material, which [labelColor] was resolved
     // against: inheriting the layer's instead would leave the label's
     // contrast promise about a surface that is not drawn.
-    final glass = Glass(
-      shape: resolvedShape,
-      material: style.material,
-      child: label,
+    final glass = DisabledGlassPresence(
+      disabled: !enabled,
+      child: Glass(
+        shape: resolvedShape,
+        material: style.material,
+        child: label,
+      ),
     );
-    if (!enabled) {
-      return glass;
-    }
-
-    return InteractiveGlass(
-      pressStretch: pressStretch,
-      glow: glow,
-      child: glass,
+    // Always the same tree, enabled or not: swapping `InteractiveGlass` in
+    // and out with [onPressed] remounted it and the glass beneath it. A
+    // disabled button just takes no pointer, so it neither presses nor
+    // glows.
+    return IgnorePointer(
+      ignoring: !enabled,
+      child: InteractiveGlass(
+        pressStretch: pressStretch,
+        glow: glow,
+        child: glass,
+      ),
     );
   }
 }

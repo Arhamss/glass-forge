@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/services.dart' show TextInputAction, TextInputType;
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
+import 'package:glass_forge/src/controls/disabled_glass.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
@@ -479,7 +480,10 @@ class _GlassTextFieldState extends State<GlassTextField>
                     Positioned.fill(
                       child: onGlass
                           ? _paintedBody(shape: shape, material: material)
-                          : Glass(shape: shape, material: material),
+                          : DisabledGlassPresence(
+                              disabled: !widget.enabled,
+                              child: Glass(shape: shape, material: material),
+                            ),
                     ),
                     child!,
                   ],

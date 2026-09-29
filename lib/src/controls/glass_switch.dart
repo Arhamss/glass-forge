@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
+import 'package:glass_forge/src/controls/disabled_glass.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
@@ -395,10 +396,13 @@ class _GlassSwitchState extends State<GlassSwitch>
         ),
       );
     }
-    return Glass(
-      shape: style.shape,
-      material: GlassMaterial.dome(),
-      child: const SizedBox(width: _knobWidth, height: _knobHeight),
+    return DisabledGlassPresence(
+      disabled: widget.onChanged == null,
+      child: Glass(
+        shape: style.shape,
+        material: GlassMaterial.dome(),
+        child: const SizedBox(width: _knobWidth, height: _knobHeight),
+      ),
     );
   }
 }
