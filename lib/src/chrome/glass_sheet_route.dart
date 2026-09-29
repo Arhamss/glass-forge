@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/chrome/glass_handoff.dart';
 import 'package:glass_forge/src/chrome/glass_sheet_handle.dart';
+import 'package:glass_forge/src/design/glass_chrome_colors.dart';
 import 'package:glass_forge/src/design/glass_surface.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
@@ -32,7 +33,8 @@ import 'package:glass_forge/src/widgets/glass_presence.dart';
 /// Motion presents and dismisses instantly.
 ///
 /// [material] replaces the sheet role's material, as
-/// `GlassSurface.material` does; null keeps the role's.
+/// `GlassSurface.material` does; null keeps the role's. The scrim and the
+/// handle take their colours from the theme's `GlassTokens.chrome`.
 ///
 /// [barrierLabel] is what a screen reader reads for the scrim. It is
 /// English by default: this package has no localizations of its own, so
@@ -82,13 +84,11 @@ Future<T?> showGlassSheet<T>({
       duration: duration,
       material: material,
       scrimLabel: barrierLabel,
+      chrome: theme.tokens.chrome,
       settings: routeSettings,
     ),
   );
 }
-
-/// The scrim's colour at full strength.
-const Color _scrimColor = Color(0x52000000);
 
 /// The space between the sheet and the screen's edges.
 const double _sheetMargin = 8;
@@ -115,6 +115,7 @@ class _GlassSheetRoute<T> extends PageRoute<T> {
     required this.duration,
     required this.material,
     required this.scrimLabel,
+    required this.chrome,
     super.settings,
   });
 
@@ -123,6 +124,9 @@ class _GlassSheetRoute<T> extends PageRoute<T> {
   final Duration duration;
   final GlassMaterial? material;
   final String scrimLabel;
+
+  /// The theme's chrome colours when the sheet was shown.
+  final GlassChromeColors chrome;
 
   /// The sheet's rise through the second part of [animation]: position and
   /// glass both ride it.
@@ -179,7 +183,7 @@ class _GlassSheetRoute<T> extends PageRoute<T> {
   bool get barrierDismissible => isDismissible;
 
   @override
-  Color get barrierColor => _scrimColor;
+  Color get barrierColor => chrome.scrim;
 
   @override
   String get barrierLabel => scrimLabel;
@@ -334,10 +338,18 @@ class _GlassSheet extends StatelessWidget {
               children: [
                 if (route.isDismissible)
                   Builder(
+                    // The surface sets its label colour on the ambient
+                    // text style; the role's own is a fallback that the
+                    // surface above always makes unreachable.
                     builder: (context) => GlassSheetHandle(
                       color:
+                          route.chrome.handle ??
                           DefaultTextStyle.of(context).style.color ??
-                          const Color(0xFFFFFFFF),
+                          GlassTheme.surfaceOf(
+                            context,
+                            GlassSurfaceRole.sheet,
+                            size: MediaQuery.sizeOf(context),
+                          ).labelColor,
                     ),
                   ),
                 Flexible(child: Builder(builder: route.builder)),

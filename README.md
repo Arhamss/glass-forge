@@ -312,7 +312,9 @@ on-track (`accent`), the knob, thumb and pill painted on glass (`knob`),
 the slider's fill and the focus ring (`fill`, `focus`, which default to the
 label colour). The defaults are Apple's green and white; one override
 recolours every control beneath it, and `GlassSwitch.activeTrackColor`
-still wins for one switch.
+still wins for one switch. The chrome's painted colours live beside them
+in `GlassTokens.chrome`: the sheet scrim (`scrim`, black at 32 %) and the
+grab handle (`handle`, which defaults to the sheet's label colour).
 
 ```dart
 GlassTheme(

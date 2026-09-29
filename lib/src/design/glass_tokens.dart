@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
+import 'package:glass_forge/src/design/glass_chrome_colors.dart';
 import 'package:glass_forge/src/design/glass_control_colors.dart';
 import 'package:glass_forge/src/design/glass_tint.dart';
 
@@ -423,6 +424,7 @@ class GlassTokens {
     this.depth = const GlassDepthScale(),
     this.tint = const GlassTints(),
     this.controls = const GlassControlPalette(),
+    this.chrome = const GlassChromeColors(),
     this.flipMaxShortSide = 96,
   });
 
@@ -441,6 +443,9 @@ class GlassTokens {
   /// The controls' own colours — the accent, the painted knob — per
   /// scheme.
   final GlassControlPalette controls;
+
+  /// The chrome's own colours — the sheet scrim and the grab handle.
+  final GlassChromeColors chrome;
 
   /// The shorter side, in logical pixels, at or below which a surface is
   /// small enough to flip its whole scheme.
@@ -469,6 +474,7 @@ class GlassTokens {
     GlassDepthScale? depth,
     GlassTints? tint,
     GlassControlPalette? controls,
+    GlassChromeColors? chrome,
     double? flipMaxShortSide,
   }) {
     return GlassTokens(
@@ -477,6 +483,7 @@ class GlassTokens {
       depth: depth ?? this.depth,
       tint: tint ?? this.tint,
       controls: controls ?? this.controls,
+      chrome: chrome ?? this.chrome,
       flipMaxShortSide: flipMaxShortSide ?? this.flipMaxShortSide,
     );
   }
@@ -492,10 +499,18 @@ class GlassTokens {
         other.depth == depth &&
         other.tint == tint &&
         other.controls == controls &&
+        other.chrome == chrome &&
         other.flipMaxShortSide == flipMaxShortSide;
   }
 
   @override
-  int get hashCode =>
-      Object.hash(blur, radius, depth, tint, controls, flipMaxShortSide);
+  int get hashCode => Object.hash(
+    blur,
+    radius,
+    depth,
+    tint,
+    controls,
+    chrome,
+    flipMaxShortSide,
+  );
 }

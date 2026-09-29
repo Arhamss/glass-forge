@@ -553,7 +553,11 @@ class _GlassDetentSheetState extends State<GlassDetentSheet>
               child: Column(
                 children: <Widget>[
                   if (widget.showHandle)
-                    GlassSheetHandle(color: style.labelColor),
+                    GlassSheetHandle(
+                      color:
+                          GlassTheme.chromeColorsOf(context).handle ??
+                          style.labelColor,
+                    ),
                   Expanded(
                     child: MediaQuery.removePadding(
                       context: context,

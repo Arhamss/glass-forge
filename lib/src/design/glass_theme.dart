@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:glass_forge/src/design/glass_chrome_colors.dart';
 import 'package:glass_forge/src/design/glass_control_colors.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
@@ -186,6 +187,11 @@ class GlassTheme extends InheritedWidget {
     BuildContext context,
     Brightness brightness,
   ) => of(context).tokens.controls.of(brightness);
+
+  /// The chrome's own colours — the sheet scrim and the grab handle — from
+  /// the theme at [context].
+  static GlassChromeColors chromeColorsOf(BuildContext context) =>
+      of(context).tokens.chrome;
 
   /// [role], resolved against [size] and the scheme at [context].
   static GlassSurfaceStyle surfaceOf(

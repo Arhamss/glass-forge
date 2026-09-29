@@ -24,6 +24,7 @@ export 'src/controls/glass_slider.dart';
 export 'src/controls/glass_switch.dart';
 export 'src/controls/glass_text_field.dart';
 export 'src/design/glass_backdrop_sampler.dart' hide meanOf;
+export 'src/design/glass_chrome_colors.dart';
 export 'src/design/glass_control_colors.dart';
 export 'src/design/glass_legibility.dart';
 export 'src/design/glass_motion_defaults.dart';

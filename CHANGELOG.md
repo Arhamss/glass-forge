@@ -57,6 +57,10 @@
   null for the label colour). The defaults are the old green and white, so
   nothing changes until a theme sets them; `GlassSwitch.activeTrackColor`
   still wins for one switch.
+- The chrome's painted colours come from the theme too:
+  `GlassTokens.chrome`, a `GlassChromeColors` with `scrim` (under
+  `showGlassSheet`, black at 32 % as before) and `handle` (both sheets'
+  grab handle, null for the sheet's label colour as before).
 - Fixed: the edge band drew a hard ring inset from every shape's edge,
   which read as a bezel. The convex squircle the band is built on is the
   glass's *height*; it was being used directly as the displacement, which
