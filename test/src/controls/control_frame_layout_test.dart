@@ -92,8 +92,8 @@ void main() {
       final frame = find.byType(GlassControlFrame);
       final rect = tester.getRect(frame);
       expect(rect.topLeft, Offset.zero);
-      // 64 x 28 track: 64 wide, grown to 44 tall.
-      expect(rect.size, const Size(64, 44));
+      // 63 x 28 track: 63 wide, grown to 44 tall.
+      expect(rect.size, const Size(63, 44));
 
       // Well outside the hit area: nothing happens.
       await tester.tapAt(const Offset(400, 300));

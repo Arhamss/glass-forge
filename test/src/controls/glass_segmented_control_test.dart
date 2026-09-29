@@ -109,6 +109,72 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  group("iOS 27's segmented Picker", () {
+    /// The painted track: the one clip with a hole, on content.
+    Rect trackOf(WidgetTester tester) => tester.getRect(
+      find.descendant(
+        of: find.byType(GlassSegmentedControl<int>),
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is ClipPath &&
+              w.clipper is GlassShapeClipper &&
+              (w.clipper! as GlassShapeClipper).hole != null,
+        ),
+      ),
+    );
+
+    testWidgets('a 32-point track under a 28-point pill inset 2', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _harness(
+          child: GlassSegmentedControl<int>(
+            segments: _threeSegments,
+            selected: 0,
+            onChanged: (_) {},
+          ),
+        ),
+      );
+      final track = trackOf(tester);
+      final pill = tester.getRect(
+        find.descendant(
+          of: find.byType(GlassSegmentedControl<int>),
+          matching: find.byType(Glass),
+        ),
+      );
+      expect(track.size, const Size(_width, 32));
+      // Three 80-point slots: the first pill is its slot less 2 each side.
+      expect(pill.size, const Size(76, 28));
+      expect(pill.topLeft - track.topLeft, const Offset(2, 2));
+    });
+
+    testWidgets('the hit area is 44 tall: 6 points above the track taps', (
+      tester,
+    ) async {
+      int? selected;
+      await tester.pumpWidget(
+        _harness(
+          child: GlassSegmentedControl<int>(
+            segments: _threeSegments,
+            selected: 0,
+            onChanged: (next) => selected = next,
+          ),
+        ),
+      );
+      final whole = tester.getRect(find.byType(GlassSegmentedControl<int>));
+      final track = trackOf(tester);
+      expect(whole.height, greaterThanOrEqualTo(44));
+      expect(track.center.dy, whole.center.dy);
+
+      await tester.tapAt(
+        Offset(tester.getCenter(find.text('Month')).dx, track.top - 6),
+      );
+      await tester.pump();
+      expect(selected, 2);
+      await tester.pumpAndSettle();
+    });
+  });
+
   testWidgets(
     'a disabled control never fires and never builds a press response',
     (tester) async {
@@ -484,8 +550,8 @@ void main() {
     // The pill is the one Positioned with a non-null `width` (the track
     // itself is a `Positioned.fill`).
     final pill = positioned.firstWhere((p) => p.width != null);
-    // The last slot starts at 160; the pill sits 3 px inside it.
-    expect(pill.left, 163);
+    // The last slot starts at 160; the pill sits 2 px inside it.
+    expect(pill.left, 162);
     expect(selected, 2);
   });
 
@@ -529,7 +595,7 @@ void main() {
       final midLeft = pillOf(tester).left;
       expect(
         midLeft,
-        isNot(anyOf(3, 163)),
+        isNot(anyOf(2, 162)),
         reason:
             'the spring already settled before Reduce Motion turned on '
             '— this test proves nothing without a mid-travel frame',
@@ -539,7 +605,7 @@ void main() {
           const FakeAccessibilityFeatures(disableAnimations: true);
       await tester.pump();
 
-      expect(pillOf(tester).left, 163);
+      expect(pillOf(tester).left, 162);
     },
   );
 
@@ -713,9 +779,9 @@ void main() {
           ),
         )
         .firstWhere((p) => p.width != null);
-    // The last slot starts at 160; the pill sits 3 px inside it. The
+    // The last slot starts at 160; the pill sits 2 px inside it. The
     // spring's pixel tolerance must not stop it short in a fraction domain.
-    expect(pill.left, closeTo(163, 0.5));
+    expect(pill.left, closeTo(162, 0.5));
   });
 
   group('a change of segments', () {

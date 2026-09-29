@@ -146,7 +146,7 @@ void main() {
   ) async {
     final (inControl, alone) = await _centres(
       tester,
-      const Size(64, 44),
+      const Size(63, 44),
       GlassSwitch(value: true, onChanged: (_) {}),
     );
     expect(_distance(inControl, _switchGreen), greaterThan(40));
@@ -158,7 +158,7 @@ void main() {
   ) async {
     final (inControl, alone) = await _centres(
       tester,
-      const Size(64, 44),
+      const Size(63, 44),
       GlassSwitch(value: false, onChanged: (_) {}),
     );
     expect(_distance(inControl, alone), lessThanOrEqualTo(_tolerance));

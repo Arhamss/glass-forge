@@ -53,6 +53,11 @@
 
 ### Changed
 
+- `GlassSwitch` and `GlassSegmentedControl` are sized to iOS 27, measured
+  against the native `Toggle` and segmented `Picker` on the simulator. The
+  switch is a 63 × 28 track under a 37 × 24 knob (was 64 and 38 wide). The
+  segmented control draws a 32-point track under a 28-point pill inset 2
+  (was 44 and 38, inset 3), centred in a hit area that stays 44 tall.
 - The controls' own colours come from the theme: `GlassTokens.controls`,
   a `GlassControlPalette` of light and dark `GlassControlColors` — `accent`
   (the switch's on-track), `knob` (the knob, thumb and pill painted on

@@ -42,6 +42,13 @@ class GlassSegment<T> {
 
 /// A row of mutually exclusive choices under a travelling glass pill.
 ///
+/// The visible track is 32 points tall, and the pill 28, inset 2 from the
+/// edges of its segment slot — measured against iOS 27's native segmented
+/// `Picker` on the simulator on 2026-09-30. The control itself lays out 44
+/// points tall, the track centred in it, so every segment keeps a 44-point
+/// hit target: the extra height is invisible margin to tap and drag in,
+/// the same growth `GlassControlFrame` gives any small control.
+///
 /// | | On content | On a glass surface |
 /// |---|---|---|
 /// | Track | painted, around the pill | painted |
@@ -80,8 +87,7 @@ class GlassSegment<T> {
 /// `onChanged: null` disables it: no tap, no drag, no arrow-key step, and
 /// the callback never runs. Each segment is its own selectable button —
 /// the frame every control shares gives it semantics, focus, a 44 × 44
-/// minimum hit
-/// target and Enter/Space activation — and reports
+/// minimum hit target and Enter/Space activation — and reports
 /// `SemanticsFlag.isSelected` for exactly the one whose [GlassSegment.value]
 /// equals [selected]. Each is named by its [GlassSegment.label] text, or by
 /// [GlassSegment.semanticLabel] when given. The left and right arrow keys
@@ -150,22 +156,30 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
     with SingleTickerProviderStateMixin, ReduceMotionSnap {
   /// The whole control's height, and the tappable height of every segment —
   /// `GlassControlFrame.minimumExtent` itself, the same reach `GlassSlider`
-  /// gives its own track: the draggable hit area is the full visual, not a
-  /// narrower painted strip inside it.
+  /// gives its own track. Taller than the visible [_trackHeight]: the hit
+  /// area grows, never the visual.
   static const double _height = GlassControlFrame.minimumExtent;
+
+  /// The painted track's height, as iOS 27 draws it.
+  static const double _trackHeight = 32;
+
+  /// The track's top edge in the control's own box: centred in [_height].
+  static const double _trackTop = (_height - _trackHeight) / 2;
 
   /// The most a segment's label grows with the reader's text size.
   ///
-  /// The control keeps its fixed 44-point height — the pill, the track
-  /// and every segment's hit target are laid out on it — so the label has
-  /// the pill's 38 points to fit in. At 1.5× a 17-point label still fits;
-  /// past about 1.8× it would be cut off. The same policy as
+  /// The track is a fixed 32 points tall, so the label has that to fit in
+  /// — the pill's 28 points for iOS's own 13-point segment label. At 1.5×
+  /// a 13-point label's line is about 23 points and sits inside the pill,
+  /// and even a 17-point one, about 31, stays inside the track; past that
+  /// it would spill over the track's edges. The same policy as
   /// `GlassTabBar`'s labels: the label grows a little and then stops,
   /// rather than being clipped.
   static const double _maxLabelScale = 1.5;
 
-  /// The gap between the pill and the edges of the segment slot it fills.
-  static const double _pillInset = 3;
+  /// The gap between the pill and the edges of the segment slot it fills,
+  /// and between the pill and the track's top and bottom.
+  static const double _pillInset = 2;
 
   /// The pill's position as a fraction of its total travel, 0 to 1, across
   /// [_lastIndex] index steps — the same domain `GlassSlider._position`
@@ -435,7 +449,7 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
     final style = GlassTheme.surfaceOf(
       context,
       GlassSurfaceRole.control,
-      size: Size(width, _height),
+      size: Size(width, _trackHeight),
       backdrop: backdrop,
     );
     final onGlass = GlassHostScope.isOnGlass(context);
@@ -462,14 +476,21 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
               return Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Positioned.fill(
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: _trackTop,
+                    height: _trackHeight,
                     child: ClipPath(
                       // On content the pill is glass, which the layer
                       // draws under the track's paint: leave a hole where
-                      // it is. See [GlassShapeClipper].
+                      // it is, in the track's own coordinates. See
+                      // [GlassShapeClipper].
                       clipper: GlassShapeClipper(
                         style.shape,
-                        hole: onGlass ? null : pill,
+                        hole: onGlass
+                            ? null
+                            : pill.shift(const Offset(0, -_trackTop)),
                       ),
                       child: DecoratedBox(
                         decoration: BoxDecoration(color: trackColor),
@@ -538,9 +559,8 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
             selected: selected,
           ),
         ),
-        // The control is a fixed 44 points high, like the tab bar, so a
-        // label follows the reader's text size only up to
-        // [_maxLabelScale]; see there.
+        // The track is a fixed 32 points high, so a label follows the
+        // reader's text size only up to [_maxLabelScale]; see there.
         child: MediaQuery.withClampedTextScaling(
           maxScaleFactor: _maxLabelScale,
           child: segment.label,
@@ -585,17 +605,18 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
   }
 
   /// Where the pill is at [_position], in this control's own box: its
-  /// segment slot, inset by [_pillInset] on every side. Measured from the
-  /// right edge under [TextDirection.rtl], where the first segment is.
+  /// segment slot across the track, inset by [_pillInset] on every side.
+  /// Measured from the right edge under [TextDirection.rtl], where the
+  /// first segment is.
   Rect _pillRect(double segmentWidth) => Rect.fromLTWH(
     _pillInset +
         _travel *
             (_textDirection == TextDirection.rtl
                 ? 1 - _position.value
                 : _position.value),
-    _pillInset,
+    _trackTop + _pillInset,
     (segmentWidth - 2 * _pillInset).clamp(0.0, double.infinity),
-    _height - 2 * _pillInset,
+    _trackHeight - 2 * _pillInset,
   );
 
   Widget _pill({

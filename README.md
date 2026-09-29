@@ -142,7 +142,7 @@ The switch's "on" side is on the left, and a slider's minimum is on the
 right.
 
 `GlassSwitch` is a track and a knob: the track is always painted — real
-glass on a 64 × 28 capsule this thin reads as a smear, not a control — and
+glass on a 63 × 28 capsule this thin reads as a smear, not a control — and
 only the knob, the one lens-profile element Apple's own switch has, becomes
 glass, and only on content.
 

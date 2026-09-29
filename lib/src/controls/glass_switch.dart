@@ -18,7 +18,7 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 ///
 /// Resolves `GlassSurfaceRole.control` for its material and motion, the same
 /// as `GlassButton`. Unlike a button, the track is **always painted** — real
-/// glass on a 64 × 28 capsule this thin would read as a smear, not a
+/// glass on a 63 × 28 capsule this thin would read as a smear, not a
 /// control — and only the knob, "Apple's one lens-profile element" per the
 /// design doc, becomes real glass, and only on content:
 ///
@@ -114,13 +114,11 @@ class GlassSwitch extends StatefulWidget {
 
 class _GlassSwitchState extends State<GlassSwitch>
     with SingleTickerProviderStateMixin, ReduceMotionSnap {
-  // Track 64 × 28, knob 38 × 24, both iOS 26/27 proportions. No capture was
-  // available while building this widget to confirm against — see the plan
-  // for this task — so these are the plan's own numbers, kept as-is rather
-  // than guessed at again here.
-  static const double _trackWidth = 64;
+  // Track 63 × 28, knob 37 × 24, inset 2: measured against iOS 27's native
+  // `Toggle` on the simulator (iPhone 18 Pro, @3x) on 2026-09-30.
+  static const double _trackWidth = 63;
   static const double _trackHeight = 28;
-  static const double _knobWidth = 38;
+  static const double _knobWidth = 37;
   static const double _knobHeight = 24;
   static const double _knobInset = (_trackHeight - _knobHeight) / 2;
 

@@ -59,6 +59,36 @@ Future<void> _dragBy(WidgetTester tester, Finder finder, double dx) async {
 }
 
 void main() {
+  testWidgets(
+    "matches iOS 27's Toggle: a 63 x 28 track, a 37 x 24 knob inset 2",
+    (tester) async {
+      await tester.pumpWidget(
+        _harness(child: GlassSwitch(value: false, onChanged: (_) {})),
+      );
+
+      final track = tester.getRect(
+        find.descendant(
+          of: find.byType(GlassSwitch),
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is ClipPath &&
+                w.clipper is GlassShapeClipper &&
+                (w.clipper! as GlassShapeClipper).hole != null,
+          ),
+        ),
+      );
+      final knob = tester.getRect(
+        find.descendant(
+          of: find.byType(GlassSwitch),
+          matching: find.byType(Glass),
+        ),
+      );
+      expect(track.size, const Size(63, 28));
+      expect(knob.size, const Size(37, 24));
+      expect(knob.topLeft - track.topLeft, const Offset(2, 2));
+    },
+  );
+
   testWidgets('a tap toggles and reports the new value', (tester) async {
     var value = false;
     await tester.pumpWidget(
