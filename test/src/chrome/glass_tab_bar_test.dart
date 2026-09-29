@@ -687,4 +687,28 @@ void main() {
       handle.dispose();
     });
   });
+
+  testWidgets('on glass already, the bar paints and never raises a lens', (
+    tester,
+  ) async {
+    final taps = <int>[];
+    await tester.pumpWidget(
+      _harness(
+        bar: Glass(
+          shape: const GlassOval(),
+          child: _followingBar(taps),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.byType(Glass), findsOneWidget);
+
+    await tester.tap(find.text('Profile'));
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(find.byType(Glass), findsOneWidget);
+    }
+    await tester.pumpAndSettle();
+    expect(taps, [2]);
+  });
 }

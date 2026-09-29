@@ -243,4 +243,36 @@ void main() {
     expect(x('title'), greaterThan(x('first')));
     expect(x('first'), greaterThan(x('second')));
   });
+
+  testWidgets('the title is a semantics header', (tester) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _harness(bar: const GlassAppBar(title: Text('Messages'))),
+    );
+    expect(
+      tester
+          .getSemantics(find.text('Messages'))
+          .getSemanticsData()
+          .flagsCollection
+          .isHeader,
+      isTrue,
+    );
+    handle.dispose();
+  });
+
+  testWidgets('on glass already, the bar paints instead of stacking glass', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        bar: const Glass(
+          shape: GlassOval(),
+          child: GlassAppBar(title: Text('Messages')),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.byType(Glass), findsOneWidget);
+    expect(find.text('Messages'), findsOneWidget);
+  });
 }

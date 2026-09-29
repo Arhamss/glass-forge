@@ -88,9 +88,12 @@ class GlassAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final title = this.title;
     final toolbar = NavigationToolbar(
       leading: leading,
-      middle: title,
+      // A header to a screen reader, so it can jump between the headings
+      // of a screen the way it does on iOS.
+      middle: title == null ? null : Semantics(header: true, child: title),
       trailing: actions.isEmpty
           ? null
           : Row(mainAxisSize: MainAxisSize.min, children: actions),

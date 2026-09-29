@@ -4,7 +4,9 @@ import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
+import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
+import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 import 'package:glass_forge/src/widgets/glass_presence.dart';
 
 /// One semantic surface, in one line.
@@ -20,6 +22,10 @@ import 'package:glass_forge/src/widgets/glass_presence.dart';
 /// per distinct material among its shapes, so five roles under one layer
 /// cost five captures however many surfaces play them, where a layer per
 /// surface costs one each.
+///
+/// On a glass surface already (under [GlassHostScope]) it paints a flat
+/// tint of its material instead of glass, so a bar or card placed inside a
+/// sheet never stacks glass on glass.
 ///
 /// Under a [GlassPresence], [child] fades with the glass: presence only
 /// reaches the refraction, and a label left drawn on glass that has gone
@@ -178,12 +184,29 @@ class GlassSurface extends StatelessWidget {
           content = FadeTransition(opacity: presence, child: content);
         }
 
-        final glass = Glass(
-          shape: style.shape,
-          material: material ?? style.material,
-          clipBehavior: clipBehavior,
-          child: content,
-        );
+        final resolved = material ?? style.material;
+        // Already on glass — a bar inside a sheet, say — this surface paints
+        // a flat tint of its material rather than stacking a second glass
+        // on the first, the same stand-in every control uses there.
+        final glass = GlassHostScope.isOnGlass(context)
+            ? ClipPath(
+                clipper: GlassShapeClipper(style.shape),
+                clipBehavior: clipBehavior,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: resolved.tint.withValues(
+                      alpha: resolved.tintOpacity,
+                    ),
+                  ),
+                  child: content,
+                ),
+              )
+            : Glass(
+                shape: style.shape,
+                material: resolved,
+                clipBehavior: clipBehavior,
+                child: content,
+              );
 
         if (style.shadows.isEmpty) {
           return glass;

@@ -17,6 +17,7 @@ import 'package:glass_forge/src/motion/settle_spring.dart';
 import 'package:glass_forge/src/rendering/declared_glass_handoff.dart';
 import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
+import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 import 'package:glass_forge/src/widgets/glass_presence.dart';
 
 /// One destination in a [GlassTabBar].
@@ -237,6 +238,12 @@ class _GlassTabBarState extends State<GlassTabBar>
   /// [TextDirection.rtl], so a finger is measured from that edge.
   bool _rtl = false;
 
+  /// Whether the bar is on glass already — inside a sheet, say — from the
+  /// most recent build. There the bar paints (see `GlassSurface`) and has
+  /// no lens: the painted pill carries the selection and springs to it,
+  /// and nothing here is glass.
+  bool _onGlass = false;
+
   int get _last => widget.tabs.length - 1;
 
   bool get _reduceMotion => GlassReduceMotion.instance.value;
@@ -331,7 +338,7 @@ class _GlassTabBarState extends State<GlassTabBar>
   /// under it instead; the lens sinks within [_sink] of the spring
   /// settling on the finger.
   void _syncFlight() {
-    if (_reduceMotion) {
+    if (_reduceMotion || _onGlass) {
       return;
     }
     final up = _lens.isMoving;
@@ -446,6 +453,7 @@ class _GlassTabBarState extends State<GlassTabBar>
   @override
   Widget build(BuildContext context) {
     _rtl = Directionality.of(context) == TextDirection.rtl;
+    _onGlass = GlassHostScope.isOnGlass(context);
     return SafeArea(
       top: false,
       minimum: _margin,
@@ -566,7 +574,7 @@ class _GlassTabBarState extends State<GlassTabBar>
             ),
             // A sibling of the bar's glass, never inside it: a `Glass`
             // built in another's child is refused outright.
-            if (!reduceMotion)
+            if (!reduceMotion && !_onGlass)
               _LensGlass(
                 lens: _lens,
                 hold: _hold,
