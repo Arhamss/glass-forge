@@ -1,127 +1,70 @@
 # Where glass_forge stands — 2026-09-29
 
 Resume file. Read it first; update it at the end of a session. It holds the
-current state only. The history it used to carry is in `git log` and in the
-ledgers under `.superpowers/sdd/` (gitignored).
+current state only; the history is in `git log` and in the ledgers under
+`.superpowers/sdd/` (gitignored).
 
 ## Branch state
 
-**Merged and pushed on 2026-09-29.** `feat/open-items` was fast-forwarded
-into `main` (`2a62763..5ad189c`) and pushed; CI (`shaders`) is green on it.
-The full suite passed on the merged result: 905 package tests, 111 on the
-Impeller lane, 16 in the example, analyze clean.
+`main` is **22 commits ahead of `origin/main`, not pushed.** They are the
+work since Arham's "resolve all apart from real iphone stuff": the tab bar
+(always-glass selection after Kibu, painted body at the legible step,
+squash inside the bar, `maxWidth` 480), the retuned touch response (drag
+stretch, 6 pt press growth, softer glow), the scaffold bars clipped to
+their own layers and laid out first, `Glass.containsChild` removed, the
+readback rebake fix, themed control and chrome colours
+(`GlassTokens.controls`, `GlassTokens.chrome`) and automatic backdrop
+sampling (`GlassBackdropSampler`). `CHANGELOG.md` "Unreleased" lists all
+of it. Pushing and publishing are Arham's call.
 
-The branch's ledger, with every decision made along the way (Arham's
-included), is `.superpowers/sdd/2026-09-28-open-items/progress.md` in the
-worktree `../glass_forge-open-items`, beside the review, audit and fix-batch
-reports. Those files are gitignored; the worktree is kept until they are no
-longer wanted.
+Verified on the final commits (2026-09-29):
 
-## What shipped
+- `flutter test`: 965 passed, 31 skipped.
+- Impeller lane
+  (`flutter test --tags impeller --run-skipped --enable-impeller --enable-flutter-gpu -j 1`):
+  114 passed.
+- Example: 16 passed.
+- `flutter analyze` (root and `example/`) and `dart format`: clean.
+- `flutter pub publish --dry-run`: no warnings.
 
-The nine widgets from the widget spec are in: `GlassButton`, `GlassSwitch`,
-`GlassSlider`, `GlassSegmentedControl`, `GlassTextField`, `GlassScaffold`,
-`GlassTabBar`, `GlassAppBar` and `showGlassSheet`. Controls share one frame
-for semantics, keys, focus and the 44-point target, and support
-right-to-left layouts, Reduce Motion, large text, disabled glass and an
-owner that declines a change. The renderer draws any number of shapes per
-material in clusters. `kMaxShapes` now applies per cluster. The edge band
-reads its backdrop bilinearly. Unpainted shapes stay out of the matte. A
-pass whose material only reshades keeps its matte, and a focused text field
-brightens through a uniform. The overlap warning reports every pair, once.
-The example is rebuilt on the package's own widgets, with a settings page
-on `GlassScaffold`. `CHANGELOG.md` "Unreleased" lists all of it, with a
-**Breaking** section (`GlassShapeClipper` unexported,
-`GlassSlider.semanticValue` renamed `semanticValueFormatter`).
+## Needs a real iPhone
 
-## Verified
+- **flutter#187820, physically.** Nothing here has been looked at on a
+  device since the chrome was reworked.
+- **The scaffold bars' hard edge.** Each bar's glass is now clipped at the
+  bar's own bounds. A full-bleed bar may show a visible line at its inner
+  edge.
+- **Switch and segmented control dimensions** against an iOS capture.
+- **Press, stretch and glow magnitudes.** They rest on one third-party
+  measurement (`liquid_glass_widgets`' 120 fps capture) and Arham's
+  feedback. A 120 fps recording of iOS would pin them.
+- **Raising `kMaxShapes`.** Needs the uniform probe re-run on the weakest
+  backend (`kMaxShapesProvenance`).
 
-- **Full suite at `54afa37`** (before the review fixes): package 761
-  passed; Impeller lane 95 passed; example 13 passed; analyze and format
-  clean.
-- **Fix batch D, at `3ec3ff4`**, on the paths it touched:
-  - Plain `rendering widgets controls chrome composition`: 393 passed,
-    21 skipped. Two back-to-back runs at the default parallelism, no
-    flake.
-  - Impeller lane with `--enable-flutter-gpu -j 1`, on
-    `rendering composition controls chrome widgets diagnostics`: 62
-    passed.
-  - Example: 16 passed.
-  - README snippets, `flutter analyze` (root and `example/`) and
-    `dart format`: clean.
-- The controller runs the full suite after batch D. Put its numbers here
-  when it lands.
-
-The Impeller lane is
-`flutter test --tags impeller --run-skipped --enable-impeller --enable-flutter-gpu -j 1`.
-`-j 1` is also in CI now. The old intermittent `setUpAll` failure came from
-`test/flutter_test_config.dart`: every test process re-copied the shader
-mirror, truncating each file first, while other processes read it. The copy
-is atomic now.
-
-## Open
-
-### Dropped by Arham, 2026-09-29 ("not needed")
+## Dropped by Arham, 2026-09-29 ("not needed")
 
 - **Task 14, Apple preset refit.** `GlassMaterial.regular` and `.clear()`
-  do not look like iOS side by side (Arham, 2026-09-28), and frost bites
-  harder than its number suggests. No refit, no rename.
-- **Task 15, device benchmark budgets.** `benchmark/budgets.json` is still
-  seed values, not measurements.
+  do not match iOS side by side. No refit, no rename.
+- **Task 15, device benchmark budgets.** `benchmark/budgets.json` stays
+  seed values.
 
-### Arham's calls, defaults kept
+## Decided and kept
 
-- **M14, controls pick some of their own colours.** The switch's green
-  track (an approximate system green) and white knob, the white slider
-  thumb and segmented pill. There is no accent system yet.
 - **The rim fold.** The edge band maps backwards for a few pixels just
-  inside the rim, then stalls, before it reads 1:1. That is x 21–24 at
-  `edgeRefraction` 24, 21–28 at 40 and 21–32 at 60, 1:1 by about x 36,
-  45 and 55. Kept as is. Numbers in `task-3-report.md`.
-- **Holding a tab differs from iOS.** A resting finger swells the pill and
-  raises no lens. This was the conservative choice, so the lens is glass on
-  glass only while it travels. iOS's timed hold is the alternative.
+  inside the rim, then stalls, before it reads 1:1: x 21–24 at
+  `edgeRefraction` 24, 21–28 at 40, 21–32 at 60; 1:1 by about x 36, 45
+  and 55.
+- **Tab bar labels are not dimmed when unselected.** The body's legible
+  step keeps every label at 3:1, and a dimmed label would drop below it.
 
-### Needs a device
+## Known limits
 
-- **Physical-iPhone check for flutter#187820.** Two things to look at:
-  - The tab-bar lens in flight is glass over the bar's glass, a bounded,
-    declared overlap.
-  - The I1 residual, still true. The bars' layer has one pass and no clip
-    of its own, so its filter reads the body under it, including body
-    glass output, where the bars draw nothing. Also, the bar heights are
-    measured a frame late, so on the scaffold's first frame the body's
-    glass band spans the whole screen.
-- **Switch and segmented control dimensions** are not measured against an
-  iOS capture.
-
-### Known limits, documented
-
-- `kMaxShapes` is 8 **per cluster**: shapes whose mattes could meet, and
-  every shape in one blend group, share a cluster. Past eight in one
-  cluster the extras are not drawn, and a debug warning says so. Raising it
-  needs the uniform probe re-run on the weakest backend
-  (`kMaxShapesProvenance`).
-- `Glass.containsChild` is accepted and not wired.
-- Backdrop luminance for surface adaptation is caller-supplied.
-- The tab bar has no maximum width.
-- `GlassDetentSheetController.settleMotion` carries the `present` role's
-  spring, which is right, but its public doc does not say so. The reason
-  is only on the private `_syncSettleMotion`.
-
-### Not done by batch C, and why
-
-- **Optional duplication the audit said to keep:** the painted stand-ins,
-  hole rects and semantics.
-- **`toImage` readback:** a readback of a boundary holding a glass layer is
-  followed by one matte bake on the next frame. Observed, not
-  investigated. The carry-over tests settle after a readback before they
-  count.
-
-### Publishing
-
-`flutter pub publish --dry-run` passed on `main` (2026-09-28). Publishing
-is Arham's call, after this branch merges.
+- `kMaxShapes` is 8 **per cluster** (shapes whose mattes could meet, and
+  every shape in one blend group). Past eight the extras are not drawn,
+  with a debug warning.
+- The backdrop sampler misses a repaint behind a repaint boundary inside
+  the source until `GlassBackdropSampler.markNeedsSample`, and a surface
+  that moves while nothing repaints or scrolls keeps its last reading.
 
 ## Working notes
 
@@ -134,5 +77,8 @@ is Arham's call, after this branch merges.
   with `tier: GeometryTier.none`.
 - `flutter analyze` from the root covers `example/` too, but only after
   `flutter pub get` has run inside `example/`.
+- A focus change applies in a microtask, and the test binding's `pump`
+  draws no frame unless one was scheduled. Call
+  `FocusManager.instance.applyFocusChangesIfNeeded()` before a single pump.
 - Compare commits in pinned `git worktree`s, never in the main checkout.
 - Prove a guard fails by breaking what it guards.
