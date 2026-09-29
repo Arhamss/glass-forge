@@ -6,6 +6,7 @@ import 'package:glass_forge/src/chrome/glass_sheet_handle.dart';
 import 'package:glass_forge/src/design/glass_surface.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
+import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
 import 'package:glass_forge/src/widgets/glass_layer.dart';
 import 'package:glass_forge/src/widgets/glass_presence.dart';
@@ -30,6 +31,9 @@ import 'package:glass_forge/src/widgets/glass_presence.dart';
 /// When false, only a `Navigator.pop` from inside the sheet does. Reduce
 /// Motion presents and dismisses instantly.
 ///
+/// [material] replaces the sheet role's material, as
+/// `GlassSurface.material` does; null keeps the role's.
+///
 /// The page beneath follows the handoff only when its route lets this one
 /// drive its `secondaryAnimation`: any `PageRoute` does, including
 /// `MaterialPageRoute`, `CupertinoPageRoute` and `PageRouteBuilder`, as long
@@ -50,6 +54,7 @@ Future<T?> showGlassSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
   bool isDismissible = true,
+  GlassMaterial? material,
 }) {
   final theme = GlassTheme.of(context);
   final duration = theme.motion
@@ -60,6 +65,7 @@ Future<T?> showGlassSheet<T>({
       builder: builder,
       isDismissible: isDismissible,
       duration: duration,
+      material: material,
     ),
   );
 }
@@ -90,11 +96,13 @@ class _GlassSheetRoute<T> extends PageRoute<T> {
     required this.builder,
     required this.isDismissible,
     required this.duration,
+    required this.material,
   });
 
   final WidgetBuilder builder;
   final bool isDismissible;
   final Duration duration;
+  final GlassMaterial? material;
 
   /// The sheet's rise through the second part of [animation]: position and
   /// glass both ride it.
@@ -270,6 +278,7 @@ class _GlassSheet extends StatelessWidget {
         presence: route._presence,
         // The surface fades its content with this presence.
         child: GlassSurface.sheet(
+          material: route.material,
           child: MediaQuery.removePadding(
             context: context,
             removeTop: true,

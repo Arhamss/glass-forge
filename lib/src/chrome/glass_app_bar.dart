@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/design/glass_surface.dart';
+import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 import 'package:glass_forge/src/widgets/glass_presence.dart';
 
@@ -49,6 +50,7 @@ class GlassAppBar extends StatelessWidget {
     this.title,
     this.actions = const <Widget>[],
     this.backdrop,
+    this.material,
     super.key,
   });
 
@@ -70,6 +72,11 @@ class GlassAppBar extends StatelessWidget {
 
   /// What is behind this bar, for the adaptation `GlassSurface` offers.
   final Color? backdrop;
+
+  /// The bar's material, in place of the navigation-bar role's. Null keeps
+  /// the role's; see [GlassSurface.material]. Pass the same material as a
+  /// `GlassTabBar.material` for a top and bottom bar that match.
+  final GlassMaterial? material;
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +103,11 @@ class GlassAppBar extends StatelessWidget {
       right: false,
       child: SizedBox(
         height: _barHeight,
-        child: GlassSurface.navigationBar(backdrop: backdrop, child: content),
+        child: GlassSurface.navigationBar(
+          backdrop: backdrop,
+          material: material,
+          child: content,
+        ),
       ),
     );
   }

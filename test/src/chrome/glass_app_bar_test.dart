@@ -44,6 +44,22 @@ double _effectiveOpacity(WidgetTester tester, Finder finder) {
 }
 
 void main() {
+  testWidgets('material replaces the navigation-bar role material', (
+    tester,
+  ) async {
+    const custom = GlassMaterial(tint: Color(0xFFFF2200), tintOpacity: 0.3);
+    await tester.pumpWidget(
+      _harness(
+        bar: const GlassAppBar(title: Text('Title'), material: custom),
+      ),
+    );
+    final glass = find.ancestor(
+      of: find.text('Title'),
+      matching: find.byType(Glass),
+    );
+    expect(tester.widget<Glass>(glass).material, custom);
+  });
+
   testWidgets('the top safe area is built in', (tester) async {
     await tester.pumpWidget(
       _harness(

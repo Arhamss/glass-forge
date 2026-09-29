@@ -281,4 +281,32 @@ void main() {
     );
     expect(find.byType(CustomPaint), findsOneWidget);
   });
+
+  testWidgets('every constructor takes a material that replaces the role '
+      'material', (tester) async {
+    const custom = GlassMaterial(tint: Color(0xFFFF2200), tintOpacity: 0.3);
+    final surfaces = <Widget>[
+      const GlassSurface(
+        role: GlassSurfaceRole.card,
+        material: custom,
+        child: Text('0'),
+      ),
+      const GlassSurface.navigationBar(material: custom, child: Text('1')),
+      const GlassSurface.sheet(material: custom, child: Text('2')),
+      const GlassSurface.card(material: custom, child: Text('3')),
+      const GlassSurface.control(material: custom, child: Text('4')),
+      const GlassSurface.scrim(material: custom, child: Text('5')),
+    ];
+    for (var i = 0; i < surfaces.length; i++) {
+      await _pump(
+        tester,
+        SizedBox(width: 200, height: 60, child: surfaces[i]),
+      );
+      final glass = find.ancestor(
+        of: find.text('$i'),
+        matching: find.byType(Glass),
+      );
+      expect(tester.widget<Glass>(glass).material, custom, reason: '$i');
+    }
+  });
 }

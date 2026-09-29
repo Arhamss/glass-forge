@@ -56,12 +56,14 @@ class GlassSurface extends StatelessWidget {
     Widget? child,
     Color? backdrop,
     Clip clipBehavior = Clip.antiAlias,
+    GlassMaterial? material,
     Key? key,
   }) : this(
          role: GlassSurfaceRole.sheet,
          child: child,
          backdrop: backdrop,
          clipBehavior: clipBehavior,
+         material: material,
          key: key,
        );
 
@@ -70,12 +72,14 @@ class GlassSurface extends StatelessWidget {
     Widget? child,
     Color? backdrop,
     Clip clipBehavior = Clip.antiAlias,
+    GlassMaterial? material,
     Key? key,
   }) : this(
          role: GlassSurfaceRole.card,
          child: child,
          backdrop: backdrop,
          clipBehavior: clipBehavior,
+         material: material,
          key: key,
        );
 
@@ -84,12 +88,14 @@ class GlassSurface extends StatelessWidget {
     Widget? child,
     Color? backdrop,
     Clip clipBehavior = Clip.antiAlias,
+    GlassMaterial? material,
     Key? key,
   }) : this(
          role: GlassSurfaceRole.control,
          child: child,
          backdrop: backdrop,
          clipBehavior: clipBehavior,
+         material: material,
          key: key,
        );
 
@@ -98,12 +104,14 @@ class GlassSurface extends StatelessWidget {
     Widget? child,
     Color? backdrop,
     Clip clipBehavior = Clip.antiAlias,
+    GlassMaterial? material,
     Key? key,
   }) : this(
          role: GlassSurfaceRole.scrim,
          child: child,
          backdrop: backdrop,
          clipBehavior: clipBehavior,
+         material: material,
          key: key,
        );
 
@@ -129,6 +137,12 @@ class GlassSurface extends StatelessWidget {
   ///
   /// Null keeps the role's. An app with a look of its own names one here;
   /// the label colour, shadows, shape and motion still come from the role.
+  ///
+  /// The label colour is resolved for the role's material, not this one,
+  /// and a [backdrop] adapts the role's material and label together: an
+  /// override replaces only the material, so it does not re-derive
+  /// contrast. An override much lighter or darker than the role's own is
+  /// the caller's to check for legibility.
   final GlassMaterial? material;
 
   @override

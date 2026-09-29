@@ -15,6 +15,7 @@ Future<void> _pumpPage(
   required List<String?> results,
   bool isDismissible = true,
   bool plainPageRoute = false,
+  GlassMaterial? material,
 }) async {
   final page = Builder(
     builder: (context) => GlassScaffold(
@@ -29,6 +30,7 @@ Future<void> _pumpPage(
               await showGlassSheet<String>(
                 context: context,
                 isDismissible: isDismissible,
+                material: material,
                 builder: (context) => SizedBox(
                   key: _contentKey,
                   height: 200,
@@ -126,6 +128,18 @@ Future<int> _pumpCheckingHandoff(
 }
 
 void main() {
+  testWidgets('material replaces the sheet role material', (tester) async {
+    const custom = GlassMaterial(tint: Color(0xFFFF2200), tintOpacity: 0.3);
+    await _pumpPage(tester, results: [], material: custom);
+    await tester.tap(find.byKey(_openKey));
+    await tester.pumpAndSettle();
+    final sheetGlass = find.ancestor(
+      of: find.byKey(_contentKey),
+      matching: find.byType(Glass),
+    );
+    expect(tester.widget<Glass>(sheetGlass).material, custom);
+  });
+
   testWidgets('completes with the value the sheet is popped with', (
     tester,
   ) async {
