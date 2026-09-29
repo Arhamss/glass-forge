@@ -9,12 +9,13 @@ Widget _harness({
   required Widget bar,
   double topInset = 0,
   Animation<double>? barPresence,
+  TextDirection textDirection = TextDirection.ltr,
 }) {
   final pinned = Align(alignment: Alignment.topCenter, child: bar);
   return MediaQuery(
     data: MediaQueryData(padding: EdgeInsets.only(top: topInset)),
     child: Directionality(
-      textDirection: TextDirection.ltr,
+      textDirection: textDirection,
       child: GlassLayer(
         tier: GeometryTier.none,
         child: barPresence == null
@@ -202,5 +203,28 @@ void main() {
     );
 
     expect(_effectiveOpacity(tester, find.byKey(titleKey)), 1);
+  });
+
+  testWidgets('right to left puts leading on the right, actions on the left', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        textDirection: TextDirection.rtl,
+        bar: const GlassAppBar(
+          leading: SizedBox(key: Key('leading'), width: 24, height: 24),
+          title: SizedBox(key: Key('title'), width: 40, height: 20),
+          actions: [
+            SizedBox(key: Key('first'), width: 24, height: 24),
+            SizedBox(key: Key('second'), width: 24, height: 24),
+          ],
+        ),
+      ),
+    );
+
+    double x(String key) => tester.getCenter(find.byKey(Key(key))).dx;
+    expect(x('leading'), greaterThan(x('title')));
+    expect(x('title'), greaterThan(x('first')));
+    expect(x('first'), greaterThan(x('second')));
   });
 }

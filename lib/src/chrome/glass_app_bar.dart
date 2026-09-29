@@ -62,7 +62,9 @@ class GlassAppBar extends StatelessWidget {
   /// side is wider. Null leaves the bar without one.
   final Widget? title;
 
-  /// Drawn at the bar's trailing edge, left to right. Empty draws nothing.
+  /// Drawn at the bar's trailing edge, in reading order. Under
+  /// [TextDirection.rtl] the bar mirrors: [leading] is on the right and
+  /// these on the left. Empty draws nothing.
   final List<Widget> actions;
 
   /// What is behind this bar, for the adaptation `GlassSurface` offers.
