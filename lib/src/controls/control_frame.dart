@@ -139,6 +139,15 @@ class GlassControlFrame extends StatelessWidget {
   /// control test in this package holds itself to.
   static const double minimumExtent = 44;
 
+  /// The opacity a disabled control draws its label and paint at.
+  static const double disabledOpacity = 0.4;
+
+  /// The colour of a control's moving element — a switch knob, a slider
+  /// thumb, a segmented pill — where it is painted rather than glass, on a
+  /// glass surface. White in both schemes, the one part of an iOS control
+  /// that never flips.
+  static const Color paintedElementColor = Color(0xFFFFFFFF);
+
   bool get _enabled =>
       onActivate != null || onIncrease != null || onDecrease != null;
 

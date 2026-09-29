@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart' show TextInputAction, TextInputType;
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
@@ -102,16 +103,52 @@ class GlassTextField extends StatefulWidget {
     this.backdrop,
     this.selectionControls,
     this.contextMenuBuilder,
+    this.focusNode,
+    this.autofocus = false,
+    this.enabled = true,
+    this.keyboardType,
+    this.textInputAction,
+    this.obscureText = false,
+    this.semanticLabel,
     super.key,
   });
 
   /// Where the field's text lives. Null owns one for this field's own
-  /// lifetime.
+  /// lifetime; switching between the two carries the text across.
   final TextEditingController? controller;
 
   /// Shown in place of the text when it is empty, and read as this field's
-  /// accessible label.
+  /// accessible label unless [semanticLabel] is given.
   final String? placeholder;
+
+  /// The name a screen reader reads for this field, in place of
+  /// [placeholder]: for a field with no placeholder, or one whose hint is
+  /// not a good name (`'name@example.com'` for an email field).
+  final String? semanticLabel;
+
+  /// Where keyboard focus for this field is tracked. Null owns one for this
+  /// field's own lifetime.
+  final FocusNode? focusNode;
+
+  /// Whether this field takes focus, and so raises the keyboard, as soon as
+  /// it is inserted.
+  final bool autofocus;
+
+  /// Whether the field takes input. False draws its text and placeholder at
+  /// 40% opacity, ignores touches, cannot be focused (a focused field loses
+  /// focus), and reports itself disabled to a screen reader.
+  final bool enabled;
+
+  /// Which keyboard to show. Null lets `EditableText` choose: a text
+  /// keyboard for a single line.
+  final TextInputType? keyboardType;
+
+  /// The keyboard's action button — Search, Done, Next. Null lets
+  /// `EditableText` choose.
+  final TextInputAction? textInputAction;
+
+  /// Whether to hide the text, as a password field does.
+  final bool obscureText;
 
   /// Drawn before the text, inside the field's own padding — usually an
   /// icon.
@@ -169,6 +206,18 @@ class _GlassTextFieldState extends State<GlassTextField>
   static const double _gap = 8;
   static const double _fontSize = 17;
 
+  /// The placeholder's opacity, relative to the label colour: a hint, read
+  /// as secondary to typed text.
+  static const double _placeholderAlpha = 0.5;
+
+  /// `EditableText`'s floating-cursor background, relative to the label
+  /// colour.
+  static const double _cursorBackgroundAlpha = 0.2;
+
+  /// The selection highlight, relative to the label colour: enough to see,
+  /// light enough to read the selected text through.
+  static const double _selectionAlpha = 0.24;
+
   /// How much brighter the material reads at full focus. Both numbers are
   /// this widget's own judgement call, not a fitted Apple constant like
   /// `GlassMaterial.regular`'s: Apple names "brighter on focus" as the
@@ -202,7 +251,8 @@ class _GlassTextFieldState extends State<GlassTextField>
   TextEditingController get _controller =>
       widget.controller ?? (_ownedController ??= TextEditingController());
 
-  FocusNode get _focusNode => _ownedFocusNode ??= FocusNode();
+  FocusNode get _focusNode =>
+      widget.focusNode ?? (_ownedFocusNode ??= FocusNode());
 
   @override
   GlobalKey<EditableTextState> get editableTextKey => _editableKey;
@@ -217,8 +267,39 @@ class _GlassTextFieldState extends State<GlassTextField>
   void initState() {
     super.initState();
     _focus = AnimationController(vsync: this, upperBound: _focusTravel);
-    _focusNode.addListener(_handleFocusChange);
+    _focusNode
+      ..canRequestFocus = widget.enabled
+      ..addListener(_handleFocusChange);
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didUpdateWidget(GlassTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      final old = oldWidget.controller;
+      if (old != null && widget.controller == null) {
+        // Taking over from the owner's controller: keep its text, the way
+        // `TextField` does, rather than starting empty.
+        _ownedController = TextEditingController.fromValue(old.value);
+      } else if (old == null && widget.controller != null) {
+        // The owner's controller replaces this field's own: done with it.
+        _ownedController?.dispose();
+        _ownedController = null;
+      }
+    }
+    if (oldWidget.focusNode != widget.focusNode) {
+      (oldWidget.focusNode ?? _ownedFocusNode)?.removeListener(
+        _handleFocusChange,
+      );
+      if (widget.focusNode != null) {
+        _ownedFocusNode?.dispose();
+        _ownedFocusNode = null;
+      }
+      _focusNode.addListener(_handleFocusChange);
+    }
+    // A node that can no longer take focus gives up any it has.
+    _focusNode.canRequestFocus = widget.enabled;
   }
 
   @override
@@ -461,20 +542,23 @@ class _GlassTextFieldState extends State<GlassTextField>
   /// trailing widget draws here exactly as it would inside a glass toolbar.
   Widget _foreground(GlassSurfaceStyle style) {
     return GlassHostScope(
-      child: Padding(
-        padding: _padding,
-        child: Row(
-          children: [
-            if (widget.leading != null) ...[
-              widget.leading!,
-              const SizedBox(width: _gap),
+      child: IgnorePointer(
+        ignoring: !widget.enabled,
+        child: Padding(
+          padding: _padding,
+          child: Row(
+            children: [
+              if (widget.leading != null) ...[
+                widget.leading!,
+                const SizedBox(width: _gap),
+              ],
+              Expanded(child: _editableStack(style)),
+              if (widget.trailing != null) ...[
+                const SizedBox(width: _gap),
+                widget.trailing!,
+              ],
             ],
-            Expanded(child: _editableStack(style)),
-            if (widget.trailing != null) ...[
-              const SizedBox(width: _gap),
-              widget.trailing!,
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -482,6 +566,9 @@ class _GlassTextFieldState extends State<GlassTextField>
 
   Widget _editableStack(GlassSurfaceStyle style) {
     final placeholder = widget.placeholder;
+    final label = style.labelColor.withValues(
+      alpha: widget.enabled ? 1 : GlassControlFrame.disabledOpacity,
+    );
     return Stack(
       alignment: AlignmentDirectional.centerStart,
       children: [
@@ -496,7 +583,7 @@ class _GlassTextFieldState extends State<GlassTextField>
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: style.labelColor.withValues(alpha: 0.5),
+                  color: label.withValues(alpha: label.a * _placeholderAlpha),
                   fontSize: _fontSize,
                 ),
               ),
@@ -504,20 +591,27 @@ class _GlassTextFieldState extends State<GlassTextField>
           ),
         Semantics(
           textField: true,
-          label: placeholder,
+          enabled: widget.enabled,
+          label: widget.semanticLabel ?? placeholder,
           child: _gestureBuilder.buildGestureDetector(
             behavior: HitTestBehavior.translucent,
             child: EditableText(
               key: _editableKey,
               controller: _controller,
               focusNode: _focusNode,
-              style: TextStyle(
-                color: style.labelColor,
-                fontSize: _fontSize,
-              ),
+              autofocus: widget.autofocus && widget.enabled,
+              readOnly: !widget.enabled,
+              keyboardType: widget.keyboardType,
+              textInputAction: widget.textInputAction,
+              obscureText: widget.obscureText,
+              style: TextStyle(color: label, fontSize: _fontSize),
               cursorColor: style.labelColor,
-              backgroundCursorColor: style.labelColor.withValues(alpha: 0.2),
-              selectionColor: style.labelColor.withValues(alpha: 0.24),
+              backgroundCursorColor: style.labelColor.withValues(
+                alpha: _cursorBackgroundAlpha,
+              ),
+              selectionColor: style.labelColor.withValues(
+                alpha: _selectionAlpha,
+              ),
               selectionControls:
                   widget.selectionControls ?? _defaultSelectionControls,
               // A real `selectionControls` implementation renders actual

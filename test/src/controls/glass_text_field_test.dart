@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -388,6 +390,160 @@ void main() {
       final editable = tester.getRect(find.byType(EditableText));
       expect(leading.left, greaterThan(editable.right));
       expect(trailing.right, lessThan(editable.left));
+    });
+  });
+
+  group('the rest of the text-field API', () {
+    /// A harness whose field can be swapped for another after the first
+    /// pump: `_harness`'s `Overlay` builds its entry once, so pumping a
+    /// second `_harness` would not reach the field at all.
+    Future<ValueNotifier<Widget>> pumpSwappable(
+      WidgetTester tester,
+      Widget first,
+    ) async {
+      final field = ValueNotifier<Widget>(first);
+      addTearDown(field.dispose);
+      await tester.pumpWidget(
+        _harness(
+          child: ValueListenableBuilder<Widget>(
+            valueListenable: field,
+            builder: (context, child, _) => child,
+          ),
+        ),
+      );
+      return field;
+    }
+
+    testWidgets('a passed focusNode is the one the field focuses', (
+      tester,
+    ) async {
+      final node = FocusNode();
+      addTearDown(node.dispose);
+      await tester.pumpWidget(
+        _harness(child: GlassTextField(focusNode: node)),
+      );
+      node.requestFocus();
+      await tester.pump();
+      expect(
+        tester.widget<EditableText>(find.byType(EditableText)).focusNode,
+        same(node),
+      );
+      expect(node.hasFocus, isTrue);
+    });
+
+    testWidgets('autofocus takes focus on insertion', (tester) async {
+      await tester.pumpWidget(
+        _harness(child: const GlassTextField(autofocus: true)),
+      );
+      await tester.pump();
+      final editable = tester.widget<EditableText>(find.byType(EditableText));
+      expect(editable.focusNode.hasFocus, isTrue);
+    });
+
+    testWidgets('disabled: a tap does not focus, and semantics say disabled', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _harness(
+          child: const GlassTextField(placeholder: 'Name', enabled: false),
+        ),
+      );
+      await tester.tap(find.byType(GlassTextField));
+      await tester.pump();
+      final editable = tester.widget<EditableText>(find.byType(EditableText));
+      expect(editable.focusNode.hasFocus, isFalse);
+      final data = tester
+          .getSemantics(find.byType(EditableText))
+          .getSemanticsData();
+      expect(data.label, 'Name');
+      expect(data.flagsCollection.isEnabled, Tristate.isFalse);
+      handle.dispose();
+    });
+
+    testWidgets('disabling a focused field takes its focus away', (
+      tester,
+    ) async {
+      final node = FocusNode();
+      addTearDown(node.dispose);
+      final field = await pumpSwappable(
+        tester,
+        GlassTextField(focusNode: node),
+      );
+      node.requestFocus();
+      await tester.pump();
+      expect(node.hasFocus, isTrue);
+      field.value = GlassTextField(focusNode: node, enabled: false);
+      await tester.pump();
+      await tester.pump();
+      expect(node.hasFocus, isFalse);
+    });
+
+    testWidgets('keyboard type, action and obscuring reach EditableText', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _harness(
+          child: const GlassTextField(
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            obscureText: true,
+          ),
+        ),
+      );
+      final editable = tester.widget<EditableText>(find.byType(EditableText));
+      expect(editable.keyboardType, TextInputType.emailAddress);
+      expect(editable.textInputAction, TextInputAction.next);
+      expect(editable.obscureText, isTrue);
+    });
+
+    testWidgets('semanticLabel names the field in place of its placeholder', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _harness(
+          child: const GlassTextField(
+            placeholder: 'name@example.com',
+            semanticLabel: 'Email',
+          ),
+        ),
+      );
+      expect(find.bySemanticsLabel('Email'), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets("dropping the owner's controller keeps the text", (
+      tester,
+    ) async {
+      final controller = TextEditingController(text: 'kept');
+      addTearDown(controller.dispose);
+      final field = await pumpSwappable(
+        tester,
+        GlassTextField(controller: controller),
+      );
+      field.value = const GlassTextField();
+      await tester.pump();
+      expect(
+        tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+        'kept',
+      );
+    });
+
+    testWidgets("taking an owner's controller shows the owner's text", (
+      tester,
+    ) async {
+      final controller = TextEditingController(text: 'owner');
+      addTearDown(controller.dispose);
+      final field = await pumpSwappable(tester, const GlassTextField());
+      await tester.enterText(find.byType(EditableText), 'mine');
+      field.value = GlassTextField(controller: controller);
+      await tester.pump();
+      expect(
+        tester.widget<EditableText>(find.byType(EditableText)).controller,
+        same(controller),
+      );
+      expect(find.text('owner'), findsOneWidget);
     });
   });
 }
