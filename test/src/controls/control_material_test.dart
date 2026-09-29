@@ -18,7 +18,9 @@ Widget _onLayer(Widget child) => Directionality(
   child: GlassLayer(
     tier: GeometryTier.none,
     material: _layerMaterial,
-    child: Center(child: SizedBox(width: 240, child: Center(child: child))),
+    child: Center(
+      child: SizedBox(width: 240, child: Center(child: child)),
+    ),
   ),
 );
 

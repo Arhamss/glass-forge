@@ -452,6 +452,7 @@ class _GlassSliderState extends State<GlassSlider>
       decreasedValue: down == null ? null : _formatValue(down),
       onIncrease: up == null ? null : _increase,
       onDecrease: down == null ? null : _decrease,
+      verticalArrows: true,
       child: LayoutBuilder(
         builder: (context, constraints) {
           _trackWidth = constraints.maxWidth;

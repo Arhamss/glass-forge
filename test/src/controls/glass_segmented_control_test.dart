@@ -357,6 +357,36 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets(
+    'up and down arrows leave the selection alone and pass the key on, as a '
+    'horizontal control should',
+    (tester) async {
+      var selected = 1;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) => _harness(
+            child: GlassSegmentedControl<int>(
+              segments: _threeSegments,
+              selected: selected,
+              onChanged: (next) => setState(() => selected = next),
+            ),
+          ),
+        ),
+      );
+      FocusManager.instance.rootScope.descendants
+          .firstWhere((node) => node.canRequestFocus)
+          .requestFocus();
+      await tester.pump();
+
+      expect(await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown), isFalse);
+      await tester.pump();
+      expect(selected, 1);
+      expect(await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp), isFalse);
+      await tester.pump();
+      expect(selected, 1);
+    },
+  );
+
   testWidgets('Enter activates the focused segment', (tester) async {
     int? selected;
     await tester.pumpWidget(

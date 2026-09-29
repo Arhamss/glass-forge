@@ -83,10 +83,11 @@ class GlassSegment<T> {
 /// `SemanticsFlag.isSelected` for exactly the one whose [GlassSegment.value]
 /// equals [selected]. Each is named by its [GlassSegment.label] text, or by
 /// [GlassSegment.semanticLabel] when given. The left and right arrow keys
-/// (up and down too) move the selection by one segment while any segment
-/// is focused. That is a keyboard affordance only: segments do not expose
-/// increase and decrease semantics actions, which would announce each one
-/// as adjustable, a slider's role.
+/// move the selection by one segment while any segment is focused. Up and
+/// down do not: this is a horizontal control, and they are left for moving
+/// past it, as on iOS. That is a keyboard affordance only: segments do not
+/// expose increase and decrease semantics actions, which would announce
+/// each one as adjustable, a slider's role.
 ///
 /// Under [TextDirection.rtl] the whole control mirrors: the first segment
 /// sits on the right, the pill and a drag travel right to left, and the

@@ -42,6 +42,7 @@ class GlassControlFrame extends StatelessWidget {
     this.decreasedValue,
     this.onIncrease,
     this.onDecrease,
+    this.verticalArrows = false,
     super.key,
   });
 
@@ -110,19 +111,27 @@ class GlassControlFrame extends StatelessWidget {
   /// [onDecrease].
   final String? decreasedValue;
 
-  /// Called by the up arrow key while focused, by the arrow key pointing
-  /// along the reading direction — right, or left under
-  /// [TextDirection.rtl], the way Flutter's own `Slider` reads them — and,
-  /// for a [slider] only, by the increase semantics action. Null leaves the
-  /// key unhandled, so it can still do whatever it would elsewhere.
+  /// Called by the arrow key pointing along the reading direction — right,
+  /// or left under [TextDirection.rtl], the way Flutter's own `Slider`
+  /// reads them — by the up arrow with [verticalArrows], and, for a
+  /// [slider] only, by the increase semantics action. Null leaves the key
+  /// unhandled, so it can still do whatever it would elsewhere.
   final VoidCallback? onIncrease;
 
-  /// Called by the down arrow key while focused, by the arrow key pointing
-  /// against the reading direction — left, or right under
-  /// [TextDirection.rtl] — and, for a [slider] only, by the decrease
-  /// semantics action. Null leaves the key unhandled, so it can still do
-  /// whatever it would elsewhere.
+  /// Called by the arrow key pointing against the reading direction —
+  /// left, or right under [TextDirection.rtl] — by the down arrow with
+  /// [verticalArrows], and, for a [slider] only, by the decrease semantics
+  /// action. Null leaves the key unhandled, so it can still do whatever it
+  /// would elsewhere.
   final VoidCallback? onDecrease;
+
+  /// Whether the up and down arrow keys also step, up calling [onIncrease]
+  /// and down [onDecrease], as they do for Flutter's own `Slider`.
+  ///
+  /// False by default: a row of choices — segments, tabs — is a horizontal
+  /// control, and the vertical arrows are left for moving on to whatever is
+  /// above or below it, as iOS does. Only a slider sets this.
+  final bool verticalArrows;
 
   /// The least a control's hit target may measure on either axis.
   ///
@@ -219,12 +228,14 @@ class GlassControlFrame extends StatelessWidget {
         ? LogicalKeyboardKey.arrowLeft
         : LogicalKeyboardKey.arrowRight;
     if (onDecrease != null &&
-        (key == backward || key == LogicalKeyboardKey.arrowDown)) {
+        (key == backward ||
+            (verticalArrows && key == LogicalKeyboardKey.arrowDown))) {
       onDecrease!.call();
       return KeyEventResult.handled;
     }
     if (onIncrease != null &&
-        (key == forward || key == LogicalKeyboardKey.arrowUp)) {
+        (key == forward ||
+            (verticalArrows && key == LogicalKeyboardKey.arrowUp))) {
       onIncrease!.call();
       return KeyEventResult.handled;
     }
