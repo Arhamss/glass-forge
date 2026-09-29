@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/disabled_glass.dart';
@@ -143,10 +146,9 @@ class GlassButton extends StatelessWidget {
       focusNode: focusNode,
       autofocus: autofocus,
       toggled: toggled,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return _body(context, constraints.biggest, enabled: enabled);
-        },
+      child: _MeasuredBody(
+        measure: backdrop != null,
+        builder: (context, size) => _body(context, size, enabled: enabled),
       ),
     );
   }
@@ -256,5 +258,92 @@ class _PaintedPressScaleState extends State<_PaintedPressScale> {
         child: widget.child,
       ),
     );
+  }
+}
+
+/// Builds a button's body for the size it is actually laid out at.
+///
+/// The surface a button resolves depends on its size only through the
+/// size gate on adaptation — a small control may flip its scheme against a
+/// [GlassButton.backdrop], a large one only adapts — and only when a
+/// backdrop is given. A button's size is its label's, which is not known
+/// until it has laid out, and the space its parent offers says nothing
+/// about it: in a list, the height offered is infinite, which read as a
+/// huge surface and never flipped.
+///
+/// So with [measure] on, the body is first built for a best guess — the
+/// offered width, and the 44-point minimum height a control is laid out
+/// at unless its content is taller — then measured, and rebuilt once for
+/// the measured size if that differs. Without a backdrop nothing depends
+/// on the size, and nothing is measured.
+class _MeasuredBody extends StatefulWidget {
+  const _MeasuredBody({required this.measure, required this.builder});
+
+  final bool measure;
+  final Widget Function(BuildContext context, Size size) builder;
+
+  @override
+  State<_MeasuredBody> createState() => _MeasuredBodyState();
+}
+
+class _MeasuredBodyState extends State<_MeasuredBody> {
+  Size? _measured;
+
+  void _onSize(Size size) {
+    if (mounted && widget.measure && size != _measured) {
+      setState(() => _measured = size);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final guess = Size(
+          constraints.maxWidth,
+          math.min(constraints.maxHeight, GlassControlFrame.minimumExtent),
+        );
+        final body = widget.builder(context, _measured ?? guess);
+        if (!widget.measure) {
+          return body;
+        }
+        return _ReportSize(onSize: _onSize, child: body);
+      },
+    );
+  }
+}
+
+/// Reports its child's size after each layout that changes it, at the end
+/// of the frame: a rebuild from inside layout would throw.
+class _ReportSize extends SingleChildRenderObjectWidget {
+  const _ReportSize({required this.onSize, required Widget super.child});
+
+  final ValueChanged<Size> onSize;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderReportSize(onSize);
+
+  @override
+  void updateRenderObject(BuildContext context, RenderObject renderObject) {
+    (renderObject as _RenderReportSize).onSize = onSize;
+  }
+}
+
+class _RenderReportSize extends RenderProxyBox {
+  _RenderReportSize(this.onSize);
+
+  ValueChanged<Size> onSize;
+  Size? _reported;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    final laidOut = size;
+    if (laidOut == _reported) {
+      return;
+    }
+    _reported = laidOut;
+    WidgetsBinding.instance.addPostFrameCallback((_) => onSize(laidOut));
   }
 }
