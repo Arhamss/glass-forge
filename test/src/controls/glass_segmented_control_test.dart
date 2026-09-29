@@ -7,13 +7,13 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/glass_segmented_control.dart';
-import 'package:glass_forge/src/controls/track_cutout.dart';
 import 'package:glass_forge/src/design/glass_legibility.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
+import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_layer.dart';
 
@@ -700,11 +700,14 @@ void main() {
       final clip = find.descendant(
         of: find.byType(GlassSegmentedControl<int>),
         matching: find.byWidgetPredicate(
-          (w) => w is ClipPath && w.clipper is TrackCutoutClipper,
+          (w) =>
+              w is ClipPath &&
+              w.clipper is GlassShapeClipper &&
+              (w.clipper! as GlassShapeClipper).hole != null,
         ),
       );
       final clipper =
-          tester.widget<ClipPath>(clip).clipper! as TrackCutoutClipper;
+          tester.widget<ClipPath>(clip).clipper! as GlassShapeClipper;
       return clipper.hole!.shift(tester.getTopLeft(clip));
     }
 
@@ -891,11 +894,14 @@ void main() {
       final clip = find.descendant(
         of: find.byType(GlassSegmentedControl<int>),
         matching: find.byWidgetPredicate(
-          (w) => w is ClipPath && w.clipper is TrackCutoutClipper,
+          (w) =>
+              w is ClipPath &&
+              w.clipper is GlassShapeClipper &&
+              (w.clipper! as GlassShapeClipper).hole != null,
         ),
       );
       final clipper =
-          tester.widget<ClipPath>(clip).clipper! as TrackCutoutClipper;
+          tester.widget<ClipPath>(clip).clipper! as GlassShapeClipper;
       return clipper.hole!.shift(tester.getTopLeft(clip));
     }
 

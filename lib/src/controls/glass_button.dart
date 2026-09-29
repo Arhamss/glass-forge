@@ -6,6 +6,7 @@ import 'package:glass_forge/src/motion/glass_press_stretch.dart';
 import 'package:glass_forge/src/motion/interactive_glass.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
+import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 
@@ -177,7 +178,7 @@ class GlassButton extends StatelessWidget {
 
     if (GlassHostScope.isOnGlass(context)) {
       final painted = ClipPath(
-        clipper: _ButtonShapeClipper(resolvedShape),
+        clipper: GlassShapeClipper(resolvedShape),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: style.material.tint.withValues(
@@ -200,26 +201,6 @@ class GlassButton extends StatelessWidget {
       child: Glass(shape: resolvedShape, child: label),
     );
   }
-}
-
-/// Clips to [shape] at the real, laid-out size.
-///
-/// A local copy of the same two lines `GlassShapeClipper` in `glass.dart`
-/// runs — not a reuse of that class, which is `@visibleForTesting` and
-/// exists for tests to reach into `Glass`'s own clip, not for other widgets
-/// in this package to paint with.
-class _ButtonShapeClipper extends CustomClipper<Path> {
-  const _ButtonShapeClipper(this.shape);
-
-  final GlassShape shape;
-
-  @override
-  Path getClip(Size size) =>
-      shape.toBorder(size).getOuterPath(Offset.zero & size);
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) =>
-      oldClipper is! _ButtonShapeClipper || oldClipper.shape != shape;
 }
 
 /// A scale-on-press for the painted body drawn under [GlassHostScope].

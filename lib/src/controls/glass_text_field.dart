@@ -9,6 +9,7 @@ import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
+import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 
@@ -437,7 +438,7 @@ class _GlassTextFieldState extends State<GlassTextField>
     required GlassMaterial material,
   }) {
     return ClipPath(
-      clipper: _TextFieldShapeClipper(shape),
+      clipper: GlassShapeClipper(shape),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: material.tint.withValues(alpha: material.tintOpacity),
@@ -556,22 +557,3 @@ class _GlassSelectionHandleControls extends EmptyTextSelectionControls
 /// which the framework also declares as a plain `final`, not `const`.
 final TextSelectionControls _defaultSelectionControls =
     _GlassSelectionHandleControls();
-
-/// Clips to [shape] at the real, laid-out size.
-///
-/// A local copy of the same two lines `GlassButton`, `GlassSwitch`,
-/// `GlassSlider` and `GlassSegmentedControl` each carry under their own
-/// name — see any of their doc comments for why this is not shared.
-class _TextFieldShapeClipper extends CustomClipper<Path> {
-  const _TextFieldShapeClipper(this.shape);
-
-  final GlassShape shape;
-
-  @override
-  Path getClip(Size size) =>
-      shape.toBorder(size).getOuterPath(Offset.zero & size);
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) =>
-      oldClipper is! _TextFieldShapeClipper || oldClipper.shape != shape;
-}

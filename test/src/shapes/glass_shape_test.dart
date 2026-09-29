@@ -1,8 +1,8 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
+import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/shapes/shape_type.dart';
-import 'package:glass_forge/src/widgets/glass.dart';
 
 /// A non-const rounded rectangle, so two calls with the same [value] return
 /// genuinely distinct instances rather than one canonicalized const object.

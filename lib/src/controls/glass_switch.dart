@@ -3,14 +3,13 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
-import 'package:glass_forge/src/controls/track_cutout.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/motion/interactive_glass.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
-import 'package:glass_forge/src/shapes/glass_shape.dart';
+import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 
@@ -30,7 +29,7 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 ///
 /// On content the painted parts leave a hole the shape of the glass
 /// element and follow it as it moves, because a `GlassLayer` draws its
-/// glass under whatever its subtree paints; see [TrackCutoutClipper].
+/// glass under whatever its subtree paints; see `GlassShapeClipper`.
 ///
 /// That keeps the same "never glass on glass" rule `GlassButton` follows —
 /// see [GlassHostScope] — while still giving the one part of a switch that
@@ -358,9 +357,9 @@ class _GlassSwitchState extends State<GlassSwitch>
                 child: ClipPath(
                   // On content the knob is glass, which the layer draws
                   // under this track's paint: leave a hole where it is.
-                  // See [TrackCutoutClipper].
-                  clipper: TrackCutoutClipper(
-                    shape: style.shape,
+                  // See [GlassShapeClipper].
+                  clipper: GlassShapeClipper(
+                    style.shape,
                     hole: onGlass
                         ? null
                         : Rect.fromLTWH(
@@ -396,7 +395,7 @@ class _GlassSwitchState extends State<GlassSwitch>
   Widget _knob({required GlassSurfaceStyle style, required bool onGlass}) {
     if (onGlass) {
       return ClipPath(
-        clipper: _SwitchShapeClipper(style.shape),
+        clipper: GlassShapeClipper(style.shape),
         child: const DecoratedBox(
           decoration: BoxDecoration(color: _knobColor),
           child: SizedBox(width: _knobWidth, height: _knobHeight),
@@ -409,25 +408,4 @@ class _GlassSwitchState extends State<GlassSwitch>
       child: const SizedBox(width: _knobWidth, height: _knobHeight),
     );
   }
-}
-
-/// Clips to [shape] at the real, laid-out size.
-///
-/// A local copy of the same clipper `GlassButton` carries under a different
-/// name — see that file's own doc comment for why this is not shared: the
-/// package's real clip lives on `Glass` itself and is `@visibleForTesting`
-/// for that widget's own tests, not for other widgets in this package to
-/// paint with.
-class _SwitchShapeClipper extends CustomClipper<Path> {
-  const _SwitchShapeClipper(this.shape);
-
-  final GlassShape shape;
-
-  @override
-  Path getClip(Size size) =>
-      shape.toBorder(size).getOuterPath(Offset.zero & size);
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) =>
-      oldClipper is! _SwitchShapeClipper || oldClipper.shape != shape;
 }

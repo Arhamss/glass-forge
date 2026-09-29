@@ -3,13 +3,12 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
-import 'package:glass_forge/src/controls/track_cutout.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/motion/glass_jiggle.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
-import 'package:glass_forge/src/shapes/glass_shape.dart';
+import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 
@@ -23,7 +22,7 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 ///
 /// On content the painted parts leave a hole the shape of the glass
 /// element and follow it as it moves, because a `GlassLayer` draws its
-/// glass under whatever its subtree paints; see [TrackCutoutClipper].
+/// glass under whatever its subtree paints; see `GlassShapeClipper`.
 ///
 /// Dragging anywhere in the 44-point-tall hit area — not only on the thumb
 /// itself — sets the value under the finger; a plain tap jumps straight to
@@ -535,9 +534,9 @@ class _GlassSliderState extends State<GlassSlider>
                   // On content the thumb is glass, which the layer draws
                   // under the track's and fill's paint: leave a hole where
                   // it is, following its drag stretch. See
-                  // [TrackCutoutClipper].
-                  clipper: TrackCutoutClipper(
-                    shape: style.shape,
+                  // [GlassShapeClipper].
+                  clipper: GlassShapeClipper(
+                    style.shape,
                     hole: onGlass
                         ? null
                         : Rect.fromLTWH(
@@ -598,7 +597,7 @@ class _GlassSliderState extends State<GlassSlider>
     const size = SizedBox(width: _thumbSize, height: _thumbSize);
     if (onGlass) {
       return ClipPath(
-        clipper: _SliderTrackClipper(style.shape),
+        clipper: GlassShapeClipper(style.shape),
         child: const DecoratedBox(
           decoration: BoxDecoration(color: _thumbColor),
           child: size,
@@ -607,25 +606,4 @@ class _GlassSliderState extends State<GlassSlider>
     }
     return Glass(shape: style.shape, child: size);
   }
-}
-
-/// Clips to [shape] at the real, laid-out size.
-///
-/// A local copy of the same two lines `GlassButton` and `GlassSwitch` each
-/// carry under their own name — see either file's doc comment for why this
-/// is not shared: the package's real clip lives on `Glass` itself and is
-/// `@visibleForTesting` for that widget's own tests, not for other widgets
-/// in this package to paint with.
-class _SliderTrackClipper extends CustomClipper<Path> {
-  const _SliderTrackClipper(this.shape);
-
-  final GlassShape shape;
-
-  @override
-  Path getClip(Size size) =>
-      shape.toBorder(size).getOuterPath(Offset.zero & size);
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) =>
-      oldClipper is! _SliderTrackClipper || oldClipper.shape != shape;
 }

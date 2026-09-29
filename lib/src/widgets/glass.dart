@@ -3,6 +3,7 @@ import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/rendering/render_glass_shape.dart';
 import 'package:glass_forge/src/scene/blend_group_link.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
+import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/tier/glass_tier_scope.dart';
 import 'package:glass_forge/src/widgets/glass_blend_group.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
@@ -129,35 +130,6 @@ GlassMaterial? _resolveMaterialFor(
     brightness:
         MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light,
   );
-}
-
-/// Clips to [shape] at paint time, once its size is known.
-///
-/// [GlassShape.resolveRadius] clamps a requested corner radius to half the
-/// shorter side of the size it is given. Clipping with `shape.toBorder`
-/// against [Size.zero], as though the shape had no size, would resolve every
-/// corner radius to zero — the clip would then disagree with the SDF at
-/// every corner the shape actually paints at.
-///
-/// Not private: exercised directly by tests, since [GlassShape]'s value
-/// equality (what makes [shouldReclip] skip a rebuilt-but-unchanged shape)
-/// has no other externally observable effect.
-@visibleForTesting
-class GlassShapeClipper extends CustomClipper<Path> {
-  /// Creates a clipper for [shape].
-  const GlassShapeClipper(this.shape);
-
-  /// The shape being clipped to.
-  final GlassShape shape;
-
-  @override
-  Path getClip(Size size) =>
-      shape.toBorder(size).getOuterPath(Offset.zero & size);
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) {
-    return oldClipper is! GlassShapeClipper || oldClipper.shape != shape;
-  }
 }
 
 class _RawGlass extends SingleChildRenderObjectWidget {
