@@ -6,6 +6,7 @@ import 'package:glass_forge/src/controls/disabled_glass.dart';
 import 'package:glass_forge/src/design/glass_backdrop_sampler.dart';
 import 'package:glass_forge/src/design/glass_legibility.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
+import 'package:glass_forge/src/design/glass_text.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/motion/settle_spring.dart';
 import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
@@ -176,6 +177,9 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
   /// `GlassTabBar`'s labels: the label grows a little and then stops,
   /// rather than being clipped.
   static const double _maxLabelScale = 1.5;
+
+  /// A segment label's size, in points: iOS's segmented control label.
+  static const double _labelSize = 13;
 
   /// The gap between the pill and the edges of the segment slot it fills,
   /// and between the pill and the track's top and bottom.
@@ -551,14 +555,25 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
       inMutuallyExclusiveGroup: true,
       autofocus: widget.autofocus && selected,
       semanticLabel: segment.semanticLabel,
+      // iOS's 13-point segment label, semibold when selected, named in full
+      // rather than just a colour: with no Material above, the ambient
+      // style is `WidgetsApp`'s 48-point, underlined debug fallback, and
+      // any size or decoration left unnamed would come from it. The app's
+      // font family still does.
       child: DefaultTextStyle.merge(
-        style: TextStyle(
+        style: glassTextStyle(
+          inherit: true,
           color: _labelColorFor(
             style: style,
             onGlass: onGlass,
             selected: selected,
           ),
+          fontSize: _labelSize,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
         ),
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         // The track is a fixed 32 points high, so a label follows the
         // reader's text size only up to [_maxLabelScale]; see there.
         child: MediaQuery.withClampedTextScaling(

@@ -6,6 +6,7 @@ import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/disabled_glass.dart';
 import 'package:glass_forge/src/design/glass_backdrop_sampler.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
+import 'package:glass_forge/src/design/glass_text.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/motion/glass_press_stretch.dart';
 import 'package:glass_forge/src/motion/interactive_glass.dart';
@@ -179,8 +180,16 @@ class GlassButton extends StatelessWidget {
 
     final label = Padding(
       padding: _padding,
+      // iOS's 17-point button label, named in full rather than just a
+      // colour: with no Material above, the ambient style is `WidgetsApp`'s
+      // 48-point, underlined debug fallback, and any size or decoration
+      // left unnamed would come from it. The app's font family still does.
       child: DefaultTextStyle.merge(
-        style: TextStyle(color: labelColor),
+        style: glassTextStyle(
+          inherit: true,
+          color: labelColor,
+          letterSpacing: glassBodyLetterSpacing,
+        ),
         child: IconTheme.merge(
           data: IconThemeData(color: labelColor),
           child: child,

@@ -11,6 +11,7 @@ import 'package:glass_forge/src/design/glass_backdrop_sampler.dart';
 import 'package:glass_forge/src/design/glass_motion_defaults.dart';
 import 'package:glass_forge/src/design/glass_shadow_painter.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
+import 'package:glass_forge/src/design/glass_text.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/design/glass_tint.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
@@ -802,7 +803,11 @@ class _TabButton extends StatelessWidget {
               tab.label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              // Size and decoration named, not left to the ambient style,
+              // which with no Material above is a debug fallback — 48
+              // points and underlined.
+              style: glassTextStyle(
+                inherit: true,
                 color: color,
                 fontSize: _labelSize,
                 fontWeight: lit ? _litWeight : _unlitWeight,

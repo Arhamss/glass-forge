@@ -7,6 +7,7 @@ import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/disabled_glass.dart';
 import 'package:glass_forge/src/design/glass_backdrop_sampler.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
+import 'package:glass_forge/src/design/glass_text.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/motion/reduce_motion.dart';
@@ -611,9 +612,12 @@ class _GlassTextFieldState extends State<GlassTextField>
                 placeholder,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                // Size and decoration named, not left to the ambient style,
+                // which with no Material above is a debug fallback — 48
+                // points and underlined.
+                style: glassTextStyle(
+                  inherit: true,
                   color: label.withValues(alpha: label.a * _placeholderAlpha),
-                  fontSize: _fontSize,
                 ),
               ),
             ),

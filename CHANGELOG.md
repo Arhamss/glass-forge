@@ -43,6 +43,11 @@
   `Material` above a glass page, its text used to draw in `WidgetsApp`'s
   debug fallback: 48-point red monospace with a yellow double underline.
   `GlassAppBar`'s title is 17-point semibold.
+- `GlassSegmentedControl` labels no longer render giant and cut off
+  outside a `Material`. They are 13 points, semibold when selected, and
+  keep the app's font family. `GlassButton` labels, the `GlassTextField`
+  placeholder and `GlassTabBar` labels likewise name their size and never
+  take an underline from the ambient style.
 
 ### Backdrop sampling
 
