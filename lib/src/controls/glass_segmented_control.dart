@@ -141,6 +141,16 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
   /// narrower painted strip inside it.
   static const double _height = GlassControlFrame.minimumExtent;
 
+  /// The most a segment's label grows with the reader's text size.
+  ///
+  /// The control keeps its fixed 44-point height — the pill, the track
+  /// and every segment's hit target are laid out on it — so the label has
+  /// the pill's 38 points to fit in. At 1.5× a 17-point label still fits;
+  /// past about 1.8× it would be cut off. The same policy as
+  /// `GlassTabBar`'s labels: the label grows a little and then stops,
+  /// rather than being clipped.
+  static const double _maxLabelScale = 1.5;
+
   /// The gap between the pill and the edges of the segment slot it fills.
   static const double _pillInset = 3;
 
@@ -489,7 +499,13 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
             selected: selected,
           ),
         ),
-        child: segment.label,
+        // The control is a fixed 44 points high, like the tab bar, so a
+        // label follows the reader's text size only up to
+        // [_maxLabelScale]; see there.
+        child: MediaQuery.withClampedTextScaling(
+          maxScaleFactor: _maxLabelScale,
+          child: segment.label,
+        ),
       ),
     );
   }

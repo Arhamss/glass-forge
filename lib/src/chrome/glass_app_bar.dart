@@ -7,6 +7,14 @@ import 'package:glass_forge/src/widgets/glass_presence.dart';
 /// The bar's height, not counting the top safe-area inset above it.
 const double _barHeight = 44;
 
+/// The most the bar's content grows with the reader's text size.
+///
+/// The bar keeps iOS's fixed 44-point height, so a 17-point title has room
+/// to grow to 1.5× (25.5 points) and no further; past that it would be cut
+/// off. iOS itself does not scale navigation-bar titles at all. The same
+/// policy as `GlassTabBar`'s labels.
+const double _maxTextScale = 1.5;
+
 /// Clear space kept between the bar's edges and its leading/title/actions.
 const double _horizontalPadding = 16;
 
@@ -93,7 +101,10 @@ class GlassAppBar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(
           horizontal: _horizontalPadding,
         ),
-        child: toolbar,
+        child: MediaQuery.withClampedTextScaling(
+          maxScaleFactor: _maxTextScale,
+          child: toolbar,
+        ),
       ),
     );
 

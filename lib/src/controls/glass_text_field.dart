@@ -43,6 +43,12 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 /// comes from the surface's own label colour, the same as every other
 /// control's label.
 ///
+/// **Large text.** The field is at least 44 points high and grows with the
+/// reader's text size, the way an iOS text field does with Dynamic Type,
+/// rather than cutting its own text off. The fixed-height controls —
+/// `GlassSegmentedControl`, `GlassTabBar`, `GlassAppBar` — instead let
+/// their labels grow to 1.5× and stop there.
+///
 /// **The keyboard inset.** On focus, and again on every subsequent change
 /// to the view's metrics while still focused, a field inside a scroll view
 /// scrolls just far enough to sit clear of whatever covers the screen: the
@@ -158,6 +164,7 @@ class _GlassTextFieldState extends State<GlassTextField>
   static const double _height = GlassControlFrame.minimumExtent;
   static const EdgeInsetsGeometry _padding = EdgeInsets.symmetric(
     horizontal: 16,
+    vertical: 8,
   );
   static const double _gap = 8;
   static const double _fontSize = 17;
@@ -362,37 +369,43 @@ class _GlassTextFieldState extends State<GlassTextField>
               (1 - style.material.tintOpacity) * _focusTintOpacityLift,
         );
 
+        // At least [_height] high, and taller when the reader's text size
+        // needs it: a field grows with Dynamic Type on iOS rather than
+        // cutting its own text off.
         return SizedBox(
           width: constraints.maxWidth,
-          height: _height,
-          child: AnimatedBuilder(
-            animation: _focus,
-            builder: (context, child) {
-              final t = _focus.value / _focusTravel;
-              final material = style.material.copyWith(
-                highlight: _lerp(
-                  style.material.highlight,
-                  brighter.highlight,
-                  t,
-                ),
-                tintOpacity: _lerp(
-                  style.material.tintOpacity,
-                  brighter.tintOpacity,
-                  t,
-                ),
-              );
-              return Stack(
-                children: [
-                  Positioned.fill(
-                    child: onGlass
-                        ? _paintedBody(shape: shape, material: material)
-                        : Glass(shape: shape, material: material),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: _height),
+            child: AnimatedBuilder(
+              animation: _focus,
+              builder: (context, child) {
+                final t = _focus.value / _focusTravel;
+                final material = style.material.copyWith(
+                  highlight: _lerp(
+                    style.material.highlight,
+                    brighter.highlight,
+                    t,
                   ),
-                  Positioned.fill(child: child!),
-                ],
-              );
-            },
-            child: _foreground(style),
+                  tintOpacity: _lerp(
+                    style.material.tintOpacity,
+                    brighter.tintOpacity,
+                    t,
+                  ),
+                );
+                return Stack(
+                  alignment: AlignmentDirectional.centerStart,
+                  children: [
+                    Positioned.fill(
+                      child: onGlass
+                          ? _paintedBody(shape: shape, material: material)
+                          : Glass(shape: shape, material: material),
+                    ),
+                    child!,
+                  ],
+                );
+              },
+              child: _foreground(style),
+            ),
           ),
         );
       },
