@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:glass_forge/src/design/glass_surfaces.dart';
+import 'package:glass_forge/src/design/glass_theme.dart';
 
 /// Semantics, focus, keyboard activation and a minimum hit target — the
 /// accessible shell every control in `lib/src/controls` builds its visuals
@@ -12,6 +14,10 @@ import 'package:flutter/widgets.dart';
 /// loose space a parent offers. A
 /// control that is already 44 × 44 or bigger — most text buttons — is
 /// unaffected; a small icon button gets extra, invisible margin to tap in.
+///
+/// While it holds keyboard focus, and only in keyboard mode, the frame
+/// draws a capsule ring just outside [child] in the control role's label
+/// colour, so a keyboard user can see where focus is.
 ///
 /// [onActivate] is both what a tap, and Enter or Space while focused, call,
 /// and what disables the control when null: no gesture reaches it, no key
@@ -172,7 +178,11 @@ class GlassControlFrame extends StatelessWidget {
       // whatever loose space it is offered, which made a button in a
       // start-aligned column span the whole row and gave a switch in
       // `Align(topLeft)` the whole screen as its hit area.
-      child: Center(widthFactor: 1, heightFactor: 1, child: child),
+      child: Center(
+        widthFactor: 1,
+        heightFactor: 1,
+        child: _FocusRing(child: child),
+      ),
     );
 
     result = GestureDetector(
@@ -257,4 +267,86 @@ class GlassControlFrame extends StatelessWidget {
     }
     return KeyEventResult.ignored;
   }
+}
+
+/// A ring around a control's visual while it holds keyboard focus.
+///
+/// Only in keyboard mode ([FocusHighlightMode.traditional]): a control
+/// focused by touch shows nothing, as on iOS, where the focus halo belongs
+/// to a hardware keyboard. The ring is drawn just outside the visual, in
+/// the control role's label colour — the colour already chosen to read
+/// against glass — as a capsule, the shape every control here resolves to.
+/// It hugs the visual, not the larger 44 × 44 hit area around it.
+class _FocusRing extends StatefulWidget {
+  const _FocusRing({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_FocusRing> createState() => _FocusRingState();
+}
+
+class _FocusRingState extends State<_FocusRing> {
+  /// Clear space between the visual and the ring.
+  static const double _gap = 3;
+
+  /// The ring's stroke width.
+  static const double _width = 2;
+
+  @override
+  void initState() {
+    super.initState();
+    FocusManager.instance.addHighlightModeListener(_onHighlightMode);
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeHighlightModeListener(_onHighlightMode);
+    super.dispose();
+  }
+
+  void _onHighlightMode(FocusHighlightMode mode) => setState(() {});
+
+  @override
+  Widget build(BuildContext context) {
+    final show =
+        Focus.of(context).hasPrimaryFocus &&
+        FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
+    if (!show) {
+      return widget.child;
+    }
+    final color = GlassTheme.surfaceOf(
+      context,
+      GlassSurfaceRole.control,
+      size: const Size.square(GlassControlFrame.minimumExtent),
+    ).labelColor;
+    return CustomPaint(
+      foregroundPainter: _FocusRingPainter(color),
+      child: widget.child,
+    );
+  }
+}
+
+class _FocusRingPainter extends CustomPainter {
+  const _FocusRingPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = (Offset.zero & size).inflate(
+      _FocusRingState._gap + _FocusRingState._width / 2,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, Radius.circular(rect.shortestSide / 2)),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _FocusRingState._width
+        ..color = color,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_FocusRingPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
