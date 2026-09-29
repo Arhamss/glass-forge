@@ -93,6 +93,28 @@ void main() {
     },
   );
 
+  testWidgets('a text child names the button when no label is given', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _harness(
+        child: GlassButton(onPressed: () {}, child: const Text('Go')),
+      ),
+    );
+
+    expect(
+      tester.getSemantics(find.byType(GlassButton)),
+      isSemantics(
+        label: 'Go',
+        isButton: true,
+        isEnabled: true,
+        hasTapAction: true,
+      ),
+    );
+    handle.dispose();
+  });
+
   testWidgets('semantics report a button, enabled, with the label', (
     tester,
   ) async {

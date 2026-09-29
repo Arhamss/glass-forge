@@ -54,6 +54,9 @@ class GlassControlFrame extends StatelessWidget {
   final VoidCallback? onActivate;
 
   /// The accessible name read for this control.
+  ///
+  /// Null names the control from [child]'s own semantics instead: a `Text`
+  /// child's words become the label. Given, it replaces them.
   final String? semanticLabel;
 
   /// Where keyboard focus for this control is tracked.
@@ -105,13 +108,13 @@ class GlassControlFrame extends StatelessWidget {
   /// [onDecrease].
   final String? decreasedValue;
 
-  /// Called by the increase semantics action, and by the right or up arrow
-  /// key while focused. Null both disables that action and leaves the key
+  /// Called by the right or up arrow key while focused, and, for a
+  /// [slider] only, by the increase semantics action. Null leaves the key
   /// unhandled, so it can still do whatever it would elsewhere.
   final VoidCallback? onIncrease;
 
-  /// Called by the decrease semantics action, and by the left or down arrow
-  /// key while focused. Null both disables that action and leaves the key
+  /// Called by the left or down arrow key while focused, and, for a
+  /// [slider] only, by the decrease semantics action. Null leaves the key
   /// unhandled, so it can still do whatever it would elsewhere.
   final VoidCallback? onDecrease;
 
@@ -153,11 +156,12 @@ class GlassControlFrame extends StatelessWidget {
     );
 
     return Semantics(
-      // The control's own visual — a `Text` label, an `Icon` — would
-      // otherwise contribute its own semantics too, merging into this
-      // node's and duplicating [semanticLabel] onto it. One control is one
-      // semantics node.
-      excludeSemantics: true,
+      // One control is one semantics node. With an explicit
+      // [semanticLabel], the visual's own semantics — a `Text`, an `Icon`
+      // — are dropped so they do not duplicate it. Without one, they are
+      // what names the control: a `Text` child's words become this node's
+      // label, merged in rather than left as a separate node.
+      excludeSemantics: semanticLabel != null,
       container: true,
       button: button,
       slider: slider,
@@ -169,8 +173,12 @@ class GlassControlFrame extends StatelessWidget {
       increasedValue: increasedValue,
       decreasedValue: decreasedValue,
       onTap: enabled ? onActivate : null,
-      onIncrease: enabled ? onIncrease : null,
-      onDecrease: enabled ? onDecrease : null,
+      // Increase and decrease make a node "adjustable" to a screen reader,
+      // which is a slider's role and nothing else's. A segment steps with
+      // the arrow keys too, but announcing it as adjustable would describe
+      // it wrongly, so only [slider] exposes these as semantics actions.
+      onIncrease: enabled && slider ? onIncrease : null,
+      onDecrease: enabled && slider ? onDecrease : null,
       child: result,
     );
   }

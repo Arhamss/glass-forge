@@ -100,8 +100,9 @@ class GlassButton extends StatelessWidget {
 
   /// The accessible name read for this button.
   ///
-  /// Required on [GlassButton.icon]; optional here, where [child] is
-  /// usually text a screen reader can already read for itself.
+  /// Required on [GlassButton.icon]; optional here. Null reads [child]'s
+  /// own semantics as the name, so a `Text` child names the button with its
+  /// words; given, this replaces them.
   final String? semanticLabel;
 
   /// Where keyboard focus for this button is tracked. Null owns one for

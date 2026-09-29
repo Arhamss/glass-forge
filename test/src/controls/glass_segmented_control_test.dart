@@ -1,4 +1,7 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/gestures.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -222,6 +225,69 @@ void main() {
     // A drag has nowhere to travel and must not throw or produce NaN.
     await _dragBy(tester, find.byType(GlassSegmentedControl<int>), 40);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'each segment is named by its label, is a button selected on exactly '
+    'one, and is not adjustable',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _harness(
+          child: GlassSegmentedControl<int>(
+            segments: _threeSegments,
+            selected: 1,
+            onChanged: (_) {},
+          ),
+        ),
+      );
+
+      final frames = find.byType(GlassControlFrame);
+      expect(frames, findsNWidgets(3));
+      const labels = ['Day', 'Week', 'Month'];
+      var selectedCount = 0;
+      for (var i = 0; i < 3; i++) {
+        final data = tester.getSemantics(frames.at(i)).getSemanticsData();
+        expect(data.label, labels[i]);
+        expect(data.flagsCollection.isButton, isTrue);
+        if (data.flagsCollection.isSelected == Tristate.isTrue) {
+          selectedCount++;
+        }
+        // Adjustable is the slider's role. A segment that offered
+        // increase/decrease was announced as one on iOS.
+        expect(data.hasAction(SemanticsAction.increase), isFalse);
+        expect(data.hasAction(SemanticsAction.decrease), isFalse);
+      }
+      expect(selectedCount, 1);
+      handle.dispose();
+    },
+  );
+
+  testWidgets('an explicit segment semanticLabel replaces its label text', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _harness(
+        child: GlassSegmentedControl<int>(
+          segments: const [
+            GlassSegment(
+              value: 0,
+              label: Text('D'),
+              semanticLabel: 'Day view',
+            ),
+            GlassSegment(value: 1, label: Text('W')),
+          ],
+          selected: 0,
+          onChanged: (_) {},
+        ),
+      ),
+    );
+
+    final frames = find.byType(GlassControlFrame);
+    expect(tester.getSemantics(frames.at(0)).label, 'Day view');
+    expect(tester.getSemantics(frames.at(1)).label, 'W');
+    handle.dispose();
   });
 
   testWidgets('semantics report a selectable button, selected on one', (

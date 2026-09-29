@@ -17,17 +17,27 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 @immutable
 class GlassSegment<T> {
   /// Creates a segment.
-  const GlassSegment({required this.value, required this.label});
+  const GlassSegment({
+    required this.value,
+    required this.label,
+    this.semanticLabel,
+  });
 
   /// What [GlassSegmentedControl.onChanged] is called with when this
   /// segment is chosen, and what [GlassSegmentedControl.selected] is
   /// compared against with `==` to find it again.
   final T value;
 
-  /// This segment's own visual — usually a [Text]. Its semantics are
-  /// excluded the same as every control's content in this package; see
-  /// [GlassControlFrame].
+  /// This segment's own visual — usually a [Text], whose words also name
+  /// the segment to a screen reader unless [semanticLabel] is given.
   final Widget label;
+
+  /// The accessible name read for this segment.
+  ///
+  /// Null, the default, reads the text [label] already shows. Give one when
+  /// [label] is an icon, or abbreviates what a screen reader should say in
+  /// full.
+  final String? semanticLabel;
 }
 
 /// A row of mutually exclusive choices under a travelling glass pill.
@@ -65,10 +75,12 @@ class GlassSegment<T> {
 /// [GlassControlFrame] gives it semantics, focus, a 44 × 44 minimum hit
 /// target and Enter/Space activation — and reports
 /// `SemanticsFlag.isSelected` for exactly the one whose [GlassSegment.value]
-/// equals [selected]. The left and right arrow keys (up and down too) move
-/// the selection by one segment while any segment is focused, through the
-/// same [GlassControlFrame.onIncrease] and [GlassControlFrame.onDecrease]
-/// `GlassSlider` steps with.
+/// equals [selected]. Each is named by its [GlassSegment.label] text, or by
+/// [GlassSegment.semanticLabel] when given. The left and right arrow keys
+/// (up and down too) move the selection by one segment while any segment
+/// is focused. That is a keyboard affordance only: segments do not expose
+/// increase and decrease semantics actions, which would announce each one
+/// as adjustable, a slider's role.
 class GlassSegmentedControl<T> extends StatefulWidget {
   /// Creates a segmented control.
   const GlassSegmentedControl({
@@ -407,6 +419,7 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
       onIncrease: enabled ? _selectNext : null,
       onDecrease: enabled ? _selectPrevious : null,
       selected: selected,
+      semanticLabel: segment.semanticLabel,
       child: DefaultTextStyle.merge(
         style: TextStyle(
           color: _labelColorFor(
