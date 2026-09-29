@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/glass_segmented_control.dart';
+import 'package:glass_forge/src/controls/track_cutout.dart';
 import 'package:glass_forge/src/design/glass_legibility.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
@@ -47,6 +48,7 @@ Widget _harness({
   required Widget child,
   bool onGlass = false,
   Brightness brightness = Brightness.light,
+  TextDirection textDirection = TextDirection.ltr,
 }) {
   final sized = SizedBox(width: _width, child: child);
   final content = onGlass
@@ -58,7 +60,7 @@ Widget _harness({
   return MediaQuery(
     data: MediaQueryData(platformBrightness: brightness),
     child: Directionality(
-      textDirection: TextDirection.ltr,
+      textDirection: textDirection,
       child: GlassLayer(
         tier: GeometryTier.none,
         material: _inert,
@@ -592,5 +594,109 @@ void main() {
         );
       }
     }
+  });
+
+  group('right to left', () {
+    Widget rtl({required int selected, ValueChanged<int>? onChanged}) =>
+        _harness(
+          textDirection: TextDirection.rtl,
+          child: GlassSegmentedControl<int>(
+            segments: _threeSegments,
+            selected: selected,
+            onChanged: onChanged ?? (_) {},
+          ),
+        );
+
+    /// The painted-track hole, in global coordinates.
+    Rect holeOf(WidgetTester tester) {
+      final clip = find.descendant(
+        of: find.byType(GlassSegmentedControl<int>),
+        matching: find.byWidgetPredicate(
+          (w) => w is ClipPath && w.clipper is TrackCutoutClipper,
+        ),
+      );
+      final clipper =
+          tester.widget<ClipPath>(clip).clipper! as TrackCutoutClipper;
+      return clipper.hole!.shift(tester.getTopLeft(clip));
+    }
+
+    for (final (index, label) in [(0, 'Day'), (1, 'Week'), (2, 'Month')]) {
+      testWidgets('the pill and its hole sit under "$label" at rest', (
+        tester,
+      ) async {
+        await tester.pumpWidget(rtl(selected: index));
+
+        final pill = tester.getRect(
+          find.descendant(
+            of: find.byType(GlassSegmentedControl<int>),
+            matching: find.byType(Glass),
+          ),
+        );
+        final labelCentre = tester.getCenter(find.text(label));
+        expect(pill.left, lessThan(labelCentre.dx));
+        expect(pill.right, greaterThan(labelCentre.dx));
+        expect(holeOf(tester), pill);
+      });
+    }
+
+    testWidgets('the first segment is on the right', (tester) async {
+      await tester.pumpWidget(rtl(selected: 0));
+      expect(
+        tester.getCenter(find.text('Day')).dx,
+        greaterThan(tester.getCenter(find.text('Month')).dx),
+      );
+    });
+
+    testWidgets('a drag selects the segment under the finger', (
+      tester,
+    ) async {
+      int? selected;
+      await tester.pumpWidget(
+        rtl(selected: 0, onChanged: (next) => selected = next),
+      );
+
+      final from = tester.getCenter(find.text('Day'));
+      final to = tester.getCenter(find.text('Month'));
+      await _dragBy(tester, find.text('Day'), to.dx - from.dx);
+      await tester.pumpAndSettle();
+
+      expect(selected, 2);
+    });
+
+    testWidgets('a short drag toward the next segment settles on it', (
+      tester,
+    ) async {
+      int? selected;
+      await tester.pumpWidget(
+        rtl(selected: 0, onChanged: (next) => selected = next),
+      );
+
+      // One 80-pixel slot to the left, in RTL toward segment 1.
+      await _dragBy(tester, find.text('Day'), -80);
+      await tester.pumpAndSettle();
+
+      expect(selected, 1);
+    });
+
+    testWidgets('the left arrow moves to the next segment', (tester) async {
+      int? selected;
+      await tester.pumpWidget(
+        rtl(selected: 0, onChanged: (next) => selected = next),
+      );
+      FocusManager.instance.rootScope.descendants
+          .firstWhere((node) => node.canRequestFocus)
+          .requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      expect(selected, 1);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      expect(selected, 0);
+
+      await tester.pumpAndSettle();
+    });
   });
 }

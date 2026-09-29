@@ -110,14 +110,18 @@ class GlassControlFrame extends StatelessWidget {
   /// [onDecrease].
   final String? decreasedValue;
 
-  /// Called by the right or up arrow key while focused, and, for a
-  /// [slider] only, by the increase semantics action. Null leaves the key
-  /// unhandled, so it can still do whatever it would elsewhere.
+  /// Called by the up arrow key while focused, by the arrow key pointing
+  /// along the reading direction — right, or left under
+  /// [TextDirection.rtl], the way Flutter's own `Slider` reads them — and,
+  /// for a [slider] only, by the increase semantics action. Null leaves the
+  /// key unhandled, so it can still do whatever it would elsewhere.
   final VoidCallback? onIncrease;
 
-  /// Called by the left or down arrow key while focused, and, for a
-  /// [slider] only, by the decrease semantics action. Null leaves the key
-  /// unhandled, so it can still do whatever it would elsewhere.
+  /// Called by the down arrow key while focused, by the arrow key pointing
+  /// against the reading direction — left, or right under
+  /// [TextDirection.rtl] — and, for a [slider] only, by the decrease
+  /// semantics action. Null leaves the key unhandled, so it can still do
+  /// whatever it would elsewhere.
   final VoidCallback? onDecrease;
 
   /// The least a control's hit target may measure on either axis.
@@ -132,6 +136,7 @@ class GlassControlFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = _enabled;
+    final rtl = Directionality.maybeOf(context) == TextDirection.rtl;
 
     Widget result = ConstrainedBox(
       constraints: const BoxConstraints(
@@ -158,7 +163,9 @@ class GlassControlFrame extends StatelessWidget {
       autofocus: autofocus,
       canRequestFocus: enabled,
       skipTraversal: !enabled,
-      onKeyEvent: enabled ? _handleKeyEvent : null,
+      onKeyEvent: enabled
+          ? (node, event) => _handleKeyEvent(event, rtl: rtl)
+          : null,
       child: result,
     );
 
@@ -190,7 +197,7 @@ class GlassControlFrame extends StatelessWidget {
     );
   }
 
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+  KeyEventResult _handleKeyEvent(KeyEvent event, {required bool rtl}) {
     if (event is! KeyDownEvent) {
       return KeyEventResult.ignored;
     }
@@ -202,15 +209,22 @@ class GlassControlFrame extends StatelessWidget {
       onActivate!.call();
       return KeyEventResult.handled;
     }
+    // The horizontal arrows follow the reading direction: under
+    // [TextDirection.rtl] the start of a row is on the right, so the left
+    // arrow moves toward its end.
+    final backward = rtl
+        ? LogicalKeyboardKey.arrowRight
+        : LogicalKeyboardKey.arrowLeft;
+    final forward = rtl
+        ? LogicalKeyboardKey.arrowLeft
+        : LogicalKeyboardKey.arrowRight;
     if (onDecrease != null &&
-        (key == LogicalKeyboardKey.arrowLeft ||
-            key == LogicalKeyboardKey.arrowDown)) {
+        (key == backward || key == LogicalKeyboardKey.arrowDown)) {
       onDecrease!.call();
       return KeyEventResult.handled;
     }
     if (onIncrease != null &&
-        (key == LogicalKeyboardKey.arrowRight ||
-            key == LogicalKeyboardKey.arrowUp)) {
+        (key == forward || key == LogicalKeyboardKey.arrowUp)) {
       onIncrease!.call();
       return KeyEventResult.handled;
     }

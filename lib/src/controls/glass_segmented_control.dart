@@ -81,6 +81,11 @@ class GlassSegment<T> {
 /// is focused. That is a keyboard affordance only: segments do not expose
 /// increase and decrease semantics actions, which would announce each one
 /// as adjustable, a slider's role.
+///
+/// Under [TextDirection.rtl] the whole control mirrors: the first segment
+/// sits on the right, the pill and a drag travel right to left, and the
+/// left arrow moves to the next segment, as the horizontal arrows follow
+/// the reading direction.
 class GlassSegmentedControl<T> extends StatefulWidget {
   /// Creates a segmented control.
   const GlassSegmentedControl({
@@ -96,7 +101,8 @@ class GlassSegmentedControl<T> extends StatefulWidget {
   // stays `const`-constructible for callers whose segments and callback
   // are const.
 
-  /// The choices, left to right. Never empty — see the class doc.
+  /// The choices, in reading order: left to right, or right to left under
+  /// [TextDirection.rtl]. Never empty — see the class doc.
   final List<GlassSegment<T>> segments;
 
   /// The value of the currently chosen segment.
@@ -160,6 +166,16 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
   /// The most recent build's track width, read by the drag handlers, which
   /// run outside `build` and have no constraints of their own to ask.
   double _trackWidth = 0;
+
+  /// The most recent build's reading direction, read by the drag handlers
+  /// for the same reason as [_trackWidth]. Under [TextDirection.rtl] the
+  /// `Row` of segments puts index 0 on the right, so the pill and a drag
+  /// both measure [_position] from the right edge instead.
+  TextDirection _textDirection = TextDirection.ltr;
+
+  /// +1 when [_position] grows left to right, -1 when it grows right to
+  /// left — what a horizontal pixel delta is multiplied by to move it.
+  double get _direction => _textDirection == TextDirection.rtl ? -1 : 1;
 
   int get _segmentCount => widget.segments.length;
 
@@ -290,7 +306,7 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
     if (travel <= 0) {
       return;
     }
-    final delta = (details.primaryDelta ?? 0) / travel;
+    final delta = _direction * (details.primaryDelta ?? 0) / travel;
     _position.value = (_position.value + delta).clamp(0.0, 1.0);
   }
 
@@ -300,7 +316,7 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
     final changed = nearest != _targetIndex;
     final travel = _travel;
     final velocity = travel > 0
-        ? details.velocity.pixelsPerSecond.dx / travel
+        ? _direction * details.velocity.pixelsPerSecond.dx / travel
         : 0.0;
     _animateTo(nearest, velocity: velocity);
     if (changed) {
@@ -316,6 +332,7 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onChanged != null;
+    _textDirection = Directionality.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         _trackWidth = constraints.maxWidth;
@@ -462,9 +479,14 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
   }
 
   /// Where the pill is at [_position], in this control's own box: its
-  /// segment slot, inset by [_pillInset] on every side.
+  /// segment slot, inset by [_pillInset] on every side. Measured from the
+  /// right edge under [TextDirection.rtl], where the first segment is.
   Rect _pillRect(double segmentWidth) => Rect.fromLTWH(
-    _pillInset + _travel * _position.value,
+    _pillInset +
+        _travel *
+            (_textDirection == TextDirection.rtl
+                ? 1 - _position.value
+                : _position.value),
     _pillInset,
     (segmentWidth - 2 * _pillInset).clamp(0.0, double.infinity),
     _height - 2 * _pillInset,
