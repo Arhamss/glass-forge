@@ -1,6 +1,7 @@
 import 'package:flutter/animation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:glass_forge/src/diagnostics/render_counters.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/rendering/render_glass_layer.dart';
 import 'package:glass_forge/src/scene/blend_group_link.dart';
@@ -384,7 +385,9 @@ class RenderGlassShape extends RenderProxyBox {
   void paint(PaintingContext context, Offset offset) {
     _syncGeometryIfTransformChanged();
     final target = _layer;
-    if (target != null && _hasRepaintBoundaryBelow(target)) {
+    if (target != null &&
+        !target.isSubtreeContext(context) &&
+        _hasRepaintBoundaryBelow(target)) {
       final marker = _marker.layer ??= _PlacementMarker(
         _schedulePlacementCheck,
       );
@@ -402,7 +405,16 @@ class RenderGlassShape extends RenderProxyBox {
   /// Where one does, the boundary can put this shape on screen from its
   /// retained layer without this shape painting at all, so "did not paint"
   /// stops meaning "not drawn". That is the one case [_marker] exists for.
+  ///
+  /// [paint] asks only when it was not handed [target]'s own subtree
+  /// context (`RenderGlassLayer.isSubtreeContext`), which already rules a
+  /// boundary out, so a shape moving directly under its layer never walks.
+  /// Not cached across attach and detach: whether an ancestor is a boundary
+  /// can change with neither -- `ImageFiltered` is one only while enabled
+  /// -- and a stale "no" here would withdraw a shape its boundary is still
+  /// drawing. A cache of that kind failed the test that pins this.
   bool _hasRepaintBoundaryBelow(RenderGlassLayer target) {
+    GlassRenderCounters.instance.recordBoundaryWalk();
     for (
       var node = parent;
       node != null && !identical(node, target);

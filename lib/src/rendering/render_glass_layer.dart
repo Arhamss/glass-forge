@@ -249,6 +249,20 @@ class RenderGlassLayer extends RenderProxyBox {
   /// Whether this layer is currently painting its own subtree.
   bool get isPaintingSubtree => _paintingSubtree;
 
+  /// The context [_paintSubtree] is painting the subtree into, while it is.
+  PaintingContext? _subtreeContext;
+
+  /// Whether [context] is the one this layer is painting its subtree into
+  /// right now.
+  ///
+  /// True for a descendant painted straight into this layer's own paint,
+  /// with nothing between them that pushed a layer of its own. A repaint
+  /// boundary always paints its subtree into a context of its own, so a
+  /// shape handed this layer's context has no boundary between them, and
+  /// needs no walk up the tree to find that out.
+  bool isSubtreeContext(PaintingContext context) =>
+      _paintingSubtree && identical(context, _subtreeContext);
+
   /// Counts the paints of this layer's subtree, so a shape can say which of
   /// them it last read its own transform in.
   ///
@@ -1016,12 +1030,14 @@ class RenderGlassLayer extends RenderProxyBox {
   /// layer is the thing painting it.
   void _paintSubtree(PaintingContext context, Offset offset) {
     _paintingSubtree = true;
+    _subtreeContext = context;
     _subtreePaint++;
     try {
       super.paint(context, offset);
       _resyncShapesThatDidNotPaint(context);
     } finally {
       _paintingSubtree = false;
+      _subtreeContext = null;
     }
   }
 

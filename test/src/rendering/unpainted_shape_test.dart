@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glass_forge/glass_forge.dart';
@@ -263,6 +265,168 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('a moving shape painted straight into its layer never walks '
+      'up to it looking for a repaint boundary', (tester) async {
+    _installCapturingProducer();
+    final left = ValueNotifier<double>(0);
+    addTearDown(left.dispose);
+
+    await tester.pumpWidget(
+      _layer(<Widget>[
+        ValueListenableBuilder<double>(
+          valueListenable: left,
+          builder: (context, value, child) => Positioned(
+            left: value,
+            top: 0,
+            width: _tile,
+            height: _tile,
+            child: child!,
+          ),
+          child: _glass(0),
+        ),
+      ]),
+    );
+    await tester.pump();
+    final layer = tester.renderObject<RenderGlassLayer>(
+      find.byType(GlassLayer),
+    );
+    final subtreePaints = layer.subtreePaint;
+    GlassRenderCounters.instance.reset();
+
+    for (var i = 1; i <= 10; i++) {
+      left.value = i * 4;
+      await tester.pump();
+    }
+
+    expect(
+      layer.subtreePaint,
+      greaterThanOrEqualTo(subtreePaints + 10),
+      reason: 'the shape did not move, so this checked nothing',
+    );
+    expect(GlassRenderCounters.instance.boundaryWalkCount, 0);
+  });
+
+  testWidgets('a shape moved under a new repaint boundary is still found '
+      'there, and stays in the matte while the boundary is reused', (
+    tester,
+  ) async {
+    final producer = _installCapturingProducer();
+    final colour = ValueNotifier<Color>(const Color(0xFF000000));
+    addTearDown(colour.dispose);
+    final glassKey = GlobalKey();
+
+    Widget build({required bool boundary}) {
+      final glass = KeyedSubtree(key: glassKey, child: _glass(0));
+      return _layer(<Widget>[
+        Positioned.fill(
+          child: ValueListenableBuilder<Color>(
+            valueListenable: colour,
+            builder: (context, value, _) => ColoredBox(color: value),
+          ),
+        ),
+        _tileAt(0, boundary ? RepaintBoundary(child: glass) : glass),
+      ]);
+    }
+
+    await tester.pumpWidget(build(boundary: false));
+    await tester.pump();
+    final layer = tester.renderObject<RenderGlassLayer>(
+      find.byType(GlassLayer),
+    );
+    final shape = tester.renderObject(find.byType(Glass));
+
+    // The same render object, reparented under a boundary.
+    await tester.pumpWidget(build(boundary: true));
+    await tester.pump();
+    expect(tester.renderObject(find.byType(Glass)), same(shape));
+
+    final subtreePaints = layer.subtreePaint;
+    for (var i = 1; i <= 3; i++) {
+      colour.value = Color(0xFF000000 + i);
+      await tester.pump();
+      await tester.pump();
+    }
+    expect(
+      layer.subtreePaint,
+      greaterThan(subtreePaints),
+      reason: 'the layer did not repaint, so this checked nothing',
+    );
+    final dpr = tester.view.devicePixelRatio;
+    expect(
+      _holds(
+        producer.last,
+        tester.getRect(find.byKey(const ValueKey<int>(0))),
+        dpr,
+      ),
+      isTrue,
+      reason: 'the shape drawn from the boundary was taken out of the matte',
+    );
+  });
+
+  testWidgets('an ancestor that becomes a repaint boundary with no reparent '
+      'is still found, and the shape stays in the matte', (tester) async {
+    // `ImageFiltered` is a boundary only while enabled, and turning it on
+    // neither detaches nor re-attaches anything below it -- so whether a
+    // boundary sits above a shape cannot be decided once per attach.
+    final producer = _installCapturingProducer();
+    final colour = ValueNotifier<Color>(const Color(0xFF000000));
+    addTearDown(colour.dispose);
+    final filtered = ValueNotifier<bool>(false);
+    addTearDown(filtered.dispose);
+
+    await tester.pumpWidget(
+      _layer(<Widget>[
+        Positioned.fill(
+          child: ValueListenableBuilder<Color>(
+            valueListenable: colour,
+            builder: (context, value, _) => ColoredBox(color: value),
+          ),
+        ),
+        _tileAt(
+          0,
+          ValueListenableBuilder<bool>(
+            valueListenable: filtered,
+            builder: (context, value, child) => ImageFiltered(
+              enabled: value,
+              imageFilter: ImageFilter.matrix(Matrix4.identity().storage),
+              child: child,
+            ),
+            child: _glass(0),
+          ),
+        ),
+      ]),
+    );
+    await tester.pump();
+
+    filtered.value = true;
+    await tester.pump();
+    await tester.pump();
+
+    final layer = tester.renderObject<RenderGlassLayer>(
+      find.byType(GlassLayer),
+    );
+    final subtreePaints = layer.subtreePaint;
+    for (var i = 1; i <= 3; i++) {
+      colour.value = Color(0xFF000000 + i);
+      await tester.pump();
+      await tester.pump();
+    }
+    expect(
+      layer.subtreePaint,
+      greaterThan(subtreePaints),
+      reason: 'the layer did not repaint, so this checked nothing',
+    );
+    expect(
+      _holds(
+        producer.last,
+        tester.getRect(find.byKey(const ValueKey<int>(0))),
+        tester.view.devicePixelRatio,
+      ),
+      isTrue,
+      reason: 'the shape drawn from the boundary was taken out of the matte',
+    );
+  });
 
   testWidgets('a shape under a repaint boundary that stays on screen bakes '
       'no new matte while the layer repaints around it', (tester) async {

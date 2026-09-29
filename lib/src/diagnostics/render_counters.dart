@@ -15,6 +15,7 @@ class GlassRenderCounters {
   int _matteProduceCount = 0;
   int _backdropPushCount = 0;
   int _passAssignmentCount = 0;
+  int _boundaryWalkCount = 0;
 
   /// How many mattes have been baked.
   int get matteProduceCount => _matteProduceCount;
@@ -29,6 +30,11 @@ class GlassRenderCounters {
   /// shape, or animating what its pass renders with through a scope such as
   /// `GlassPresence`, is meant to cost none.
   int get passAssignmentCount => _passAssignmentCount;
+
+  /// How many times a shape has walked its ancestors to its layer, looking
+  /// for a repaint boundary between them. A moving shape painted straight
+  /// into its layer's own paint is meant to need none.
+  int get boundaryWalkCount => _boundaryWalkCount;
 
   /// Records a matte bake.
   void recordMatteProduce() {
@@ -51,10 +57,18 @@ class GlassRenderCounters {
     }
   }
 
+  /// Records one walk from a shape up to its layer.
+  void recordBoundaryWalk() {
+    if (kDebugMode) {
+      _boundaryWalkCount++;
+    }
+  }
+
   /// Resets every counter.
   void reset() {
     _matteProduceCount = 0;
     _backdropPushCount = 0;
     _passAssignmentCount = 0;
+    _boundaryWalkCount = 0;
   }
 }
