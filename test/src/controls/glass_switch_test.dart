@@ -235,8 +235,13 @@ void main() {
 
     var value = false;
     await tester.pumpWidget(
-      _harness(
-        child: GlassSwitch(value: value, onChanged: (next) => value = next),
+      StatefulBuilder(
+        builder: (context, setState) => _harness(
+          child: GlassSwitch(
+            value: value,
+            onChanged: (next) => setState(() => value = next),
+          ),
+        ),
       ),
     );
 
@@ -263,8 +268,16 @@ void main() {
         tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
       );
 
+      var value = false;
       await tester.pumpWidget(
-        _harness(child: GlassSwitch(value: false, onChanged: (_) {})),
+        StatefulBuilder(
+          builder: (context, setState) => _harness(
+            child: GlassSwitch(
+              value: value,
+              onChanged: (next) => setState(() => value = next),
+            ),
+          ),
+        ),
       );
 
       await tester.tap(find.byType(GlassSwitch));
@@ -302,6 +315,103 @@ void main() {
       expect(settledTransform.transform.getTranslation().x, 22);
     },
   );
+
+  group('the owner rejects the change', () {
+    // An `onChanged` that neither rebuilds nor stores: a confirm dialog, a
+    // save that fails, a placeholder. The switch must go on showing
+    // `value`, as `Switch` and `CupertinoSwitch` do.
+    Widget rejecting(List<bool> reported) => _harness(
+      child: GlassSwitch(
+        value: false,
+        onChanged: reported.add,
+        semanticLabel: 'Wi-Fi',
+      ),
+    );
+
+    void expectOff(WidgetTester tester) {
+      expect(_knobX(tester), 0);
+      expect(
+        tester.getSemantics(find.byType(GlassSwitch)),
+        isSemantics(
+          label: 'Wi-Fi',
+          isEnabled: true,
+          hasToggledState: true,
+          isToggled: false,
+        ),
+      );
+    }
+
+    testWidgets('a tap springs the knob back to off', (tester) async {
+      final handle = tester.ensureSemantics();
+      final reported = <bool>[];
+      await tester.pumpWidget(rejecting(reported));
+
+      await tester.tap(find.byType(GlassSwitch));
+      await tester.pumpAndSettle();
+
+      expect(reported, [true]);
+      expectOff(tester);
+      handle.dispose();
+    });
+
+    testWidgets('a drag past half springs the knob back to off', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      final reported = <bool>[];
+      await tester.pumpWidget(rejecting(reported));
+
+      await _dragBy(tester, find.byType(GlassSwitch), 16);
+      await tester.pumpAndSettle();
+
+      expect(reported, [true]);
+      expectOff(tester);
+      handle.dispose();
+    });
+
+    testWidgets('Space springs the knob back to off', (tester) async {
+      final handle = tester.ensureSemantics();
+      final reported = <bool>[];
+      await tester.pumpWidget(rejecting(reported));
+      FocusManager.instance.rootScope.descendants
+          .firstWhere((node) => node.canRequestFocus)
+          .requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+
+      expect(reported, [true]);
+      expectOff(tester);
+      handle.dispose();
+    });
+
+    testWidgets('an owner that accepts later moves the knob then', (
+      tester,
+    ) async {
+      var value = false;
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return _harness(
+              child: GlassSwitch(value: value, onChanged: (_) {}),
+            );
+          },
+        ),
+      );
+
+      await tester.tap(find.byType(GlassSwitch));
+      await tester.pumpAndSettle();
+      expect(_knobX(tester), 0);
+
+      // The save came back: the owner now rebuilds with the new value.
+      rebuild(() => value = true);
+      await tester.pumpAndSettle();
+      expect(_knobX(tester), 22);
+    });
+  });
 
   group('right to left', () {
     Widget rtl({required bool value, ValueChanged<bool>? onChanged}) =>
@@ -379,3 +489,15 @@ void main() {
     });
   });
 }
+
+/// The knob's travel from its off side, read off the paint-time translate.
+double _knobX(WidgetTester tester) => tester
+    .widget<Transform>(
+      find.descendant(
+        of: find.byType(GlassSwitch),
+        matching: find.byType(Transform),
+      ),
+    )
+    .transform
+    .getTranslation()
+    .x;

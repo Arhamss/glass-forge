@@ -68,7 +68,11 @@ class GlassTab {
 /// A tap aims it at the new tab. A drag anywhere along the bar keeps
 /// re-aiming it at the finger, so it chases rather than sticks, and a
 /// release throws it to the tab it was heading for, carrying the finger's
-/// speed. Nothing is reported until the finger lifts.
+/// speed. Nothing is reported until the finger lifts. The selection always
+/// ends up at [currentIndex]: an owner that declines the tab a drag was
+/// released on, or has not rebuilt with it by the next frame, gets the
+/// selection sent back, and only the tab at [currentIndex] ever reports
+/// itself selected.
 ///
 /// The lens shares the bar's presence: its own is the bar's times its
 /// flight, so a bar faded out by a covering route never leaves a lens
@@ -232,6 +236,12 @@ class _GlassTabBarState extends State<GlassTabBar>
   void didUpdateWidget(GlassTabBar oldWidget) {
     super.didUpdateWidget(oldWidget);
     _assertIndex();
+    _followIndex();
+  }
+
+  /// Aims the selection at [GlassTabBar.currentIndex] unless a drag owns it
+  /// or it is already heading there.
+  void _followIndex() {
     if (_hover == null && _lens.target != widget.currentIndex) {
       _aim(widget.currentIndex.toDouble());
     }
@@ -346,6 +356,15 @@ class _GlassTabBarState extends State<GlassTabBar>
     if (target != widget.currentIndex) {
       unawaited(HapticFeedback.lightImpact());
       widget.onTap(target);
+      // An owner that declined [target], or has not rebuilt with it yet,
+      // left [GlassTabBar.currentIndex] where it was: send it back there.
+      SchedulerBinding.instance
+        ..addPostFrameCallback((_) {
+          if (mounted) {
+            _followIndex();
+          }
+        })
+        ..ensureVisualUpdate();
     }
   }
 

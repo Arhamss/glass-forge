@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/physics.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/track_cutout.dart';
@@ -57,6 +58,13 @@ class GlassSegment<T> {
 /// moves the pill continuously under the finger; only on release does it
 /// snap to the nearest segment and, if that changed the selection, call
 /// [onChanged].
+///
+/// The pill always ends up under [selected]. It springs toward a new
+/// choice at once, for feel, then reports it; if the owner has not rebuilt
+/// with that value by the next frame — it declined the change, or is still
+/// deciding — the pill springs back, and a later rebuild with the new value
+/// moves it again. Only the segment at [selected] ever reports itself
+/// selected.
 ///
 /// ```dart
 /// GlassSegmentedControl<int>(
@@ -212,17 +220,39 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
   @override
   void didUpdateWidget(GlassSegmentedControl<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_dragging) {
-      final desired = _indexOf(widget.selected);
-      assert(
-        desired != -1,
-        'GlassSegmentedControl.selected must be the value of one of '
-        'segments',
-      );
-      if (desired != _targetIndex) {
-        _animateTo(desired);
-      }
+    _followSelected();
+  }
+
+  /// Springs the pill to [GlassSegmentedControl.selected] unless a drag
+  /// owns it or it is already heading there.
+  void _followSelected() {
+    if (_dragging) {
+      return;
     }
+    final desired = _indexOf(widget.selected);
+    assert(
+      desired != -1,
+      'GlassSegmentedControl.selected must be the value of one of '
+      'segments',
+    );
+    if (desired != _targetIndex) {
+      _animateTo(desired);
+    }
+  }
+
+  /// Reports the segment at [index] to [onChanged], then checks after the
+  /// next frame that the owner took it: an owner that declined, or has not
+  /// rebuilt yet, has left [GlassSegmentedControl.selected] where it was,
+  /// and the pill springs back to it.
+  void _report(ValueChanged<T> onChanged, int index) {
+    onChanged(widget.segments[index].value);
+    SchedulerBinding.instance
+      ..addPostFrameCallback((_) {
+        if (mounted) {
+          _followSelected();
+        }
+      })
+      ..ensureVisualUpdate();
   }
 
   @override
@@ -289,7 +319,7 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
       return;
     }
     _animateTo(clamped);
-    onChanged(widget.segments[clamped].value);
+    _report(onChanged, clamped);
   }
 
   void _selectNext() => _select(_targetIndex + 1);
@@ -319,8 +349,9 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
         ? _direction * details.velocity.pixelsPerSecond.dx / travel
         : 0.0;
     _animateTo(nearest, velocity: velocity);
-    if (changed) {
-      widget.onChanged?.call(widget.segments[nearest].value);
+    final onChanged = widget.onChanged;
+    if (changed && onChanged != null) {
+      _report(onChanged, nearest);
     }
   }
 

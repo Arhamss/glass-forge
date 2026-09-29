@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/physics.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/track_cutout.dart';
@@ -39,6 +40,12 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 ///   onChanged: (next) => setState(() => volume = next),
 /// )
 /// ```
+///
+/// The thumb follows the finger while a drag is down, for feel, and after a
+/// tap or a keyboard step moves at once; once the gesture or step is over,
+/// it shows [value]. An owner that declined the change, or has not rebuilt
+/// with it by the next frame, gets the thumb back where [value] says, and
+/// semantics report [value] throughout.
 ///
 /// `onChanged: null` disables it: no tap, no drag, no keyboard step, and the
 /// callback never runs. Focus and the increase/decrease semantics actions
@@ -172,12 +179,30 @@ class _GlassSliderState extends State<GlassSlider>
   @override
   void didUpdateWidget(GlassSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_dragging) {
-      final desired = _fractionOf(widget.value);
-      if (desired != _position.value) {
-        _position.value = desired;
-      }
+    _followValue();
+  }
+
+  /// Puts the thumb at [GlassSlider.value] unless a drag owns it.
+  void _followValue() {
+    if (_dragging) {
+      return;
     }
+    final desired = _fractionOf(widget.value);
+    if (desired != _position.value) {
+      _position.value = desired;
+    }
+  }
+
+  /// After the next frame, puts the thumb back at [GlassSlider.value] if
+  /// the owner did not rebuild with what a gesture or step just reported.
+  void _followValueAfterFrame() {
+    SchedulerBinding.instance
+      ..addPostFrameCallback((_) {
+        if (mounted) {
+          _followValue();
+        }
+      })
+      ..ensureVisualUpdate();
   }
 
   @override
@@ -258,6 +283,7 @@ class _GlassSliderState extends State<GlassSlider>
     );
     _position.value = _fractionOf(next);
     widget.onChanged?.call(next);
+    _followValueAfterFrame();
   }
 
   void _increase() => _step(1);
@@ -282,12 +308,14 @@ class _GlassSliderState extends State<GlassSlider>
     _dragging = false;
     widget.onChangeEnd?.call(_currentValue);
     _animateStretchTo(1);
+    _followValueAfterFrame();
   }
 
   void _onDragCancel() {
     _dragging = false;
     widget.onChangeEnd?.call(_currentValue);
     _animateStretchTo(1);
+    _followValueAfterFrame();
   }
 
   void _updateFromLocalX(double dx) {

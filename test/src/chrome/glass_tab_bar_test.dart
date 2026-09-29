@@ -382,6 +382,69 @@ void main() {
     expect(tester.getSize(surface).height, GlassTabBar.height);
   });
 
+  group('the owner rejects the change', () {
+    /// The painted pill: the last clip the bar builds.
+    Rect pillOf(WidgetTester tester) => tester.getRect(
+      find
+          .descendant(
+            of: find.byType(GlassTabBar),
+            matching: find.byType(ClipPath),
+          )
+          .last,
+    );
+
+    Rect lensOf(WidgetTester tester) => tester.getRect(
+      find.descendant(
+        of: find.byType(GlassPresence),
+        matching: find.byType(Glass),
+      ),
+    );
+
+    testWidgets('a drag released on another tab settles back', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final taps = <int>[];
+      // `onTap` that neither rebuilds nor stores: the bar must go on
+      // showing `currentIndex`.
+      await tester.pumpWidget(
+        _harness(
+          bar: GlassTabBar(tabs: _tabs, currentIndex: 0, onTap: taps.add),
+        ),
+      );
+
+      final from = tester.getCenter(find.text('Home'));
+      final to = tester.getCenter(find.text('Profile'));
+      final gesture = await tester.startGesture(
+        from,
+        kind: PointerDeviceKind.mouse,
+      );
+      for (var i = 1; i <= 10; i++) {
+        await gesture.moveTo(Offset.lerp(from, to, i / 10)!);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(taps, [2]);
+      final home = tester.getCenter(find.text('Home')).dx;
+      for (final rect in [pillOf(tester), lensOf(tester)]) {
+        expect(rect.left, lessThan(home));
+        expect(rect.right, greaterThan(home));
+      }
+      expect(
+        tester.getSemantics(find.byType(GlassControlFrame).at(0)),
+        isSemantics(
+          label: 'Home',
+          isButton: true,
+          isSelected: true,
+          isEnabled: true,
+        ),
+      );
+      semantics.dispose();
+    });
+  });
+
   group('right to left', () {
     Widget rtl(List<int> taps, {int initial = 0}) => _harness(
       textDirection: TextDirection.rtl,

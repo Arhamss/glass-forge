@@ -358,6 +358,88 @@ void main() {
     await tester.pump();
   });
 
+  group('the owner rejects the change', () {
+    // An `onChanged` that neither rebuilds nor stores. The thumb may follow
+    // the finger while it is down, but once the gesture is over the slider
+    // must show `value` again, as `Slider` does.
+    Widget rejecting(List<double> reported) => _harness(
+      child: GlassSlider(
+        value: 0.25,
+        onChanged: reported.add,
+        semanticLabel: 'Volume',
+      ),
+    );
+
+    void expectAtQuarter(WidgetTester tester) {
+      final slider = tester.getRect(find.byType(GlassSlider));
+      final thumb = tester.getRect(
+        find.descendant(
+          of: find.byType(GlassSlider),
+          matching: find.byType(Glass),
+        ),
+      );
+      expect(thumb.center.dx - slider.left, closeTo(_xFor(0.25), 0.001));
+      expect(
+        tester.getSemantics(find.byType(GlassSlider)),
+        isSemantics(label: 'Volume', value: '0.25', isSlider: true),
+      );
+    }
+
+    testWidgets('a tap leaves the thumb where value says', (tester) async {
+      final handle = tester.ensureSemantics();
+      final reported = <double>[];
+      await tester.pumpWidget(rejecting(reported));
+
+      final anchor = _anchor(tester, find.byType(GlassSlider));
+      final gesture = await tester.startGesture(
+        anchor + Offset(_xFor(0.75), 0),
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(reported.last, closeTo(0.75, 0.001));
+      expectAtQuarter(tester);
+      handle.dispose();
+    });
+
+    testWidgets('a drag puts the thumb back when it ends', (tester) async {
+      final handle = tester.ensureSemantics();
+      final reported = <double>[];
+      await tester.pumpWidget(rejecting(reported));
+
+      await _dragThrough(tester, find.byType(GlassSlider), [
+        _xFor(0.25),
+        _xFor(0.5),
+        _xFor(0.9),
+      ]);
+      await tester.pumpAndSettle();
+
+      expect(reported.last, closeTo(0.9, 0.001));
+      expectAtQuarter(tester);
+      handle.dispose();
+    });
+
+    testWidgets('an arrow key leaves the thumb where value says', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      final reported = <double>[];
+      await tester.pumpWidget(rejecting(reported));
+      FocusManager.instance.rootScope.descendants
+          .firstWhere((node) => node.canRequestFocus)
+          .requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+
+      expect(reported, [closeTo(0.35, 0.001)]);
+      expectAtQuarter(tester);
+      handle.dispose();
+    });
+  });
+
   group('right to left', () {
     Widget rtl({required double value, ValueChanged<double>? onChanged}) =>
         _harness(

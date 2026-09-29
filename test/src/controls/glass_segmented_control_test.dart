@@ -325,13 +325,15 @@ void main() {
   });
 
   testWidgets('arrow keys move a focused selection', (tester) async {
-    int? selected;
+    var selected = 0;
     await tester.pumpWidget(
-      _harness(
-        child: GlassSegmentedControl<int>(
-          segments: _threeSegments,
-          selected: 0,
-          onChanged: (next) => selected = next,
+      StatefulBuilder(
+        builder: (context, setState) => _harness(
+          child: GlassSegmentedControl<int>(
+            segments: _threeSegments,
+            selected: selected,
+            onChanged: (next) => setState(() => selected = next),
+          ),
         ),
       ),
     );
@@ -465,12 +467,15 @@ void main() {
         tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
       );
 
+      var selected = 0;
       await tester.pumpWidget(
-        _harness(
-          child: GlassSegmentedControl<int>(
-            segments: _threeSegments,
-            selected: 0,
-            onChanged: (_) {},
+        StatefulBuilder(
+          builder: (context, setState) => _harness(
+            child: GlassSegmentedControl<int>(
+              segments: _threeSegments,
+              selected: selected,
+              onChanged: (next) => setState(() => selected = next),
+            ),
           ),
         ),
       );
@@ -596,6 +601,76 @@ void main() {
     }
   });
 
+  group('the owner rejects the change', () {
+    // An `onChanged` that neither rebuilds nor stores. The pill must settle
+    // back under `selected`, and only that segment reports itself selected.
+    Widget rejecting(List<int> reported) => _harness(
+      child: GlassSegmentedControl<int>(
+        segments: _threeSegments,
+        selected: 0,
+        onChanged: reported.add,
+      ),
+    );
+
+    void expectOnDay(WidgetTester tester) {
+      final pill = tester.getRect(
+        find.descendant(
+          of: find.byType(GlassSegmentedControl<int>),
+          matching: find.byType(Glass),
+        ),
+      );
+      final day = tester.getCenter(find.text('Day')).dx;
+      expect(pill.left, lessThan(day));
+      expect(pill.right, greaterThan(day));
+      final frames = find.byType(GlassControlFrame);
+      expect(
+        tester.getSemantics(frames.at(0)),
+        isSemantics(isButton: true, isEnabled: true, isSelected: true),
+      );
+    }
+
+    testWidgets('a tap springs the pill back', (tester) async {
+      final handle = tester.ensureSemantics();
+      final reported = <int>[];
+      await tester.pumpWidget(rejecting(reported));
+
+      await tester.tap(find.text('Month'));
+      await tester.pumpAndSettle();
+
+      expect(reported, [2]);
+      expectOnDay(tester);
+      handle.dispose();
+    });
+
+    testWidgets('a drag springs the pill back', (tester) async {
+      final handle = tester.ensureSemantics();
+      final reported = <int>[];
+      await tester.pumpWidget(rejecting(reported));
+
+      await _dragBy(tester, find.byType(GlassSegmentedControl<int>), 140);
+      await tester.pumpAndSettle();
+
+      expect(reported, [2]);
+      expectOnDay(tester);
+      handle.dispose();
+    });
+
+    testWidgets('a second tap on the same segment reports it again', (
+      tester,
+    ) async {
+      final reported = <int>[];
+      await tester.pumpWidget(rejecting(reported));
+
+      await tester.tap(find.text('Week'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Week'));
+      await tester.pumpAndSettle();
+
+      expect(reported, [1, 1]);
+      expectOnDay(tester);
+    });
+  });
+
   group('right to left', () {
     Widget rtl({required int selected, ValueChanged<int>? onChanged}) =>
         _harness(
@@ -679,9 +754,14 @@ void main() {
     });
 
     testWidgets('the left arrow moves to the next segment', (tester) async {
-      int? selected;
+      var selected = 0;
       await tester.pumpWidget(
-        rtl(selected: 0, onChanged: (next) => selected = next),
+        StatefulBuilder(
+          builder: (context, setState) => rtl(
+            selected: selected,
+            onChanged: (next) => setState(() => selected = next),
+          ),
+        ),
       );
       FocusManager.instance.rootScope.descendants
           .firstWhere((node) => node.canRequestFocus)

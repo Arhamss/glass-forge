@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/physics.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/track_cutout.dart';
@@ -55,6 +56,13 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 /// Under [TextDirection.rtl] the switch mirrors, as `Switch` and
 /// `CupertinoSwitch` do: "on" is the left side, and a drag toward it is a
 /// drag to the left.
+///
+/// The switch always ends up showing [value]. A tap or a drag springs the
+/// knob toward the new side at once, for feel, then reports it; if the
+/// owner has not rebuilt with that value by the next frame — it declined
+/// the change, or is still deciding — the knob springs back, and a later
+/// rebuild with the new value moves it again. Semantics report [value]
+/// throughout.
 ///
 /// `onChanged: null` disables it: no tap, no drag, and the callback never
 /// runs — see [GlassControlFrame], which every control in this package
@@ -167,10 +175,31 @@ class _GlassSwitchState extends State<GlassSwitch>
   @override
   void didUpdateWidget(GlassSwitch oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _followValue();
+  }
+
+  /// Springs the knob to [GlassSwitch.value] unless a drag owns it or it is
+  /// already heading there.
+  void _followValue() {
     final desired = widget.value ? _travel : 0.0;
     if (!_dragging && desired != _target) {
       _animateTo(desired);
     }
+  }
+
+  /// Reports [next] to [GlassSwitch.onChanged], then checks after the next
+  /// frame that the owner took it: an owner that declined, or has not
+  /// rebuilt yet, has left [GlassSwitch.value] where it was, and the knob
+  /// springs back to it.
+  void _report(ValueChanged<bool> onChanged, bool next) {
+    onChanged(next);
+    SchedulerBinding.instance
+      ..addPostFrameCallback((_) {
+        if (mounted) {
+          _followValue();
+        }
+      })
+      ..ensureVisualUpdate();
   }
 
   @override
@@ -215,7 +244,7 @@ class _GlassSwitchState extends State<GlassSwitch>
     }
     final next = !widget.value;
     _animateTo(next ? _travel : 0);
-    onChanged(next);
+    _report(onChanged, next);
   }
 
   void _onDragStart(DragStartDetails details) {
@@ -240,7 +269,7 @@ class _GlassSwitchState extends State<GlassSwitch>
     );
     final onChanged = widget.onChanged;
     if (onChanged != null && settledOn != widget.value) {
-      onChanged(settledOn);
+      _report(onChanged, settledOn);
     }
   }
 
