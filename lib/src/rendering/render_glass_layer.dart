@@ -344,6 +344,8 @@ class RenderGlassLayer extends RenderProxyBox {
   ///
   /// A pass on the unclipped single-pass arrangement reports the layer's
   /// own clip, which is where it draws.
+  ///
+  /// Recorded in debug builds only; always empty in release.
   @visibleForTesting
   List<Rect> get debugPassClips => List.unmodifiable(_debugPassClips);
   final List<Rect> _debugPassClips = <Rect>[];
@@ -459,7 +461,14 @@ class RenderGlassLayer extends RenderProxyBox {
   /// `(a, b)` in the order they were found. The check runs every paint, and
   /// an overlap that persists would otherwise print sixty times a second —
   /// burying the one line that matters under a thousand copies of itself.
-  final Set<(_PassKey, _PassKey)> _warnedOverlaps = <(_PassKey, _PassKey)>{};
+  ///
+  /// Keyed by the passes themselves, by identity, not by their keys: a
+  /// material animating every frame is a new key every frame, but its pass
+  /// is carried over (see [_carryOverMovedPasses]), so it is the same
+  /// overlap. Pruned to the live passes on every check, so a retired pass
+  /// is not held for the layer's whole life.
+  final Set<(_GlassPass, _GlassPass)> _warnedOverlaps =
+      <(_GlassPass, _GlassPass)>{};
 
   static String _ordinal(int n) => switch (n % 10) {
     1 when n % 100 != 11 => '${n}st',
@@ -780,6 +789,10 @@ class RenderGlassLayer extends RenderProxyBox {
   /// what actually renders.
   void _debugWarnOnCrossPassOverlap() {
     assert(() {
+      final live = _passes.values.toSet();
+      _warnedOverlaps.removeWhere(
+        (pair) => !live.contains(pair.$1) || !live.contains(pair.$2),
+      );
       final entries = _records.values.toList(growable: false);
       for (var i = 0; i < entries.length; i++) {
         final a = entries[i];
@@ -816,8 +829,12 @@ class RenderGlassLayer extends RenderProxyBox {
           // Once per pair of passes, in either order — and every new pair in
           // this paint, not just the first: returning after one left the
           // rest unreported until some later paint that might never come.
-          if (_warnedOverlaps.contains((assignedB, assignedA)) ||
-              !_warnedOverlaps.add((assignedA, assignedB))) {
+          final passA = _passes[assignedA];
+          final passB = _passes[assignedB];
+          if (passA == null ||
+              passB == null ||
+              _warnedOverlaps.contains((passB, passA)) ||
+              !_warnedOverlaps.add((passA, passB))) {
             continue;
           }
           debugPrint(
@@ -897,7 +914,10 @@ class RenderGlassLayer extends RenderProxyBox {
       }
     }
     if (passes.isEmpty) {
-      _debugPassClips.clear();
+      assert(() {
+        _debugPassClips.clear();
+        return true;
+      }(), 'test-only bookkeeping');
       // No shapes, nothing any of their materials would draw, or every
       // capable pass is currently at presence 0. Upstream pushes a full
       // backdrop even when its blur is zero.
@@ -1260,7 +1280,10 @@ class RenderGlassLayer extends RenderProxyBox {
     // legal for the same reason assigning `filter` is: a layer tree is not
     // handed to the compositor until the end of the frame, and the setter
     // calls `markNeedsAddToScene` itself.
-    _debugPassClips.clear();
+    assert(() {
+      _debugPassClips.clear();
+      return true;
+    }(), 'test-only bookkeeping');
     final glassClip = _glassClip;
     for (var i = 0; i < clips.length; i++) {
       var clip = _passClip(passes[i]);
@@ -1268,12 +1291,18 @@ class RenderGlassLayer extends RenderProxyBox {
         final within = clip.intersect(glassClip);
         clip = within.width > 0 && within.height > 0 ? within : Rect.zero;
       }
-      _debugPassClips.add(clip);
+      assert(() {
+        _debugPassClips.add(clip);
+        return true;
+      }(), 'test-only bookkeeping');
       clips[i].clipRect = clip.shift(offset);
     }
-    if (clips.isEmpty) {
-      _debugPassClips.add(layerClip);
-    }
+    assert(() {
+      if (clips.isEmpty) {
+        _debugPassClips.add(layerClip);
+      }
+      return true;
+    }(), 'test-only bookkeeping');
 
     // Checked here, not earlier in `paint`, for the same reason the filters
     // are built here: before this point every shape's registered geometry

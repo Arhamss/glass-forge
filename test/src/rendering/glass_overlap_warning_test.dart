@@ -233,4 +233,64 @@ void main() {
           'overlapping:\n${printed.join('\n')}',
     );
   });
+
+  testWidgets('an overlap whose material animates every frame warns once', (
+    tester,
+  ) async {
+    // A material animating every frame is a new pass key every frame. The
+    // pass itself is carried over, so it is the same overlap throughout,
+    // and it must not print once per frame.
+    final printed = <String>[];
+    final original = debugPrint;
+    debugPrint = (message, {wrapWidth}) {
+      if (message != null) printed.add(message);
+    };
+    final frost = ValueNotifier<double>(20);
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GlassLayer(
+            child: Stack(
+              children: <Widget>[
+                const Positioned(
+                  left: 0,
+                  top: 0,
+                  child: Glass(
+                    shape: GlassRoundedRectangle(
+                      radius: BorderRadius.all(Radius.circular(28)),
+                    ),
+                    material: GlassMaterial(frost: 8),
+                    child: SizedBox(width: 100, height: 100),
+                  ),
+                ),
+                Positioned(
+                  left: 40,
+                  top: 40,
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: frost,
+                    builder: (context, value, _) => Glass(
+                      shape: const GlassRoundedRectangle(
+                        radius: BorderRadius.all(Radius.circular(28)),
+                      ),
+                      material: GlassMaterial(frost: value),
+                      child: const SizedBox(width: 100, height: 100),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      for (var i = 1; i <= 10; i++) {
+        frost.value = 20 + i.toDouble();
+        await tester.pump();
+      }
+    } finally {
+      debugPrint = original;
+      frost.dispose();
+    }
+
+    expect(printed.where((m) => m.contains('187820')), hasLength(1));
+  });
 }
