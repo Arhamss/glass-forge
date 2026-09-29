@@ -255,7 +255,8 @@ class _GlassSliderState extends State<GlassSlider>
   double _valueOf(double fraction) => widget.min + fraction * _range;
 
   /// One keyboard or semantics step: one [GlassSlider.divisions]-th of the
-  /// range, or a tenth of it without divisions. Zero, not a division by
+  /// range, landing on the divisions' grid, or a tenth of it without
+  /// divisions. Zero, not a division by
   /// zero, when [_range] is zero.
   double get _stepSize {
     if (_range <= 0) {
@@ -299,10 +300,20 @@ class _GlassSliderState extends State<GlassSlider>
       return null;
     }
     final current = _currentValue;
-    final next = (current + direction * stepSize).clamp(
-      widget.min,
-      widget.max,
-    );
+    final divisions = widget.divisions;
+    final double next;
+    if (divisions != null) {
+      // Onto the next grid line in [direction], not a whole step from an
+      // off-grid value set from outside: 0.3 on a 0.25 grid steps to 0.5
+      // or 0.25, never to 0.55 or 0.05.
+      final steps = (current - widget.min) / stepSize;
+      final index = direction > 0
+          ? (steps + 1e-9).floor() + 1
+          : (steps - 1e-9).ceil() - 1;
+      next = widget.min + index.clamp(0, divisions) * stepSize;
+    } else {
+      next = (current + direction * stepSize).clamp(widget.min, widget.max);
+    }
     return next == current ? null : next;
   }
 

@@ -641,6 +641,43 @@ void main() {
       );
       handle.dispose();
     });
+
+    testWidgets('an arrow key off the grid steps onto it', (tester) async {
+      var value = 0.3;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) => _harness(
+            child: GlassSlider(
+              value: value,
+              divisions: 4,
+              onChanged: (next) => setState(() => value = next),
+            ),
+          ),
+        ),
+      );
+      focusIt();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      expect(value, closeTo(0.5, 1e-9));
+
+      value = 0.3;
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) => _harness(
+            child: GlassSlider(
+              value: value,
+              divisions: 4,
+              onChanged: (next) => setState(() => value = next),
+            ),
+          ),
+        ),
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      expect(value, closeTo(0.25, 1e-9));
+    });
   });
 
   group('inside a vertical scroll view', () {
