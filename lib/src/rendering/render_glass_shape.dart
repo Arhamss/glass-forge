@@ -20,6 +20,7 @@ class RenderGlassShape extends RenderProxyBox {
     required this._shape,
     required this._group,
     this._presence,
+    this._lift,
     this._material,
   });
 
@@ -159,6 +160,32 @@ class RenderGlassShape extends RenderProxyBox {
     _layer?.updateShapePresence(this, _presence!.value);
   }
 
+  /// What lifts this shape's glass toward its lit version, or null for
+  /// none. See `GlassLiftScope`.
+  ///
+  /// Handled exactly like [presence]: the animation's identity is part of
+  /// this shape's pass key, and a value tick reaches the layer as a
+  /// uniform through [_onLiftChanged] without re-sorting any pass.
+  Animation<double>? get lift => _lift;
+  Animation<double>? _lift;
+  set lift(Animation<double>? value) {
+    if (identical(_lift, value)) {
+      return;
+    }
+    if (attached) {
+      _lift?.removeListener(_onLiftChanged);
+    }
+    _lift = value;
+    if (attached) {
+      value?.addListener(_onLiftChanged);
+    }
+    _syncGeometry();
+  }
+
+  void _onLiftChanged() {
+    _layer?.updateShapeLift(this, _lift!.value);
+  }
+
   void _joinGroup() {
     _group?.add(this);
     _group?.addListener(_onGroupChanged);
@@ -209,6 +236,7 @@ class RenderGlassShape extends RenderProxyBox {
     super.attach(owner);
     _joinGroup();
     _presence?.addListener(_onPresenceChanged);
+    _lift?.addListener(_onLiftChanged);
     _layer = _findAncestorLayer();
     _syncGeometry();
   }
@@ -226,6 +254,7 @@ class RenderGlassShape extends RenderProxyBox {
     _marker.layer = null;
     _leaveGroup();
     _presence?.removeListener(_onPresenceChanged);
+    _lift?.removeListener(_onLiftChanged);
     super.detach();
   }
 
@@ -346,6 +375,8 @@ class RenderGlassShape extends RenderProxyBox {
       _presence,
       _presence?.value ?? 1.0,
       placed: _placed,
+      liftScope: _lift,
+      lift: _lift?.value ?? 0,
     );
   }
 

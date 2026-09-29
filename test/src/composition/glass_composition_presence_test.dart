@@ -39,4 +39,19 @@ void main() {
     expect(full, isNot(equals(half)));
     expect(full.presence, 1);
   });
+
+  test('a snapshot differing only in lift is not equal', () {
+    final mapping = Float32List.fromList(<double>[1, 0, 0, 1, 0, 0]);
+    FilterSnapshot snapshot(double lift) => FilterSnapshot.of(
+      matte: null,
+      devicePixelRatio: 3,
+      materialRevision: 7,
+      coordinateMapping: mapping,
+      presence: 1,
+      glow: const GlassGlow.none(),
+      lift: lift,
+    );
+    expect(snapshot(0), isNot(equals(snapshot(0.5))));
+    expect(snapshot(0.5), equals(snapshot(0.5)));
+  });
 }

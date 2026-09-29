@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/services.dart' show TextInputAction, TextInputType;
 import 'package:flutter/widgets.dart';
+import 'package:glass_forge/src/composition/glass_composition.dart';
 import 'package:glass_forge/src/controls/control_frame.dart';
 import 'package:glass_forge/src/controls/disabled_glass.dart';
 import 'package:glass_forge/src/design/glass_surfaces.dart';
@@ -13,6 +14,7 @@ import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/shapes/glass_shape_clipper.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
+import 'package:glass_forge/src/widgets/glass_lift.dart';
 
 /// A single line of editable text in a capsule of glass.
 ///
@@ -37,6 +39,13 @@ import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 /// `settle` spring, and blur restores the same way. A painted ring would be
 /// a second edge fighting the lens profile; see
 /// `docs/superpowers/specs/2026-09-14-glass-widgets-design.md`, B5.
+///
+/// The brightening is a uniform on the field's backdrop pass, driven the
+/// way `GlassPresence` drives a fade, not a new material on every frame: the
+/// material never changes, so the focus animation re-sorts no pass and
+/// rebakes no matte. At rest the field shares a pass with neighbouring glass
+/// of the same material; from focus until the blur has finished it has a
+/// pass of its own.
 ///
 /// **The caret and selection are never refracted.** [EditableText] is a
 /// *sibling* of the field's `Glass` in a `Stack`, not its child, so the
@@ -219,17 +228,6 @@ class _GlassTextFieldState extends State<GlassTextField>
   /// light enough to read the selected text through.
   static const double _selectionAlpha = 0.24;
 
-  /// How much brighter the material reads at full focus. Both numbers are
-  /// this widget's own judgement call, not a fitted Apple constant like
-  /// `GlassMaterial.regular`'s: Apple names "brighter on focus" as the
-  /// behaviour (see the class doc) without publishing the delta. 1.35×
-  /// lifts the rim highlight enough to read as lit without blowing past the
-  /// dome preset's own highlight; the tint opacity move keeps a third of
-  /// its remaining headroom to full opacity so the capsule visibly
-  /// thickens without ever turning solid.
-  static const double _focusHighlightBoost = 1.35;
-  static const double _focusTintOpacityLift = 1 / 3;
-
   final GlobalKey<EditableTextState> _editableKey =
       GlobalKey<EditableTextState>();
   late final TextSelectionGestureDetectorBuilder _gestureBuilder =
@@ -246,6 +244,19 @@ class _GlassTextFieldState extends State<GlassTextField>
   static const double _focusTravel = 100;
 
   late final AnimationController _focus;
+
+  /// [_focus] as 0 to 1: how lit the glass is. See [GlassLiftScope]. The
+  /// tween is evaluated at the controller's own 0 to [_focusTravel] value,
+  /// so its end of `1 / _focusTravel` scales that back down to a fraction.
+  late final Animation<double> _lift = _focus.drive(
+    Tween<double>(begin: 0, end: 1 / _focusTravel),
+  );
+
+  /// Whether the glass is handed [_lift]: from focus until the blur has
+  /// finished. Outside that the field hands its layer no lift, so its glass
+  /// shares a pass with neighbouring glass of the same material rather than
+  /// always costing one of its own.
+  bool _lit = false;
 
   bool _scrollIntoViewScheduled = false;
 
@@ -267,7 +278,8 @@ class _GlassTextFieldState extends State<GlassTextField>
   @override
   void initState() {
     super.initState();
-    _focus = AnimationController(vsync: this, upperBound: _focusTravel);
+    _focus = AnimationController(vsync: this, upperBound: _focusTravel)
+      ..addStatusListener(_handleFocusStatus);
     _focusNode
       ..canRequestFocus = widget.enabled
       ..addListener(_handleFocusChange);
@@ -325,8 +337,24 @@ class _GlassTextFieldState extends State<GlassTextField>
     }
   }
 
+  /// Hands the glass back to its neighbours' pass once a blur has settled.
+  ///
+  /// On any stop, not only [AnimationStatus.dismissed]: a spring run through
+  /// `animateWith` ends `completed` whichever way it went, and within its
+  /// tolerance of rest rather than on it, so this also lands the value on 0.
+  void _handleFocusStatus(AnimationStatus status) {
+    if (status.isAnimating || _focusNode.hasFocus || !_lit || !mounted) {
+      return;
+    }
+    setState(() => _lit = false);
+    _focus.value = 0;
+  }
+
   void _handleFocusChange() {
     final focused = _focusNode.hasFocus;
+    if (focused && !_lit && mounted) {
+      setState(() => _lit = true);
+    }
     _animateFocusTo(focused ? _focusTravel : 0);
     if (focused) {
       _lastCovered = null;
@@ -448,12 +476,6 @@ class _GlassTextFieldState extends State<GlassTextField>
         );
         final onGlass = GlassHostScope.isOnGlass(context);
         final shape = widget.shape ?? style.shape;
-        final brighter = style.material.copyWith(
-          highlight: style.material.highlight * _focusHighlightBoost,
-          tintOpacity:
-              style.material.tintOpacity +
-              (1 - style.material.tintOpacity) * _focusTintOpacityLift,
-        );
 
         // At least [_height] high, and taller when the reader's text size
         // needs it: a field grows with Dynamic Type on iOS rather than
@@ -462,46 +484,31 @@ class _GlassTextFieldState extends State<GlassTextField>
           width: constraints.maxWidth,
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: _height),
-            child: AnimatedBuilder(
-              animation: _focus,
-              builder: (context, child) {
-                final t = _focus.value / _focusTravel;
-                final material = style.material.copyWith(
-                  highlight: _lerp(
-                    style.material.highlight,
-                    brighter.highlight,
-                    t,
-                  ),
-                  tintOpacity: _lerp(
-                    style.material.tintOpacity,
-                    brighter.tintOpacity,
-                    t,
-                  ),
-                );
-                return Stack(
-                  alignment: AlignmentDirectional.centerStart,
-                  children: [
-                    Positioned.fill(
-                      child: onGlass
-                          ? _paintedBody(shape: shape, material: material)
-                          : DisabledGlassPresence(
-                              disabled: !widget.enabled,
-                              child: Glass(shape: shape, material: material),
+            child: Stack(
+              alignment: AlignmentDirectional.centerStart,
+              children: [
+                Positioned.fill(
+                  child: onGlass
+                      ? _paintedBody(shape: shape, material: style.material)
+                      : GlassLiftScope(
+                          lift: _lit ? _lift : null,
+                          child: DisabledGlassPresence(
+                            disabled: !widget.enabled,
+                            child: Glass(
+                              shape: shape,
+                              material: style.material,
                             ),
-                    ),
-                    child!,
-                  ],
-                );
-              },
-              child: _foreground(style),
+                          ),
+                        ),
+                ),
+                _foreground(style),
+              ],
             ),
           ),
         );
       },
     );
   }
-
-  double _lerp(double a, double b, double t) => a + (b - a) * t;
 
   /// [GlassTextField.contextMenuBuilder], or this field's own default:
   /// [SystemContextMenu.editableText] where the device can show it, and no
@@ -524,24 +531,34 @@ class _GlassTextFieldState extends State<GlassTextField>
         SystemContextMenu.editableText(editableTextState: editableTextState);
   }
 
+  /// The stand-in for the glass on a glass surface, lit on focus the same
+  /// way the glass's own pass is. Only this rebuilds per focus tick.
   Widget _paintedBody({
     required GlassShape shape,
     required GlassMaterial material,
   }) {
     return ClipPath(
       clipper: GlassShapeClipper(shape),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: material.tint.withValues(alpha: material.tintOpacity),
+      child: AnimatedBuilder(
+        animation: _lift,
+        builder: (context, _) => DecoratedBox(
+          decoration: BoxDecoration(
+            color: material.tint.withValues(
+              alpha: GlassComposition.liftedTintOpacity(
+                material.tintOpacity,
+                _lift.value,
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 
   /// Leading, the editable text and its placeholder, and trailing — the
-  /// part of this field drawn *above* the glass, laid out once as
-  /// [AnimatedBuilder.child] so the focus spring's every tick rebuilds only
-  /// the background behind it.
+  /// part of this field drawn *above* the glass. The focus spring never
+  /// rebuilds it: focus lights the glass's pass, or the painted stand-in's
+  /// colour, and nothing else.
   ///
   /// Wrapped in its own [GlassHostScope]: this content sits visually on top
   /// of the field's own glass (or its painted stand-in) even though it is a

@@ -28,6 +28,7 @@ class FilterSnapshot {
     required Float32List coordinateMapping,
     required this.presence,
     required this.glow,
+    this.lift = 0,
   }) : coordinateMapping = Float32List.fromList(coordinateMapping);
 
   /// Captures the current state.
@@ -38,6 +39,7 @@ class FilterSnapshot {
     required Float32List coordinateMapping,
     required double presence,
     required GlassGlow glow,
+    double lift = 0,
   }) {
     return FilterSnapshot(
       texture: matte?.texture,
@@ -47,6 +49,7 @@ class FilterSnapshot {
       coordinateMapping: Float32List.fromList(coordinateMapping),
       presence: presence,
       glow: glow,
+      lift: lift,
     );
   }
 
@@ -72,6 +75,10 @@ class FilterSnapshot {
   /// The touch glow lit under a held finger, in layer-local pixels.
   final GlassGlow glow;
 
+  /// How far this pass's glass is lifted toward its lit version, 0 to 1.
+  /// See `GlassLiftScope`.
+  final double lift;
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {
@@ -84,6 +91,7 @@ class FilterSnapshot {
         other.materialRevision == materialRevision &&
         other.presence == presence &&
         other.glow == glow &&
+        other.lift == lift &&
         _sameMapping(other.coordinateMapping, coordinateMapping);
   }
 
@@ -95,6 +103,7 @@ class FilterSnapshot {
     materialRevision,
     presence,
     glow,
+    lift,
     Object.hashAll(coordinateMapping),
   );
 

@@ -8,6 +8,7 @@ import 'package:glass_forge/src/tier/glass_tier_scope.dart';
 import 'package:glass_forge/src/widgets/glass_blend_group.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 import 'package:glass_forge/src/widgets/glass_layer.dart';
+import 'package:glass_forge/src/widgets/glass_lift.dart';
 import 'package:glass_forge/src/widgets/glass_presence.dart';
 
 /// One glass surface.
@@ -93,6 +94,7 @@ class Glass extends StatelessWidget {
       shape: shape,
       group: group,
       presence: GlassPresenceScope.maybeOf(context),
+      lift: GlassLiftScope.maybeOf(context),
       material: _resolveMaterialFor(context, material),
       child: GlassHostScope(
         child: ClipPath(
@@ -137,6 +139,7 @@ class _RawGlass extends SingleChildRenderObjectWidget {
     required this.shape,
     required this.group,
     required this.presence,
+    required this.lift,
     required this.material,
     required Widget super.child,
   });
@@ -144,6 +147,7 @@ class _RawGlass extends SingleChildRenderObjectWidget {
   final GlassShape shape;
   final BlendGroupLink? group;
   final Animation<double>? presence;
+  final Animation<double>? lift;
   final GlassMaterial? material;
 
   @override
@@ -152,6 +156,7 @@ class _RawGlass extends SingleChildRenderObjectWidget {
       shape: shape,
       group: group,
       presence: presence,
+      lift: lift,
       material: material,
     );
   }
@@ -165,6 +170,7 @@ class _RawGlass extends SingleChildRenderObjectWidget {
       ..shape = shape
       ..group = group
       ..presence = presence
+      ..lift = lift
       ..material = material;
   }
 }

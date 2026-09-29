@@ -48,7 +48,7 @@ void debugResetAcceleratedProducerRegistration() {
 /// rebuilt `ImageFilter` and nothing more.
 @immutable
 class _PassKey {
-  const _PassKey(this.material, this.presenceScope);
+  const _PassKey(this.material, this.presenceScope, [this.liftScope]);
 
   /// The material every shape sharing this key renders with.
   final GlassMaterial material;
@@ -56,14 +56,23 @@ class _PassKey {
   /// The identity of whatever drives this key's shapes' presence, or null.
   final Object? presenceScope;
 
+  /// The identity of whatever lifts this key's shapes, or null. Keyed by
+  /// identity for the same reason as [presenceScope].
+  final Object? liftScope;
+
   @override
   bool operator ==(Object other) =>
       other is _PassKey &&
       other.material == material &&
-      identical(other.presenceScope, presenceScope);
+      identical(other.presenceScope, presenceScope) &&
+      identical(other.liftScope, liftScope);
 
   @override
-  int get hashCode => Object.hash(material, identityHashCode(presenceScope));
+  int get hashCode => Object.hash(
+    material,
+    identityHashCode(presenceScope),
+    identityHashCode(liftScope),
+  );
 }
 
 /// One backdrop pass: every shape in this layer that renders with the same
@@ -90,6 +99,11 @@ class _GlassPass {
   ///
   /// Mutable and outside the key on purpose. See [_PassKey].
   double presence = 1;
+
+  /// How far this pass's glass is lifted toward its lit version, 0 to 1.
+  ///
+  /// Mutable and outside the key, like [presence]. See `GlassLiftScope`.
+  double lift = 0;
 
   /// Just this pass's shapes, in registration order.
   ///
@@ -127,6 +141,8 @@ class _ShapeRecord {
     required this.presenceScope,
     required this.presence,
     required this.placed,
+    required this.liftScope,
+    required this.lift,
   });
 
   ShapeGeometry geometry;
@@ -146,6 +162,12 @@ class _ShapeRecord {
 
   /// This shape's presence this frame, 0 to 1.
   double presence;
+
+  /// The identity of whatever lifts this shape, or null.
+  Object? liftScope;
+
+  /// This shape's lift this frame, 0 to 1.
+  double lift;
 
   /// The pass this shape is currently registered into.
   _PassKey? assigned;
@@ -501,6 +523,9 @@ class RenderGlassLayer extends RenderProxyBox {
   /// painted -- keeps its pass assignment, so the pass is ready for the
   /// frame it appears, but stays out of that pass's scene: out of the
   /// matte, its clusters and the diagnostics that read them.
+  ///
+  /// [liftScope] and [lift] are [presenceScope] and [presence]'s twins for
+  /// what brightens the shape. See `GlassLiftScope`.
   void registerShape(
     Object key,
     ShapeGeometry geometry,
@@ -509,6 +534,8 @@ class RenderGlassLayer extends RenderProxyBox {
     Object? presenceScope,
     double presence, {
     bool placed = true,
+    Object? liftScope,
+    double lift = 0,
   }) {
     scene.register(key, geometry);
 
@@ -521,6 +548,8 @@ class RenderGlassLayer extends RenderProxyBox {
         presenceScope: presenceScope,
         presence: presence,
         placed: placed,
+        liftScope: liftScope,
+        lift: lift,
       );
       _assignmentsDirty = true;
       return;
@@ -531,12 +560,15 @@ class RenderGlassLayer extends RenderProxyBox {
       ..placed = placed;
     if (existing.declared != material ||
         !identical(existing.group, group) ||
-        !identical(existing.presenceScope, presenceScope)) {
+        !identical(existing.presenceScope, presenceScope) ||
+        !identical(existing.liftScope, liftScope)) {
       existing
         ..declared = material
         ..group = group
         ..presenceScope = presenceScope
-        ..presence = presence;
+        ..presence = presence
+        ..liftScope = liftScope
+        ..lift = lift;
       _assignmentsDirty = true;
       return;
     }
@@ -545,7 +577,9 @@ class RenderGlassLayer extends RenderProxyBox {
     // Its pass is already decided, so the new geometry goes straight in --
     // this runs for every shape on every animating frame, from inside this
     // layer's own subtree paint.
-    existing.presence = presence;
+    existing
+      ..presence = presence
+      ..lift = lift;
     final assigned = existing.assigned;
     if (assigned != null) {
       _placeInPass(_passes[assigned], key, existing);
@@ -595,6 +629,17 @@ class RenderGlassLayer extends RenderProxyBox {
     markNeedsPaint();
   }
 
+  /// Updates one shape's lift without disturbing its pass. The twin of
+  /// [updateShapePresence].
+  void updateShapeLift(Object key, double lift) {
+    final record = _records[key];
+    if (record == null || record.lift == lift) {
+      return;
+    }
+    record.lift = lift;
+    markNeedsPaint();
+  }
+
   /// Sorts every registered shape into the pass that will render it.
   ///
   /// A blend group is one continuous surface, and one surface has one
@@ -614,6 +659,7 @@ class RenderGlassLayer extends RenderProxyBox {
   /// there, at that shape's blend width.
   void _reassignPasses() {
     _assignmentsDirty = false;
+    GlassRenderCounters.instance.recordPassAssignment();
 
     final groupMaterials = <Object, GlassMaterial>{};
     for (final record in _records.values) {
@@ -642,7 +688,11 @@ class RenderGlassLayer extends RenderProxyBox {
         }
         return true;
       }(), 'debug-only warning; always true');
-      targets[entry.key] = _PassKey(material, record.presenceScope);
+      targets[entry.key] = _PassKey(
+        material,
+        record.presenceScope,
+        record.liftScope,
+      );
     }
 
     _carryOverMovedPasses(targets);
@@ -878,14 +928,20 @@ class RenderGlassLayer extends RenderProxyBox {
     // surface: the highest presence among its shapes wins rather than an
     // average, so a pass is fully present as soon as any shape in it is,
     // and reaches zero only when every shape has.
+    // Lift folds the same way.
     for (final pass in _passes.values) {
-      pass.presence = 0;
+      pass
+        ..presence = 0
+        ..lift = 0;
     }
     for (final record in _records.values) {
       final pass = _passes[record.assigned];
-      if (pass != null && record.presence > pass.presence) {
-        pass.presence = record.presence;
+      if (pass == null) {
+        continue;
       }
+      pass
+        ..presence = math.max(pass.presence, record.presence)
+        ..lift = math.max(pass.lift, record.lift);
     }
 
     // Everything that decides whether a pass renders at all has to be known
@@ -1441,10 +1497,12 @@ class RenderGlassLayer extends RenderProxyBox {
         coordinateMapping: mapping,
         presence: pass.presence,
         glow: glow,
+        lift: pass.lift,
       ),
       devicePixelRatio: _devicePixelRatio,
       presence: pass.presence,
       glow: glow,
+      lift: pass.lift,
     );
     if (filter != null) {
       return filter;

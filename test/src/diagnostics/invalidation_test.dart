@@ -307,11 +307,20 @@ void main() {
 
       GlassRenderCounters.instance.reset();
       await tester.tap(find.byType(GlassTextField));
+      // The frame focus lands in may give the field its own pass, once.
+      await tester.pump();
+      final assignedOnFocus = GlassRenderCounters.instance.passAssignmentCount;
       await run();
       expect(
         GlassRenderCounters.instance.matteProduceCount,
         lessThanOrEqualTo(2),
         reason: 'focusing only brightens the glass; its shape never changes',
+      );
+      expect(assignedOnFocus, lessThanOrEqualTo(1));
+      expect(
+        GlassRenderCounters.instance.passAssignmentCount,
+        assignedOnFocus,
+        reason: 'the brightening is a uniform, not a material per frame',
       );
 
       GlassRenderCounters.instance.reset();
@@ -320,6 +329,11 @@ void main() {
       expect(
         GlassRenderCounters.instance.matteProduceCount,
         lessThanOrEqualTo(2),
+      );
+      expect(
+        GlassRenderCounters.instance.passAssignmentCount,
+        lessThanOrEqualTo(1),
+        reason: 'once, when the settled field rejoins its neighbours',
       );
     },
   );

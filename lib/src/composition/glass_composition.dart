@@ -42,6 +42,27 @@ class GlassComposition {
   /// billionth of a refraction is a pass that should not be pushed.
   static const double _presenceEpsilon = 0.001;
 
+  /// How much brighter the rim highlight reads at full lift.
+  ///
+  /// This package's own judgement call, not a fitted Apple constant like
+  /// `GlassMaterial.regular`'s: Apple names "brighter on focus" as the
+  /// behaviour of a focused text field without publishing the delta. 1.35x
+  /// lifts the rim enough to read as lit without blowing past the dome
+  /// preset's own highlight.
+  static const double liftHighlightBoost = 1.35;
+
+  /// How much of the tint's remaining headroom to full opacity a full lift
+  /// takes: the surface visibly thickens without ever turning solid.
+  static const double liftTintOpacityShare = 1 / 3;
+
+  /// [highlight] lifted by [lift], 0 to 1. See `GlassLiftScope`.
+  static double liftedHighlight(double highlight, double lift) =>
+      highlight * (1 + (liftHighlightBoost - 1) * lift);
+
+  /// [tintOpacity] lifted by [lift], 0 to 1. See `GlassLiftScope`.
+  static double liftedTintOpacity(double tintOpacity, double lift) =>
+      tintOpacity + (1 - tintOpacity) * liftTintOpacityShare * lift;
+
   /// Whether [material] can put anything on screen on this backend.
   ///
   /// Answerable without a matte, and that is the whole point: a
@@ -81,6 +102,7 @@ class GlassComposition {
     required double devicePixelRatio,
     required double presence,
     required GlassGlow glow,
+    double lift = 0,
   }) {
     if (presence < _presenceEpsilon) {
       return null;
@@ -122,6 +144,7 @@ class GlassComposition {
       devicePixelRatio,
       presence,
       glow,
+      lift,
     );
 
     final glass = ui.ImageFilter.shader(shader);
@@ -170,6 +193,7 @@ class GlassComposition {
     double devicePixelRatio,
     double presence,
     GlassGlow glow,
+    double lift,
   ) {
     final bounds = matte?.bounds ?? Rect.zero;
     final tint = material.tint;
@@ -181,13 +205,13 @@ class GlassComposition {
       ..setFloat(i++, bounds.height)
       ..setFloat(i++, material.maxDisplacement * devicePixelRatio)
       ..setFloat(i++, material.chromaticAberration * presence)
-      ..setFloat(i++, material.tintOpacity * presence)
+      ..setFloat(i++, liftedTintOpacity(material.tintOpacity, lift) * presence)
       ..setFloat(i++, 1 + (material.saturation - 1) * presence)
       ..setFloat(i++, tint.r)
       ..setFloat(i++, tint.g)
       ..setFloat(i++, tint.b)
       ..setFloat(i++, material.variant == GlassVariant.clear ? 1 : 0)
-      ..setFloat(i++, material.highlight * presence)
+      ..setFloat(i++, liftedHighlight(material.highlight, lift) * presence)
       ..setFloat(i++, material.lightDirection.dx)
       ..setFloat(i++, material.lightDirection.dy)
       ..setFloat(i++, material.contour * presence)

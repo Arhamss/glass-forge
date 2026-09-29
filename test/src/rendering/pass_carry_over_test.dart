@@ -11,6 +11,7 @@ library;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:glass_forge/src/composition/glass_composition.dart';
 import 'package:glass_forge/src/diagnostics/render_counters.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
@@ -19,6 +20,7 @@ import 'package:glass_forge/src/shaders/shader_library.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_layer.dart';
+import 'package:glass_forge/src/widgets/glass_lift.dart';
 import 'package:glass_forge/src/widgets/glass_presence.dart';
 
 const _boundary = ValueKey<String>('boundary');
@@ -105,6 +107,62 @@ void main() {
 
   setUpAll(ShaderLibrary.instance.warmUp);
   tearDownAll(ShaderLibrary.instance.disposeAll);
+
+  testWidgets(
+    'a lifted pass draws what the lit material draws, and lifting moves no '
+    'pass',
+    (tester) async {
+      const base = GlassMaterial(
+        tint: Color(0xFFFFFFFF),
+        tintOpacity: 0.3,
+        highlight: 0.4,
+      );
+      final lit = base.copyWith(
+        tintOpacity: GlassComposition.liftedTintOpacity(base.tintOpacity, 1),
+        highlight: GlassComposition.liftedHighlight(base.highlight, 1),
+      );
+      final lift = AnimationController(vsync: const TestVSync());
+      addTearDown(lift.dispose);
+
+      await tester.pumpWidget(
+        _scene([
+          _at(
+            _rect,
+            GlassLiftScope(
+              lift: lift,
+              child: const Glass(shape: GlassOval(), material: base),
+            ),
+          ),
+        ]),
+      );
+      await tester.pump();
+      final unlifted = await _colorAt(tester, _rect.center);
+      await _settle(tester);
+
+      GlassRenderCounters.instance.reset();
+      lift.value = 1;
+      await tester.pump();
+      expect(GlassRenderCounters.instance.passAssignmentCount, 0);
+      expect(GlassRenderCounters.instance.matteProduceCount, 0);
+      final lifted = await _colorAt(tester, _rect.center);
+      expect(
+        _distance(lifted, unlifted),
+        greaterThan(8),
+        reason: 'the lift has to reach the pass',
+      );
+
+      // The same glass in the lit material, in a layer built fresh.
+      await tester.pumpWidget(
+        _scene(
+          [_at(_rect, Glass(shape: const GlassOval(), material: lit))],
+          layerKey: UniqueKey(),
+        ),
+      );
+      await tester.pump();
+      final reference = await _colorAt(tester, _rect.center);
+      expect(_distance(lifted, reference), lessThanOrEqualTo(1));
+    },
+  );
 
   testWidgets(
     'a pass carried over to a shading-only change draws the new tint',

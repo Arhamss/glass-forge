@@ -14,12 +14,21 @@ class GlassRenderCounters {
 
   int _matteProduceCount = 0;
   int _backdropPushCount = 0;
+  int _passAssignmentCount = 0;
 
   /// How many mattes have been baked.
   int get matteProduceCount => _matteProduceCount;
 
   /// How many backdrop filters have been pushed.
   int get backdropPushCount => _backdropPushCount;
+
+  /// How many times a layer has re-sorted its shapes into backdrop passes.
+  ///
+  /// Every run allocates and re-keys, and a pass that moves to a new key is
+  /// at best carried over and at worst rebuilt with a fresh matte. Moving a
+  /// shape, or animating what its pass renders with through a scope such as
+  /// `GlassPresence`, is meant to cost none.
+  int get passAssignmentCount => _passAssignmentCount;
 
   /// Records a matte bake.
   void recordMatteProduce() {
@@ -35,9 +44,17 @@ class GlassRenderCounters {
     }
   }
 
-  /// Resets both counters.
+  /// Records one run of a layer's pass assignment.
+  void recordPassAssignment() {
+    if (kDebugMode) {
+      _passAssignmentCount++;
+    }
+  }
+
+  /// Resets every counter.
   void reset() {
     _matteProduceCount = 0;
     _backdropPushCount = 0;
+    _passAssignmentCount = 0;
   }
 }

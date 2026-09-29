@@ -3,13 +3,16 @@ import 'dart:ui' show Tristate;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:glass_forge/src/composition/glass_composition.dart';
 import 'package:glass_forge/src/controls/glass_text_field.dart';
+import 'package:glass_forge/src/diagnostics/render_counters.dart';
 import 'package:glass_forge/src/geometry/producer_registry.dart';
 import 'package:glass_forge/src/material/glass_material.dart';
 import 'package:glass_forge/src/shapes/glass_shape.dart';
 import 'package:glass_forge/src/widgets/glass.dart';
 import 'package:glass_forge/src/widgets/glass_host_scope.dart';
 import 'package:glass_forge/src/widgets/glass_layer.dart';
+import 'package:glass_forge/src/widgets/glass_lift.dart';
 
 /// A material that renders nothing, so the composite pass is skipped — the
 /// same reason `glass_button_test.dart` needs it outside Impeller.
@@ -73,6 +76,16 @@ Finder _glass() => find.descendant(
   matching: find.byType(Glass),
 );
 
+/// The field's focus lift as its glass sees it, or null when unlifted.
+Animation<double>? _lift(WidgetTester tester) => tester
+    .widget<GlassLiftScope>(
+      find.descendant(
+        of: find.byType(GlassTextField),
+        matching: find.byType(GlassLiftScope),
+      ),
+    )
+    .lift;
+
 void main() {
   testWidgets('typing reaches onChanged', (tester) async {
     final controller = TextEditingController();
@@ -109,30 +122,84 @@ void main() {
     expect(submitted, 'go');
   });
 
-  testWidgets('focus brightens the material and blur restores it', (
+  testWidgets('focus lights the glass and blur restores it', (
     tester,
   ) async {
     await tester.pumpWidget(_harness(child: const GlassTextField()));
 
     final before = tester.widget<Glass>(_glass()).material!;
+    expect(_lift(tester), isNull, reason: 'at rest the glass is not lifted');
 
     await tester.tap(find.byType(GlassTextField));
     await tester.pumpAndSettle();
 
-    final focused = tester.widget<Glass>(_glass()).material!;
     expect(
-      focused.highlight,
-      greaterThan(before.highlight),
+      _lift(tester)?.value,
+      closeTo(1, 1e-9),
       reason: 'focus should read as the glass lighting up',
     );
+    // Lit by a uniform on the pass, never by a new material.
+    expect(tester.widget<Glass>(_glass()).material, before);
 
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pumpAndSettle();
 
-    final blurred = tester.widget<Glass>(_glass()).material!;
-    expect(blurred.highlight, closeTo(before.highlight, 1e-9));
-    expect(blurred.tintOpacity, closeTo(before.tintOpacity, 1e-9));
+    expect(_lift(tester), isNull);
+    expect(tester.widget<Glass>(_glass()).material, before);
   });
+
+  testWidgets('a lit field renders the brighter material focus used to set', (
+    tester,
+  ) async {
+    // The end state of the lift, pinned to the numbers the field used to
+    // build a brighter material from: highlight x1.35, and tint opacity a
+    // third of the way to opaque.
+    const material = GlassMaterial(highlight: 0.4, tintOpacity: 0.25);
+    expect(GlassComposition.liftedHighlight(material.highlight, 0), 0.4);
+    expect(
+      GlassComposition.liftedHighlight(material.highlight, 1),
+      closeTo(0.4 * 1.35, 1e-12),
+    );
+    expect(GlassComposition.liftedTintOpacity(material.tintOpacity, 0), 0.25);
+    expect(
+      GlassComposition.liftedTintOpacity(material.tintOpacity, 1),
+      closeTo(0.25 + 0.75 / 3, 1e-12),
+    );
+  });
+
+  testWidgets(
+    'focus and blur animate without re-sorting the layer into passes',
+    (tester) async {
+      await tester.pumpWidget(_harness(child: const GlassTextField()));
+      await tester.pumpAndSettle();
+
+      Future<void> frames(int count) async {
+        for (var i = 0; i < count; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+      }
+
+      await tester.tap(find.byType(GlassTextField));
+      // The frame focus lands in may move the field into its own pass once.
+      await tester.pump();
+      GlassRenderCounters.instance.reset();
+      await frames(60);
+      expect(
+        GlassRenderCounters.instance.passAssignmentCount,
+        0,
+        reason: 'brightening is a uniform, not a new material every frame',
+      );
+
+      FocusManager.instance.primaryFocus?.unfocus();
+      GlassRenderCounters.instance.reset();
+      await frames(60);
+      expect(
+        GlassRenderCounters.instance.passAssignmentCount,
+        lessThanOrEqualTo(1),
+        reason: 'at most once, when the field rejoins its neighbours',
+      );
+    },
+  );
 
   testWidgets('Reduce Motion makes the focus change instant', (tester) async {
     addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
@@ -140,14 +207,12 @@ void main() {
         const FakeAccessibilityFeatures(disableAnimations: true);
 
     await tester.pumpWidget(_harness(child: const GlassTextField()));
-    final before = tester.widget<Glass>(_glass()).material!;
 
     await tester.tap(find.byType(GlassTextField));
     // Exactly one frame: an instant settle needs no further pumps.
     await tester.pump();
 
-    final focused = tester.widget<Glass>(_glass()).material!;
-    expect(focused.highlight, greaterThan(before.highlight));
+    expect(_lift(tester)?.value, 1);
   });
 
   testWidgets('the EditableText is not a descendant of Glass', (
