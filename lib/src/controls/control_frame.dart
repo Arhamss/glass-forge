@@ -151,6 +151,21 @@ class GlassControlFrame extends StatelessWidget {
   /// control test in this package holds itself to.
   static const double minimumExtent = 44;
 
+  /// Asserts that a control that fills its width — a slider, a segmented
+  /// control, a text field — was given a bounded one.
+  ///
+  /// In an unbounded `Row` such a control would ask for an infinite width
+  /// and fail with a layout error far from the cause; this names the
+  /// control and the fix instead.
+  static void debugAssertBoundedWidth(BoxConstraints constraints, String name) {
+    assert(
+      constraints.hasBoundedWidth,
+      '$name fills the width it is given, and was given an unbounded one. '
+      'In a Row, wrap it in Expanded or Flexible; elsewhere, give it a '
+      'width with SizedBox.',
+    );
+  }
+
   /// The opacity a disabled control draws its label and paint at.
   static const double disabledOpacity = 0.4;
 

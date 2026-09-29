@@ -471,6 +471,7 @@ class _GlassSliderState extends State<GlassSlider>
       verticalArrows: true,
       child: LayoutBuilder(
         builder: (context, constraints) {
+          GlassControlFrame.debugAssertBoundedWidth(constraints, 'GlassSlider');
           _trackWidth = constraints.maxWidth;
           return GestureDetector(
             behavior: HitTestBehavior.opaque,

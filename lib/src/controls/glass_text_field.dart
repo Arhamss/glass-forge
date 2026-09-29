@@ -436,6 +436,10 @@ class _GlassTextFieldState extends State<GlassTextField>
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        GlassControlFrame.debugAssertBoundedWidth(
+          constraints,
+          'GlassTextField',
+        );
         final style = GlassTheme.surfaceOf(
           context,
           GlassSurfaceRole.control,

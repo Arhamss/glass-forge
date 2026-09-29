@@ -394,6 +394,10 @@ class _GlassSegmentedControlState<T> extends State<GlassSegmentedControl<T>>
     _textDirection = Directionality.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
+        GlassControlFrame.debugAssertBoundedWidth(
+          constraints,
+          'GlassSegmentedControl',
+        );
         _trackWidth = constraints.maxWidth;
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
