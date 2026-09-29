@@ -29,6 +29,11 @@
   `GlassMotionController.setPressAnchor` is now `setPressDrag`. The value
   is the finger's movement since pointer-down, no longer its offset from
   the surface's centre.
+- `Glass.containsChild` is removed. It was accepted and never did
+  anything. What glass refracts is whatever paints behind its
+  `GlassLayer`; a child of `Glass` paints over the glass, never into what
+  it bends. Put content you want refracted behind the layer, as
+  `GlassScaffold` does with its body.
 
 ### Changed
 
@@ -290,5 +295,4 @@ First release.
 
 ### Known limits
 
-- `Glass.containsChild` is accepted but not wired yet.
 - Benchmark budgets are seed values, not measurements from real hardware.

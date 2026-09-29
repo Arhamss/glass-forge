@@ -18,7 +18,6 @@ class Glass extends StatelessWidget {
     required this.shape,
     this.child,
     this.material,
-    this.containsChild = false,
     this.clipBehavior = Clip.antiAlias,
     super.key,
   });
@@ -43,11 +42,6 @@ class Glass extends StatelessWidget {
   /// material its first shape asked for. Debug builds say so when it
   /// happens.
   final GlassMaterial? material;
-
-  /// Whether [child] sits behind the glass and is refracted by it.
-  ///
-  /// Reserved for a future task; not yet wired to any rendering behaviour.
-  final bool containsChild;
 
   /// How [child] is clipped to [shape].
   final Clip clipBehavior;

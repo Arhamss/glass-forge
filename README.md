@@ -425,7 +425,6 @@ harness marks such a run untrustworthy rather than letting it quietly pass.
 - `GlassSwitch` and `GlassSegmentedControl` dimensions are not yet measured
   against an iOS capture. The controls pick some of their own colours,
   such as the switch's green track and white knob.
-- `containsChild` on `Glass` is accepted and not yet wired.
 - Backdrop luminance for surface adaptation is caller-supplied; nothing
   samples it automatically yet.
 - Where two materials' shapes overlap, the later pass samples the earlier
