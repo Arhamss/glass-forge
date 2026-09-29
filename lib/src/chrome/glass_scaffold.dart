@@ -193,6 +193,17 @@ class _GlassScaffoldBodyState extends State<_GlassScaffoldBody> {
     }
   }
 
+  /// One bar's own layer, its glass clipped to the layer's exact bounds and
+  /// fading through the scaffold's presence.
+  Widget _barLayer(GlassMaterial material, Widget bar) {
+    return GlassLayerClip.toBounds(
+      child: GlassLayer(
+        material: material,
+        child: GlassPresence(presence: _presence, child: bar),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
@@ -251,56 +262,50 @@ class _GlassScaffoldBodyState extends State<_GlassScaffoldBody> {
             ),
             child: GlassLayer(material: material, child: body),
           ),
-          // The bars' layer. Its own `Stack` below only ever carries the
-          // bars.
-          GlassLayer(
-            material: material,
-            child: Stack(
-              children: [
-                if (topBar != null)
-                  Align(
-                    alignment: Alignment.topCenter,
-                    child: GlassPresence(
-                      presence: _presence,
-                      child: _MeasureSize(
-                        onChange: _handleTopBarSize,
-                        child: SafeArea(
-                          bottom: false,
-                          left: false,
-                          right: false,
-                          child: topBar,
-                        ),
-                      ),
-                    ),
+          // Each bar in a layer of its own, the size of the bar, whose
+          // passes are clipped to exactly that: a bar's filter never
+          // reaches over the body's band, where body glass draws. One
+          // layer for both bars would be one pass whose clip spans the
+          // screen between them, over every piece of body glass.
+          if (topBar != null)
+            Align(
+              alignment: Alignment.topCenter,
+              child: _barLayer(
+                material,
+                _MeasureSize(
+                  onChange: _handleTopBarSize,
+                  child: SafeArea(
+                    bottom: false,
+                    left: false,
+                    right: false,
+                    child: topBar,
                   ),
-                if (bottomBar != null)
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: GlassPresence(
-                      presence: _presence,
-                      child: _MeasureSize(
-                        onChange: _handleBottomBarSize,
-                        // Rides the keyboard: as `viewInsets.bottom` grows
-                        // this bar lifts by the same amount, clear of it,
-                        // rather than being covered the way a bar fixed to
-                        // the screen's edge would be.
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            bottom: media.viewInsets.bottom,
-                          ),
-                          child: SafeArea(
-                            top: false,
-                            left: false,
-                            right: false,
-                            child: bottomBar,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+                ),
+              ),
             ),
-          ),
+          if (bottomBar != null)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: _barLayer(
+                material,
+                _MeasureSize(
+                  onChange: _handleBottomBarSize,
+                  // Rides the keyboard: as `viewInsets.bottom` grows this
+                  // bar lifts by the same amount, clear of it, rather than
+                  // being covered the way a bar fixed to the screen's edge
+                  // would be.
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+                    child: SafeArea(
+                      top: false,
+                      left: false,
+                      right: false,
+                      child: bottomBar,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

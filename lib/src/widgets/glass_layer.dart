@@ -91,6 +91,7 @@ class _GlassLayerState extends State<GlassLayer> {
     final geometry =
         widget.tier ?? resolved?.geometry ?? GeometryTier.accelerated;
 
+    final clip = GlassLayerClip.maybeOf(context);
     return GlassGlowScope(
       glow: _glow,
       child: GlassLayerScope(
@@ -99,7 +100,8 @@ class _GlassLayerState extends State<GlassLayer> {
           material: effective,
           tier: geometry,
           glow: _glow,
-          glassClip: GlassLayerClip.maybeOf(context),
+          glassClip: clip?.rect,
+          clipToBounds: clip?.toBounds ?? false,
           // Reset for this layer's subtree: the clip belongs to the one
           // layer built directly under it, in that layer's own coordinates,
           // and means nothing to a layer nested further down.
@@ -227,20 +229,35 @@ class _RepaintOnScroll extends StatelessWidget {
 /// render object's `RenderGlassLayer.glassClip`: the layer's backdrop
 /// passes are clipped to it, and its subtree still paints everywhere.
 /// `GlassScaffold` uses it to keep body glass out from under its bars.
+///
+/// [GlassLayerClip.toBounds] instead clips the layer's passes to that
+/// layer's own exact bounds (`RenderGlassLayer.clipGlassToBounds`), which
+/// is how `GlassScaffold` keeps each bar's filter off the body.
 class GlassLayerClip extends InheritedWidget {
   /// Limits the next [GlassLayer] below to [rect], or lifts any limit when
   /// [rect] is null.
-  const GlassLayerClip({required this.rect, required super.child, super.key});
+  const GlassLayerClip({required this.rect, required super.child, super.key})
+    : toBounds = false;
 
-  /// Where the layer's glass may draw; null for anywhere.
+  /// Limits the next [GlassLayer] below to its own exact bounds.
+  const GlassLayerClip.toBounds({required super.child, super.key})
+    : rect = null,
+      toBounds = true;
+
+  /// Where the layer's glass may draw; null for anywhere, unless
+  /// [toBounds].
   final Rect? rect;
 
-  /// The [rect] in effect at [context], or null.
-  static Rect? maybeOf(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<GlassLayerClip>()?.rect;
+  /// Whether the layer's glass may draw only inside the layer's bounds.
+  final bool toBounds;
+
+  /// The [GlassLayerClip] in effect at [context], or null.
+  static GlassLayerClip? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<GlassLayerClip>();
 
   @override
-  bool updateShouldNotify(GlassLayerClip oldWidget) => rect != oldWidget.rect;
+  bool updateShouldNotify(GlassLayerClip oldWidget) =>
+      rect != oldWidget.rect || toBounds != oldWidget.toBounds;
 }
 
 class _RawGlassLayer extends SingleChildRenderObjectWidget {
@@ -249,6 +266,7 @@ class _RawGlassLayer extends SingleChildRenderObjectWidget {
     required this.tier,
     required this.glow,
     required this.glassClip,
+    required this.clipToBounds,
     required Widget super.child,
   });
 
@@ -256,6 +274,7 @@ class _RawGlassLayer extends SingleChildRenderObjectWidget {
   final GeometryTier tier;
   final ValueNotifier<GlassGlow> glow;
   final Rect? glassClip;
+  final bool clipToBounds;
 
   @override
   RenderGlassLayer createRenderObject(BuildContext context) {
@@ -265,7 +284,8 @@ class _RawGlassLayer extends SingleChildRenderObjectWidget {
         devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
       )
       ..glowListenable = glow
-      ..glassClip = glassClip;
+      ..glassClip = glassClip
+      ..clipGlassToBounds = clipToBounds;
   }
 
   @override
@@ -286,6 +306,7 @@ class _RawGlassLayer extends SingleChildRenderObjectWidget {
       // directly, which is how the glow reaches paint without going
       // through build at all.
       ..glowListenable = glow
-      ..glassClip = glassClip;
+      ..glassClip = glassClip
+      ..clipGlassToBounds = clipToBounds;
   }
 }

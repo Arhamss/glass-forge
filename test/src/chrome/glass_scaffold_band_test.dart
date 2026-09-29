@@ -259,6 +259,82 @@ void main() {
     expect(printed.where((line) => line.contains('overlap')), isEmpty);
   });
 
+  testWidgets("the bars' passes are clipped to the bars, and never meet "
+      "the body's", (tester) async {
+    const topKey = ValueKey<String>('top');
+    const bottomKey = ValueKey<String>('bottom');
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(size: Size(800, 600)),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: GlassScaffold(
+            topBar: const SizedBox(
+              height: _barHeight,
+              child: Glass(key: topKey, shape: GlassOval()),
+            ),
+            bottomBar: const SizedBox(
+              height: _barHeight,
+              child: Glass(key: bottomKey, shape: GlassOval()),
+            ),
+            // One switch scrolled half under the top bar, one mid-screen:
+            // body glass both under a bar and well clear of the bars.
+            body: SingleChildScrollView(
+              controller: controller,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 40),
+                  GlassSwitch(value: true, onChanged: (_) {}),
+                  const SizedBox(height: 200),
+                  GlassSwitch(value: false, onChanged: (_) {}),
+                  const SizedBox(height: 2000),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    const topRect = Rect.fromLTRB(0, 0, 800, _barHeight);
+    const bottomRect = Rect.fromLTRB(0, 600 - _barHeight, 800, 600);
+    final top = _globalPassClips(tester, topKey);
+    final bottom = _globalPassClips(tester, bottomKey);
+    expect(top, isNotEmpty);
+    expect(bottom, isNotEmpty);
+    for (final (clips, bar) in [(top, topRect), (bottom, bottomRect)]) {
+      for (final clip in clips) {
+        expect(
+          clip.isEmpty || bar.expandToInclude(clip) == bar,
+          isTrue,
+          reason: 'a bar pass clipped to $clip reaches outside $bar',
+        );
+      }
+    }
+
+    final body = _knobLayer(tester);
+    final origin = body.localToGlobal(Offset.zero);
+    final bodyClips = [
+      for (final clip in body.debugPassClips) clip.shift(origin),
+    ];
+    expect(bodyClips.where((clip) => !clip.isEmpty), isNotEmpty);
+    for (final clip in bodyClips.where((clip) => !clip.isEmpty)) {
+      for (final barClip in [...top, ...bottom]) {
+        final overlap = clip.intersect(barClip);
+        expect(
+          overlap.width <= 0 || overlap.height <= 0,
+          isTrue,
+          reason: 'body pass $clip stacks under bar pass $barClip',
+        );
+      }
+    }
+  });
+
   testWidgets('a body with two materials clips every one of its passes out '
       'of the bar', (tester) async {
     final (clips, printed) = await clipsWithSwitchAt(
@@ -284,4 +360,16 @@ void main() {
       isEmpty,
     );
   });
+}
+
+/// The layer that renders the `Glass` keyed [key], and its pass clips in
+/// global coordinates.
+List<Rect> _globalPassClips(WidgetTester tester, Key key) {
+  RenderObject? node = tester.renderObject(find.byKey(key));
+  while (node != null && node is! RenderGlassLayer) {
+    node = node.parent;
+  }
+  final layer = node! as RenderGlassLayer;
+  final origin = layer.localToGlobal(Offset.zero);
+  return [for (final clip in layer.debugPassClips) clip.shift(origin)];
 }

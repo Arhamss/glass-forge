@@ -8,8 +8,8 @@ const ValueKey<String> _backgroundKey = ValueKey('background');
 
 void main() {
   testWidgets(
-    'two GlassLayers: the body in one, the bars alone in the other, the '
-    'background in neither',
+    'three GlassLayers: the body in one, each bar alone in its own, the '
+    'background in none',
     (tester) async {
       const bodyKey = ValueKey<String>('body');
       await tester.pumpWidget(
@@ -24,31 +24,33 @@ void main() {
       );
 
       final layers = find.byType(GlassLayer);
-      expect(layers, findsNWidgets(2));
+      expect(layers, findsNWidgets(3));
 
-      final bodyLayer = find.ancestor(
-        of: find.byKey(bodyKey),
-        matching: layers,
-      );
-      final barLayer = find.ancestor(
-        of: find.byKey(_topBarKey),
-        matching: layers,
-      );
+      Finder layerOf(Key key) =>
+          find.ancestor(of: find.byKey(key), matching: layers);
+      final bodyLayer = layerOf(bodyKey);
+      final topLayer = layerOf(_topBarKey);
+      final bottomLayer = layerOf(_bottomBarKey);
       expect(bodyLayer, findsOneWidget);
-      expect(barLayer, findsOneWidget);
-      expect(
+      expect(topLayer, findsOneWidget);
+      expect(bottomLayer, findsOneWidget);
+      final widgets = {
         tester.widget(bodyLayer),
-        isNot(same(tester.widget(barLayer))),
-      );
-      expect(
-        find.descendant(of: barLayer, matching: find.byKey(_bottomBarKey)),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: barLayer, matching: find.byKey(bodyKey)),
-        findsNothing,
-        reason: 'what the bars refract must be painted behind their layer',
-      );
+        tester.widget(topLayer),
+        tester.widget(bottomLayer),
+      };
+      expect(widgets, hasLength(3));
+      for (final bar in [topLayer, bottomLayer]) {
+        expect(
+          find.descendant(of: bar, matching: find.byKey(bodyKey)),
+          findsNothing,
+          reason: 'what the bars refract must be painted behind their layer',
+        );
+        // Each bar's layer is the size of the bar, and clips its glass to
+        // exactly that.
+        final render = tester.renderObject<RenderBox>(bar);
+        expect(render.size.height, 44);
+      }
       expect(
         find.descendant(of: layers, matching: find.byKey(_backgroundKey)),
         findsNothing,

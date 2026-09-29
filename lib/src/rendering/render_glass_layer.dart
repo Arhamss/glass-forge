@@ -374,6 +374,29 @@ class RenderGlassLayer extends RenderProxyBox {
     markNeedsPaint();
   }
 
+  /// Whether this layer's glass may draw only inside its own bounds, exactly.
+  ///
+  /// The layer already clips everything it pushes to its bounds, but grown
+  /// onto a pixel bucket (see `expandToPixelBuckets`), which can reach tens
+  /// of pixels past its edge. A layer that must not put a filter over its
+  /// neighbours -- `GlassScaffold`'s bars, each in a layer the size of the
+  /// bar, over a body with glass of its own -- clips to its exact bounds
+  /// instead, by the same means as [glassClip]. When both are set,
+  /// [glassClip] wins.
+  bool get clipGlassToBounds => _clipGlassToBounds;
+  bool _clipGlassToBounds = false;
+  set clipGlassToBounds(bool value) {
+    if (_clipGlassToBounds == value) {
+      return;
+    }
+    _clipGlassToBounds = value;
+    markNeedsPaint();
+  }
+
+  /// [glassClip], or this layer's exact bounds under [clipGlassToBounds].
+  Rect? get _effectiveGlassClip =>
+      _glassClip ?? (_clipGlassToBounds ? Offset.zero & size : null);
+
   /// Where each backdrop pass was last clipped, in this layer's local
   /// logical space, in push order. Test-only.
   ///
@@ -1286,9 +1309,10 @@ class RenderGlassLayer extends RenderProxyBox {
   ) {
     final pushed = <BackdropFilterLayer>[];
     final clips = <ClipRectLayer>[];
-    // A [glassClip] needs each pass in a clip of its own, and the subtree
+    // A glass clip needs each pass in a clip of its own, and the subtree
     // outside them, which is the several-pass arrangement even for one.
-    final stacks = passes.length > 1 || _glassClip != null;
+    final glassClip = _effectiveGlassClip;
+    final stacks = passes.length > 1 || glassClip != null;
     // The layer's own clip, which is what wraps all of this anyway. Used as
     // each pass's provisional clip because the real one cannot be known yet
     // -- see the narrowing below -- and because it is the behaviour this had
@@ -1348,7 +1372,6 @@ class RenderGlassLayer extends RenderProxyBox {
       _debugPassClips.clear();
       return true;
     }(), 'test-only bookkeeping');
-    final glassClip = _glassClip;
     for (var i = 0; i < clips.length; i++) {
       var clip = _passClip(passes[i]);
       if (glassClip != null) {
