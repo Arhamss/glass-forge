@@ -37,6 +37,15 @@ class GlassControlColors {
 
   /// The colour of an "on" state: a switch's track when it is on.
   ///
+  /// Only the switch reads it. The slider's fill and the focus ring are
+  /// separate tokens, [fill] and [focus], and do not follow the accent:
+  /// left null they stay the label colour. To put a brand accent on all
+  /// three, set all three:
+  ///
+  /// ```dart
+  /// const GlassControlColors(accent: blue, fill: blue, focus: blue)
+  /// ```
+  ///
   /// `GlassSwitch.activeTrackColor` still wins over this for one switch.
   final Color accent;
 
