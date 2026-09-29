@@ -140,7 +140,7 @@ class GlassSlider extends StatefulWidget {
 }
 
 class _GlassSliderState extends State<GlassSlider>
-    with TickerProviderStateMixin, ReduceMotionSnap {
+    with SingleTickerProviderStateMixin, ReduceMotionSnap {
   static const double _trackHeight = 6;
   static const double _thumbSize = 28;
 
@@ -152,7 +152,11 @@ class _GlassSliderState extends State<GlassSlider>
   /// build time (it fills whatever width this slider is given), where a
   /// pixel-offset domain like `GlassSwitch._position` would have to be
   /// re-based on every layout change. A fraction needs no re-basing.
-  late final AnimationController _position;
+  ///
+  /// A plain notifier, not an `AnimationController`: the thumb follows the
+  /// finger or jumps to a value, and never animates, so it needs no ticker.
+  /// Every write is already clamped to 0..1 by [_fractionOf] or [_snap].
+  late final ValueNotifier<double> _position;
 
   /// The thumb's live stretch ratio along the track axis, 1 at rest.
   late final AnimationController _stretch;
@@ -176,10 +180,7 @@ class _GlassSliderState extends State<GlassSlider>
   @override
   void initState() {
     super.initState();
-    _position = AnimationController(
-      vsync: this,
-      value: _fractionOf(widget.value),
-    );
+    _position = ValueNotifier<double>(_fractionOf(widget.value));
     _stretch = AnimationController(
       vsync: this,
       value: 1,
@@ -347,7 +348,6 @@ class _GlassSliderState extends State<GlassSlider>
     _dragging = true;
     _lastTimestamp = details.sourceTimeStamp;
     _lastX = details.localPosition.dx;
-    _position.stop();
     widget.onChangeStart?.call(_currentValue);
     _updateFromLocalX(details.localPosition.dx);
   }
