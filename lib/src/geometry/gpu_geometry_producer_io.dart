@@ -13,11 +13,11 @@ import 'package:glass_forge/src/scene/glass_scene.dart';
 import 'package:glass_forge/src/shapes/shape_geometry.dart';
 import 'package:glass_forge/src/shapes/shape_limits.dart';
 
-/// `buildShaderBundleJson`'s legacy output path for the compiled bundle,
-/// relative to the package root: `build/shaderbundles/geometry.shaderbundle`,
-/// derived from the manifest file name
-/// `shaders/gpu/geometry.shaderbundle.json`.
-const String _bundleLegacyPath = 'build/shaderbundles/geometry.shaderbundle';
+/// Where the build hook puts the compiled bundle, relative to the package
+/// root: inside `glass_forge_generated/`, the directory `pubspec.yaml`
+/// declares as an asset. See `hook/build.dart` for why the bundle is copied
+/// there rather than declared where `buildShaderBundleJson` writes it.
+const String _bundlePath = 'glass_forge_generated/geometry.shaderbundle';
 
 /// Asset keys to try [gpu.ShaderLibrary.fromAsset] with, in order.
 ///
@@ -29,8 +29,8 @@ const String _bundleLegacyPath = 'build/shaderbundles/geometry.shaderbundle';
 /// `flutter: shaders:` entries, which land under both; the bare form is
 /// tried second so the package's own test suite still finds the bundle.
 const List<String> _defaultBundleAssetKeys = <String>[
-  'packages/glass_forge/$_bundleLegacyPath',
-  _bundleLegacyPath,
+  'packages/glass_forge/$_bundlePath',
+  _bundlePath,
 ];
 
 /// Bakes the matte with a Flutter GPU render pass.

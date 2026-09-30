@@ -17,6 +17,8 @@ crops a region of the screen instead, in screen pixels, and sets it on
 the same backdrop as a rounded card: a close-up with no body.
 """
 
+import lib.transport
+import lib.session
 import argparse
 import os
 import subprocess

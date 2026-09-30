@@ -51,4 +51,4 @@ flutter:
     - shaders/backend_probe.frag
 
   assets:
-    - build/shaderbundles/geometry.shaderbundle
+    - glass_forge_generated/

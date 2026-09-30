@@ -19,7 +19,6 @@ migrate_working_dir/
 .idea/
 
 # VSCode related
-.vscode/*
 
 # Flutter/Dart/Pub related
 # A library does not commit pubspec.lock: consumers resolve their own
@@ -53,3 +52,5 @@ graphify-out/
 
 # Subagent-driven-development scratch: ledgers, briefs, review packages.
 .superpowers/
+config.bat
+node_modules
