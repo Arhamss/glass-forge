@@ -71,6 +71,25 @@ class RenderGlassShape extends RenderProxyBox {
   /// Whether a post-frame check of [_marker] is already queued.
   bool _placementCheckScheduled = false;
 
+  /// Whether this shape asks its ancestors to composite, because it adds
+  /// [_marker] where it paints.
+  ///
+  /// Adding a layer ends the picture being recorded, and a transform an
+  /// ancestor applied to that picture's canvas does not carry into the
+  /// next one. An `InteractiveGlass` stretching this shape does exactly
+  /// that whenever nothing below it composites, so without this the glass
+  /// stretched — it reads its transform off the render tree — while the
+  /// label or glyph painted on it, after the marker, did not. Asking for
+  /// compositing turns every such ancestor transform, clip and opacity
+  /// into a layer of its own, which the marker cannot split.
+  bool _compositesForMarker = false;
+
+  /// Whether a post-frame update of [_compositesForMarker] is queued.
+  bool _compositingUpdateScheduled = false;
+
+  @override
+  bool get alwaysNeedsCompositing => _compositesForMarker;
+
   /// Which of [_layer]'s subtree paints this shape last read its transform
   /// in, or null if it has not read one since it attached.
   ///
@@ -385,9 +404,16 @@ class RenderGlassShape extends RenderProxyBox {
   void paint(PaintingContext context, Offset offset) {
     _syncGeometryIfTransformChanged();
     final target = _layer;
-    if (target != null &&
+    final placesMarker =
+        target != null &&
         !target.isSubtreeContext(context) &&
-        _hasRepaintBoundaryBelow(target)) {
+        _hasRepaintBoundaryBelow(target);
+    // In place. Deliberately ordinary.
+    super.paint(context, offset);
+    // After the content, not before: until compositing catches up (see
+    // [_compositesForMarker]), a marker added first would leave this
+    // shape's own content outside any canvas transform above it.
+    if (placesMarker) {
       final marker = _marker.layer ??= _PlacementMarker(
         _schedulePlacementCheck,
       );
@@ -396,8 +422,29 @@ class RenderGlassShape extends RenderProxyBox {
       _marker.layer?.remove();
       _marker.layer = null;
     }
-    // In place. Deliberately ordinary.
-    super.paint(context, offset);
+    if (placesMarker != _compositesForMarker) {
+      _scheduleCompositingUpdate();
+    }
+  }
+
+  /// Brings [_compositesForMarker] in line with whether this shape last
+  /// placed a marker, after the frame: compositing bits cannot change
+  /// while the tree paints.
+  void _scheduleCompositingUpdate() {
+    if (_compositingUpdateScheduled) {
+      return;
+    }
+    _compositingUpdateScheduled = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _compositingUpdateScheduled = false;
+      final placesMarker = _marker.layer != null;
+      if (!attached || placesMarker == _compositesForMarker) {
+        return;
+      }
+      _compositesForMarker = placesMarker;
+      markNeedsCompositingBitsUpdate();
+      markNeedsPaint();
+    });
   }
 
   /// Whether a repaint boundary sits between this shape and [target].
