@@ -4,6 +4,11 @@
   the repository by absolute URL, since the images are kept out of the
   package, and so are its links to the example app, the changelog and the
   license.
+- The compiled Flutter GPU shader bundle is declared as the asset
+  directory `glass_forge_generated/`, which the package ships, instead of a
+  file under `build/`, which it cannot. pub.dev's analysis no longer
+  reports a missing asset, and a bundle that fails to build no longer needs
+  a placeholder file to keep an app's build going.
 
 ## 0.1.0
 

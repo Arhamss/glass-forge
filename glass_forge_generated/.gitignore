@@ -1,0 +1,4 @@
+# Written by hook/build.dart in every build. The directory itself ships,
+# so pubspec.yaml can declare it as an asset; nothing in it is committed.
+*
+!.gitignore

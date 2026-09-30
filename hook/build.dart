@@ -3,12 +3,16 @@ import 'dart:io';
 import 'package:flutter_gpu_shaders/build.dart';
 import 'package:hooks/hooks.dart';
 
-/// Where `buildShaderBundleJson` writes the compiled bundle, and where
-/// `pubspec.yaml`'s `flutter: assets:` entry expects to find it. Must match
-/// both: the manifest name below (`geometry.shaderbundle.json` becomes
-/// `geometry.shaderbundle`) and `_bundleLegacyPath` in
-/// `lib/src/geometry/gpu_geometry_producer.dart`.
-const String _bundleLegacyPath = 'build/shaderbundles/geometry.shaderbundle';
+/// Where the compiled bundle is copied to, relative to the package root.
+///
+/// `buildShaderBundleJson` writes into `build/shaderbundles/`, which is not
+/// part of the published package, so declaring that file under `flutter:
+/// assets:` names a file pub.dev's analysis never sees. Instead
+/// `pubspec.yaml` declares the directory `glass_forge_generated/`, which
+/// ships holding only its `.gitignore`, and the bundle is copied into it
+/// here. Must match `_bundlePath` in
+/// `lib/src/geometry/gpu_geometry_producer_io.dart`.
+const String _bundlePath = 'glass_forge_generated/geometry.shaderbundle';
 
 /// Builds the Flutter GPU shader bundle.
 ///
@@ -18,25 +22,23 @@ const String _bundleLegacyPath = 'build/shaderbundles/geometry.shaderbundle';
 /// built — an unsupported toolchain, an experimental API that moved — the
 /// package still renders through the runtime-effect producer. Breaking a
 /// consumer's build over a fast path they never asked for is not a trade we
-/// are willing to make, so failures are reported and swallowed.
-///
-/// Catching the failure here is not enough on its own: `pubspec.yaml`
-/// statically declares [_bundleLegacyPath] under `flutter: assets:`, so
-/// Flutter's asset bundler fails the *whole build* — independently of this
-/// hook, and unconditionally — if that file does not exist when it runs,
-/// regardless of how gracefully this `catch` block behaved. So on failure
-/// this also stamps a placeholder at that exact path. `ShaderLibrary
-/// .fromAsset` will fail to parse it, which `GpuGeometryProducer.warmUp`
-/// already treats as an ordinary "unavailable" outcome — the placeholder
-/// only has to exist, not be valid.
+/// are willing to make, so failures are reported and swallowed. A declared
+/// asset *directory* does not fail the build when it has no bundle in it,
+/// so nothing has to stand in for a bundle that did not build: the loader
+/// finds no asset, which `GpuGeometryProducer.warmUp` already treats as
+/// "unavailable".
 void main(List<String> args) async {
   await build(args, (input, output) async {
     try {
-      await buildShaderBundleJson(
+      final result = await buildShaderBundleJson(
         buildInput: input,
         buildOutput: output,
         manifestFileName: 'shaders/gpu/geometry.shaderbundle.json',
         includeDirectories: [input.packageRoot.resolve('shaders/')],
+      );
+      _copyIfChanged(
+        File.fromUri(result.outputFile),
+        File.fromUri(input.packageRoot.resolve(_bundlePath)),
       );
     } on Object catch (error, stackTrace) {
       // A build hook runs as a standalone Dart script, outside Flutter's own
@@ -49,30 +51,31 @@ void main(List<String> args) async {
         'rendering will use the runtime-effect path instead. This is not '
         'fatal.\n$error\n$stackTrace',
       );
-      await _ensurePlaceholderBundleExists(input.packageRoot);
     }
   });
 }
 
-/// Writes an empty file at [_bundleLegacyPath] if nothing is there yet.
+/// Copies [from] over [to] unless [to] already holds the same bytes.
 ///
-/// Guarded on its own: a placeholder failing to write must not turn a
-/// soft shader-bundle failure into a hard build failure either.
-Future<void> _ensurePlaceholderBundleExists(Uri packageRoot) async {
-  try {
-    final file = File.fromUri(packageRoot.resolve(_bundleLegacyPath));
-    if (file.existsSync()) {
-      return;
-    }
-    file.parent.createSync(recursive: true);
-    file.writeAsBytesSync(const <int>[]);
-  } on Object catch (error) {
-    stderr.writeln(
-      'glass_forge: could not stamp a placeholder Flutter GPU shader '
-      'bundle either ($error). If `flutter: assets:` in pubspec.yaml still '
-      'lists $_bundleLegacyPath, the build will fail on that missing '
-      'asset — this is the one failure mode this hook cannot swallow on '
-      'its own.',
-    );
+/// Skipping an identical copy keeps the file's timestamp still, so nothing
+/// watching the asset sees a change on a build that changed nothing.
+void _copyIfChanged(File from, File to) {
+  final bytes = from.readAsBytesSync();
+  if (to.existsSync() && _sameBytes(to.readAsBytesSync(), bytes)) {
+    return;
   }
+  to.parent.createSync(recursive: true);
+  to.writeAsBytesSync(bytes, flush: true);
+}
+
+bool _sameBytes(List<int> a, List<int> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) {
+      return false;
+    }
+  }
+  return true;
 }

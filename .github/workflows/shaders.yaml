@@ -30,12 +30,6 @@ jobs:
       # shaders that fail SkSL twice, and found out from user bug reports
       # months later.
       #
-      # It has to run before analyze, for a second reason. Building runs the
-      # package's hook/build.dart, which generates
-      # build/shaderbundles/geometry.shaderbundle. pubspec.yaml declares that
-      # file as an asset, so on a checkout where nothing has been built yet
-      # analyze reports `asset_does_not_exist` and fails the job.
-      #
       # The example is a phone demo with no web/ folder checked in, so
       # `flutter create` makes one. It also writes a template
       # test/widget_test.dart that refers to a `MyApp` this app does not have;
