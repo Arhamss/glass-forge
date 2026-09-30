@@ -1,7 +1,20 @@
-# glass_forge
+<p align="center">
+  <img src="docs/readme/lens.gif" width="340" alt="A lens of liquid glass dragged across a photo of the northern lights, bending it at the rim, then tapped through circle, rounded rectangle, pill and capsule">
+</p>
 
-Liquid glass for Flutter: real refraction where the GPU allows, graceful
-degradation everywhere else.
+<h1 align="center">glass_forge</h1>
+
+<p align="center">
+  <b>Liquid glass for Flutter.</b><br>
+  Real refraction where the GPU allows, graceful degradation everywhere else.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Flutter-%E2%89%A5%203.47-02569B?logo=flutter&logoColor=white" alt="Flutter 3.47 or later">
+  <img src="https://img.shields.io/badge/platforms-iOS%20%7C%20Android%20%7C%20macOS-6E56CF" alt="iOS, Android and macOS">
+  <img src="https://img.shields.io/badge/renderer-Impeller-111827" alt="Impeller">
+  <img src="https://img.shields.io/badge/license-MIT-22C55E" alt="MIT license">
+</p>
 
 One package, one `pub add`. Rendering, tiering, motion, design tokens and the
 native accessibility signals all live here, because a consumer should never
@@ -27,15 +40,76 @@ GlassLayer(
 )
 ```
 
-The [example app](example/) is a playground: three live scenes behind a
-`GlassTabBar` — a lens you drag and reshape, drops that melt together, and
-a Control Center-style kit of the package's own `GlassButton`,
-`GlassSwitch` and `GlassSlider` — under a `GlassDetentSheet` with a knob
-for every field of `GlassMaterial`, presets that morph into one another, a
-quality-tier pin, and a button that copies the material you ended up with
-as Dart. A settings page shows the chrome together: a `GlassScaffold` with
-a `GlassAppBar`, controls and text fields in the body, and a rename sheet
-from `showGlassSheet`.
+## See it
+
+Everything below is the [example app](example/), recorded on the iPhone 18
+Pro Max simulator running Impeller. Nothing is mocked up: every frame is the
+package rendering live.
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="docs/readme/liquid.gif" width="260" alt="Glass drops orbiting a larger one, melting into it on each pass, then the large drop dragged away and springing home"><br>
+      <b>Drops that melt</b><br>
+      <sub>Shapes in a <code>GlassBlendGroup</code> smooth-min into one surface instead of overlapping.</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/readme/kit.gif" width="260" alt="A Control Center-style panel of glass tiles: toggles switched on, a switch flipped, two sliders dragged"><br>
+      <b>A day job</b><br>
+      <sub><code>GlassButton</code>, <code>GlassSwitch</code> and <code>GlassSlider</code> on glass tiles, eleven shapes in one layer.</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/readme/tuner.gif" width="260" alt="The lens morphing through the Frosted, Prism and Lens presets, then a sheet rising with a control for every material field"><br>
+      <b>Tuned live</b><br>
+      <sub>Presets morph into one another; a <code>GlassDetentSheet</code> holds a knob for every field of <code>GlassMaterial</code>.</sub>
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td width="46%" align="center">
+      <img src="docs/readme/pull.gif" width="300" alt="Close-up of two glass buttons pulled by a finger: each stretches toward it with its icon, brightens, and bounces back on release">
+    </td>
+    <td>
+      <h3>Press, pull, let go</h3>
+      <p>
+        Pull a button and it gives the way native iOS glass does: about
+        1.5&times; along the pull, the icon or label stretching with it,
+        following the finger a few points. It lights up as it stretches and
+        stays lit however far you drag. Let go and it springs back through
+        rest with a soft bounce.
+      </p>
+      <p>
+        All of it comes from one press spring, so the stretch, the sheen and
+        the rebound can never fall out of step. Reduce Motion turns the
+        movement off and keeps the response.
+      </p>
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/readme/lens.png" width="220" alt="The lens scene at rest"><br><sub>Lens</sub></td>
+    <td align="center"><img src="docs/readme/liquid.png" width="220" alt="A drop necking into the larger one"><br><sub>Liquid</sub></td>
+    <td align="center"><img src="docs/readme/kit.png" width="220" alt="The Control Center-style kit"><br><sub>Kit</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/readme/tuner.png" width="220" alt="The material sheet raised over the kit"><br><sub>Material sheet</sub></td>
+    <td align="center"><img src="docs/readme/settings.png" width="220" alt="A settings page with a glass app bar, switches, a slider, a segmented control and text fields"><br><sub><code>GlassScaffold</code> and <code>GlassAppBar</code></sub></td>
+    <td align="center"><img src="docs/readme/sheet.png" width="220" alt="A rename sheet riding above the keyboard"><br><sub><code>showGlassSheet</code> over the keyboard</sub></td>
+  </tr>
+</table>
+
+The example is a playground: three live scenes behind a `GlassTabBar`, under
+a sheet with every field of `GlassMaterial`, presets, a quality-tier pin, and
+a button that copies the material you end up with as Dart. Run it yourself:
+
+```sh
+cd example
+flutter run
+```
 
 ## How it works, in one paragraph
 
