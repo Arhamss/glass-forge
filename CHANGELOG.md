@@ -1,3 +1,10 @@
+## 0.1.1
+
+- The README's GIFs and screenshots load on pub.dev. They are linked from
+  the repository by absolute URL, since the images are kept out of the
+  package, and so are its links to the example app, the changelog and the
+  license.
+
 ## 0.1.0
 
 First release.

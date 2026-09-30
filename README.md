@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/readme/lens.gif" width="340" alt="A lens of liquid glass dragged across a photo of the northern lights, bending it at the rim, then tapped through circle, rounded rectangle, pill and capsule">
+  <img src="https://raw.githubusercontent.com/Arhamss/glass-forge/84c3c964c2b9e5e0f96f4753b988afe0a6cf1fde/docs/readme/lens.gif" width="340" alt="A lens of liquid glass dragged across a photo of the northern lights, bending it at the rim, then tapped through circle, rounded rectangle, pill and capsule">
 </p>
 
 <p align="center">
@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Arhamss/glass-forge">GitHub</a> &nbsp;&bull;&nbsp; <a href="example/">Example app</a> &nbsp;&bull;&nbsp; <a href="CHANGELOG.md">Changelog</a> &nbsp;&bull;&nbsp; <a href="https://github.com/Arhamss/glass-forge/issues">Issues</a>
+  <a href="https://github.com/Arhamss/glass-forge">GitHub</a> &nbsp;&bull;&nbsp; <a href="https://github.com/Arhamss/glass-forge/tree/main/example">Example app</a> &nbsp;&bull;&nbsp; <a href="https://pub.dev/packages/glass_forge/changelog">Changelog</a> &nbsp;&bull;&nbsp; <a href="https://github.com/Arhamss/glass-forge/issues">Issues</a>
 </p>
 
 ---
@@ -46,24 +46,24 @@ GlassLayer(
 
 ## See it
 
-Everything below is the [example app](example/), recorded on the iPhone 18
+Everything below is the [example app](https://github.com/Arhamss/glass-forge/tree/main/example), recorded on the iPhone 18
 Pro Max simulator running Impeller. Nothing is mocked up: every frame is the
 package rendering live.
 
 <table>
   <tr>
     <td align="center" width="33%">
-      <img src="docs/readme/liquid.gif" width="260" alt="Glass drops orbiting a larger one, melting into it on each pass, then the large drop dragged away and springing home"><br>
+      <img src="https://raw.githubusercontent.com/Arhamss/glass-forge/84c3c964c2b9e5e0f96f4753b988afe0a6cf1fde/docs/readme/liquid.gif" width="260" alt="Glass drops orbiting a larger one, melting into it on each pass, then the large drop dragged away and springing home"><br>
       <b>Drops that melt</b><br>
       <sub>Shapes in a <code>GlassBlendGroup</code> smooth-min into one surface instead of overlapping.</sub>
     </td>
     <td align="center" width="33%">
-      <img src="docs/readme/kit.gif" width="260" alt="A Control Center-style panel of glass tiles: toggles switched on, a switch flipped, two sliders dragged"><br>
+      <img src="https://raw.githubusercontent.com/Arhamss/glass-forge/84c3c964c2b9e5e0f96f4753b988afe0a6cf1fde/docs/readme/kit.gif" width="260" alt="A Control Center-style panel of glass tiles: toggles switched on, a switch flipped, two sliders dragged"><br>
       <b>A day job</b><br>
       <sub><code>GlassButton</code>, <code>GlassSwitch</code> and <code>GlassSlider</code> on glass tiles, eleven shapes in one layer.</sub>
     </td>
     <td align="center" width="33%">
-      <img src="docs/readme/tuner.gif" width="260" alt="The lens morphing through the Frosted, Prism and Lens presets, then a sheet rising with a control for every material field"><br>
+      <img src="https://raw.githubusercontent.com/Arhamss/glass-forge/84c3c964c2b9e5e0f96f4753b988afe0a6cf1fde/docs/readme/tuner.gif" width="260" alt="The lens morphing through the Frosted, Prism and Lens presets, then a sheet rising with a control for every material field"><br>
       <b>Tuned live</b><br>
       <sub>Presets morph into one another; a <code>GlassDetentSheet</code> holds a knob for every field of <code>GlassMaterial</code>.</sub>
     </td>
@@ -73,7 +73,7 @@ package rendering live.
 <table>
   <tr>
     <td width="46%" align="center">
-      <img src="docs/readme/pull.gif" width="300" alt="Close-up of two glass buttons pulled by a finger: each stretches toward it with its icon, brightens, and bounces back on release">
+      <img src="https://raw.githubusercontent.com/Arhamss/glass-forge/84c3c964c2b9e5e0f96f4753b988afe0a6cf1fde/docs/readme/pull.gif" width="300" alt="Close-up of two glass buttons pulled by a finger: each stretches toward it with its icon, brightens, and bounces back on release">
     </td>
     <td>
       <h3>Press, pull, let go</h3>
@@ -95,14 +95,14 @@ package rendering live.
 
 <table>
   <tr>
-    <td align="center"><img src="docs/readme/lens.png" width="220" alt="The lens scene at rest"><br><sub>Lens</sub></td>
-    <td align="center"><img src="docs/readme/liquid.png" width="220" alt="A drop necking into the larger one"><br><sub>Liquid</sub></td>
-    <td align="center"><img src="docs/readme/kit.png" width="220" alt="The Control Center-style kit"><br><sub>Kit</sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/Arhamss/glass-forge/84c3c964c2b9e5e0f96f4753b988afe0a6cf1fde/docs/readme/lens.png" width="220" alt="The lens scene at rest"><br><sub>Lens</sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/Arhamss/glass-forge/84c3c964c2b9e5e0f96f4753b988afe0a6cf1fde/docs/readme/liquid.png" width="220" alt="A drop necking into the larger one"><br><sub>Liquid</sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/Arhamss/glass-forge/84c3c964c2b9e5e0f96f4753b988afe0a6cf1fde/docs/readme/kit.png" width="220" alt="The Control Center-style kit"><br><sub>Kit</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/readme/tuner.png" width="220" alt="The material sheet raised over the kit"><br><sub>Material sheet</sub></td>
-    <td align="center"><img src="docs/readme/settings.png" width="220" alt="A settings page with a glass app bar, switches, a slider, a segmented control and text fields"><br><sub><code>GlassScaffold</code> and <code>GlassAppBar</code></sub></td>
-    <td align="center"><img src="docs/readme/sheet.png" width="220" alt="A rename sheet riding above the keyboard"><br><sub><code>showGlassSheet</code> over the keyboard</sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/Arhamss/glass-forge/84c3c964c2b9e5e0f96f4753b988afe0a6cf1fde/docs/readme/tuner.png" width="220" alt="The material sheet raised over the kit"><br><sub>Material sheet</sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/Arhamss/glass-forge/84c3c964c2b9e5e0f96f4753b988afe0a6cf1fde/docs/readme/settings.png" width="220" alt="A settings page with a glass app bar, switches, a slider, a segmented control and text fields"><br><sub><code>GlassScaffold</code> and <code>GlassAppBar</code></sub></td>
+    <td align="center"><img src="https://raw.githubusercontent.com/Arhamss/glass-forge/84c3c964c2b9e5e0f96f4753b988afe0a6cf1fde/docs/readme/sheet.png" width="220" alt="A rename sheet riding above the keyboard"><br><sub><code>showGlassSheet</code> over the keyboard</sub></td>
   </tr>
 </table>
 
@@ -576,4 +576,4 @@ is used for the accelerated geometry producer where available and needs
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+MIT — see [`LICENSE`](https://github.com/Arhamss/glass-forge/blob/main/LICENSE).
