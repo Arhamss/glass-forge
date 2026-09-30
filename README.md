@@ -2,19 +2,23 @@
   <img src="docs/readme/lens.gif" width="340" alt="A lens of liquid glass dragged across a photo of the northern lights, bending it at the rim, then tapped through circle, rounded rectangle, pill and capsule">
 </p>
 
-<h1 align="center">glass_forge</h1>
-
 <p align="center">
-  <b>Liquid glass for Flutter.</b><br>
-  Real refraction where the GPU allows, graceful degradation everywhere else.
+  <img src="https://img.shields.io/badge/CODEABLE-GLASS_FORGE-7cf5c4?style=for-the-badge&labelColor=0e0926" alt="Codeable glass_forge" />
+  <img src="https://img.shields.io/badge/FLUTTER-3.47%2B-352e5c?style=for-the-badge&labelColor=0e0926&logo=flutter&logoColor=7cf5c4" alt="Flutter 3.47 or later" />
+  <img src="https://img.shields.io/badge/IMPELLER-352e5c?style=for-the-badge&labelColor=0e0926" alt="Impeller" />
+  <img src="https://img.shields.io/badge/iOS_%C2%B7_ANDROID_%C2%B7_macOS-352e5c?style=for-the-badge&labelColor=0e0926&logo=apple&logoColor=7cf5c4" alt="iOS, Android and macOS" />
+  <img src="https://img.shields.io/badge/LICENSE-MIT-6b6190?style=for-the-badge&labelColor=0e0926" alt="MIT" />
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Flutter-%E2%89%A5%203.47-02569B?logo=flutter&logoColor=white" alt="Flutter 3.47 or later">
-  <img src="https://img.shields.io/badge/platforms-iOS%20%7C%20Android%20%7C%20macOS-6E56CF" alt="iOS, Android and macOS">
-  <img src="https://img.shields.io/badge/renderer-Impeller-111827" alt="Impeller">
-  <img src="https://img.shields.io/badge/license-MIT-22C55E" alt="MIT license">
+  <strong>Liquid glass for Flutter — real refraction where the GPU allows, graceful degradation everywhere else.</strong>
 </p>
+
+<p align="center">
+  <a href="https://github.com/Arhamss/glass-forge">GitHub</a> &nbsp;&bull;&nbsp; <a href="example/">Example app</a> &nbsp;&bull;&nbsp; <a href="CHANGELOG.md">Changelog</a> &nbsp;&bull;&nbsp; <a href="https://github.com/Arhamss/glass-forge/issues">Issues</a>
+</p>
+
+---
 
 One package, one `pub add`. Rendering, tiering, motion, design tokens and the
 native accessibility signals all live here, because a consumer should never
@@ -570,14 +574,6 @@ is used for the accelerated geometry producer where available and needs
 `FLTEnableFlutterGPU` in `Info.plist` on iOS, or the
 `io.flutter.embedding.android.EnableFlutterGPU` metadata key on Android.
 
-## Credit
-
-Built on [`liquid_glass_renderer`](https://github.com/whynotmake-it/flutter_liquid_glass)
-by Tim Lehmann / whynotmake.it (MIT), whose shader corpus and 16-shape
-batching design are the foundation here. Spring motion comes from
-[`motor`](https://github.com/whynotmake-it/rivership/tree/main/packages/motor)
-by the same author.
-
 ## License
 
-MIT — see [`LICENSE`](LICENSE) and [`THIRD_PARTY.md`](THIRD_PARTY.md).
+MIT — see [`LICENSE`](LICENSE).
