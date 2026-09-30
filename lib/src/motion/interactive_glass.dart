@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:glass_forge/src/composition/glass_glow.dart';
 import 'package:glass_forge/src/design/glass_theme.dart';
@@ -265,6 +267,14 @@ class _InteractiveGlassState extends State<InteractiveGlass>
   static double _glowRadiusFor(Size size) =>
       (size.longestSide * 1.5).clamp(_glowMinRadius, _glowMaxRadius);
 
+  /// [InteractiveGlass.pressStretch], or none under Reduce Motion. Read by
+  /// both the transform and the sheen, so neither answers a drag the other
+  /// ignores.
+  GlassPressStretch get _resolvedPressStretch =>
+      GlassReduceMotion.instance.value
+      ? const GlassPressStretch.none()
+      : widget.pressStretch;
+
   static const double _glowMinRadius = 48;
   static const double _glowMaxRadius = 640;
 
@@ -520,14 +530,30 @@ class _InteractiveGlassState extends State<InteractiveGlass>
       _lastWrittenGlow = null;
       return;
     }
-    final centre = _layerLocalPointerPosition();
+    final centre = _layerLocalGlowCentre();
     if (centre == null) {
       return;
     }
+    final size = context.size ?? Size.zero;
+    // The sheen a stretch adds: a white lift in step with how far the
+    // surface has given, on top of the press's own. The radius widens with
+    // it — never from zero, see above — so the lift spreads over the whole
+    // stretched surface instead of pooling under the finger.
+    final pressStretch = _resolvedPressStretch;
+    final reach = pressStretch.sheen > 0
+        ? glassPressReach(
+            size: size,
+            state: _controller.value,
+            pressStretch: pressStretch,
+          )
+        : 0.0;
     final next = GlassGlow(
       centre: centre,
-      radius: _glowRadiusFor(context.size ?? Size.zero),
-      strength: _glowMaxStrength * press,
+      radius: math.min(_glowRadiusFor(size) * (1 + reach), _glowMaxRadius),
+      strength: math.min(
+        _glowMaxStrength * press + pressStretch.sheen * reach,
+        1,
+      ),
     );
     notifier.value = next;
     _lastWrittenGlow = next;
@@ -552,7 +578,12 @@ class _InteractiveGlassState extends State<InteractiveGlass>
     final notifier = _glowNotifier;
     final stillOwned = notifier != null && _ownsGlow(notifier);
     _lastWrittenGlow = null;
-    _globalPointerPosition = null;
+    // Only once no finger is left. A press publishes at depth 0 before its
+    // spring first ticks, and every move in that frame lands here; losing
+    // the position then left a pull that went still with no glow at all.
+    if (_pointersDown.isEmpty) {
+      _globalPointerPosition = null;
+    }
     if (notifier != null && stillOwned) {
       notifier.value = const GlassGlow.none();
     }
@@ -586,6 +617,34 @@ class _InteractiveGlassState extends State<InteractiveGlass>
       return null;
     }
     return layer.globalToLocal(global);
+  }
+
+  /// Where the glow sits: under the finger, but never off this surface.
+  ///
+  /// A finger pulling a surface soon leaves it — the surface gives a few
+  /// points, the finger goes on for fifty — and a glow centred on the
+  /// finger went with it, so the harder the pull, the clearer the glass
+  /// turned, just as its sheen should be at its brightest. Clamped to the
+  /// surface's own bounds in layer space, the light keeps tracking the
+  /// finger along the edge and stays on the glass it belongs to.
+  Offset? _layerLocalGlowCentre() {
+    final centre = _layerLocalPointerPosition();
+    final layer = _findAncestorLayer();
+    final box = context.findRenderObject();
+    if (centre == null || layer == null || box is! RenderBox) {
+      return centre;
+    }
+    if (!box.hasSize) {
+      return centre;
+    }
+    final bounds = MatrixUtils.transformRect(
+      box.getTransformTo(layer),
+      Offset.zero & box.size,
+    );
+    return Offset(
+      centre.dx.clamp(bounds.left, bounds.right),
+      centre.dy.clamp(bounds.top, bounds.bottom),
+    );
   }
 
   /// Walks the render tree for the nearest enclosing `RenderGlassLayer`,
@@ -654,9 +713,7 @@ class _InteractiveGlassState extends State<InteractiveGlass>
     // `_settleEverythingNow` snaps that to its target instead of easing it,
     // so without this an under-Reduce-Motion press would deform at full
     // strength, just instantly instead of springing into it.
-    final pressStretch = GlassReduceMotion.instance.value
-        ? const GlassPressStretch.none()
-        : widget.pressStretch;
+    final pressStretch = _resolvedPressStretch;
 
     // The transform wraps the gestures, not the other way round, so hit
     // testing passes through `RenderGlassMotion`'s inverse and lands on the

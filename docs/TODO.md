@@ -39,9 +39,12 @@ The simulator cannot answer these, and Arham chose to leave them for now.
 
 - **flutter#187820, physically.** Glass-on-glass whitewash only shows on a
   device; the simulator hides it.
-- **Press, stretch and glow magnitudes.** They rest on one third-party
+- **Press and glow magnitudes.** They rest on one third-party
   measurement (`liquid_glass_widgets`' 120 fps capture) and Arham's
-  feedback. A 120 fps recording of iOS would pin them.
+  feedback. A 120 fps recording of iOS would pin them. The press-stretch
+  was retuned on 2026-09-30 against screenshots of the Clock app's
+  buttons pulled on a physical iPhone (1.5x along, no squash, 10 pt
+  travel); the 0.2 sheen and rebound 0.75 are by eye.
 - **Raising `kMaxShapes`.** Needs the uniform probe re-run on the weakest
   backend (`kMaxShapesProvenance`).
 

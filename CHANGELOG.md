@@ -37,6 +37,15 @@
 
 ### Fixed
 
+- The label or glyph on a moving glass surface moves with it. Under a
+  repaint boundary inside its `GlassLayer` (an `Opacity`, a list row), a
+  shape's placement marker split the picture, and whatever transform an
+  ancestor had applied to its canvas, such as an `InteractiveGlass`
+  stretch, was dropped for the content painted after it. The glass
+  stretched and the content stayed put.
+- A press whose finger moves before the press spring's first frame keeps
+  its touch glow. Every such move reached the glow at depth 0, which
+  forgot where the finger was.
 - `GlassScaffold`, `showGlassSheet` and `GlassDetentSheet` now give their
   content a text style and icon colour of their own, iOS's 17-point body
   in the theme's label colour, the way Material's `Scaffold` does. With no
@@ -67,6 +76,13 @@
 
 ### Changed
 
+- A pulled glass surface gives visibly, like a native button: the
+  press-stretch defaults to 35 % along the pull (was 5 %) with no squash
+  across it (was 1), and follows the finger up to 10 pt (was 4). The
+  label or glyph on it stretches with the glass. It takes on
+  a white sheen as it stretches (`GlassPressStretch.sheen`), and the touch
+  glow stays on the surface however far the finger pulls. Letting go
+  bounces back softly through rest (`GlassPressStretch.rebound`).
 - `GlassSwitch` and `GlassSegmentedControl` are sized to iOS 27, measured
   against the native `Toggle` and segmented `Picker` on the simulator. The
   switch is a 63 × 28 track under a 37 × 24 knob (was 64 and 38 wide). The

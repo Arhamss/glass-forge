@@ -93,7 +93,8 @@ class RenderGlassMotion extends RenderProxyBox {
   set pressStretch(GlassPressStretch value) {
     if (_pressStretch.intensity == value.intensity &&
         _pressStretch.squash == value.squash &&
-        _pressStretch.travel == value.travel) {
+        _pressStretch.travel == value.travel &&
+        _pressStretch.rebound == value.rebound) {
       return;
     }
     _pressStretch = value;

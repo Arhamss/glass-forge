@@ -438,7 +438,8 @@ void main() {
       // Longer along x, the drag's own axis, and shorter across it.
       final m = _transformOf(motion);
       expect(m.entry(0, 0), greaterThan(1));
-      expect(m.entry(1, 1), lessThan(1));
+      // No squash by default: a native button keeps its width.
+      expect(m.entry(1, 1), closeTo(1, 1e-9));
 
       await gesture.up();
       await _settle(tester, motion);
@@ -548,7 +549,7 @@ void main() {
       expect(state.pressDrag.dx, closeTo(300, 1e-6));
       final m = _transformOf(motion);
       expect(m.entry(0, 0), greaterThan(1));
-      expect(m.entry(0, 0), lessThanOrEqualTo(1.05 + 1e-9));
+      expect(m.entry(0, 0), lessThanOrEqualTo(1.35 + 1e-9));
 
       await gesture.up();
       await _settle(tester, motion);

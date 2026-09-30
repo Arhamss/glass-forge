@@ -119,7 +119,7 @@ void main() {
     await _hold(tester, 120);
   });
 
-  testWidgets('a long drag stretches, but never past about 5 %', (
+  testWidgets('a long drag stretches, but never past about 35 %', (
     tester,
   ) async {
     await tester.pumpWidget(_surface(const Size(100, 100)));
@@ -130,12 +130,12 @@ void main() {
     for (var i = 0; i < 60; i++) {
       await gesture.moveBy(const Offset(10, 0));
       await tester.pump(const Duration(milliseconds: 16));
-      // Elongation along the drag over squash across it: with squash 1
-      // that is the stretch squared.
-      largest = math.max(largest, math.sqrt(_elongation(_painted(motion))));
+      // Elongation along the drag over the width across it: with no
+      // squash that is the stretch itself.
+      largest = math.max(largest, _elongation(_painted(motion)));
     }
-    expect(largest, greaterThan(1.01), reason: 'the drag never stretched');
-    expect(largest, lessThanOrEqualTo(1.05 + 1e-9));
+    expect(largest, greaterThan(1.2), reason: 'the drag barely stretched');
+    expect(largest, lessThanOrEqualTo(1.35 + 1e-9));
 
     await gesture.up();
     await _hold(tester, 120);
@@ -203,6 +203,126 @@ void main() {
       greaterThanOrEqualTo(size.longestSide),
       reason: 'the glow does not reach across the surface',
     );
+    await gesture.up();
+    await _hold(tester, 120);
+  });
+
+  testWidgets('letting go of a stretch bounces back through rest', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_surface(const Size(44, 44)));
+    final motion = _motionOf(tester);
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(InteractiveGlass)),
+    );
+    for (var i = 0; i < 12; i++) {
+      await gesture.moveBy(const Offset(10, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await _hold(tester);
+    final pulled = _painted(motion);
+    expect(pulled.entry(0, 0), greaterThan(pulled.entry(1, 1)));
+
+    await gesture.up();
+    // The most the surface is squashed along the pull on the way back:
+    // below 1 means it rebounded past its resting shape.
+    var squash = double.infinity;
+    for (var i = 0; i < 60; i++) {
+      await tester.pump(const Duration(milliseconds: 8));
+      final m = _painted(motion);
+      squash = math.min(squash, m.entry(0, 0) / m.entry(1, 1));
+    }
+    expect(squash, lessThan(0.97), reason: 'no rebound');
+    expect(squash, greaterThan(0.9), reason: 'a soft rebound, not a jolt');
+
+    await _hold(tester, 120);
+    final rest = _painted(motion);
+    expect(rest.entry(0, 0), closeTo(1, 1e-3));
+    expect(rest.entry(1, 1), closeTo(1, 1e-3));
+  });
+
+  testWidgets('a stretch lights the glass with a wider, whiter glow', (
+    tester,
+  ) async {
+    const size = Size(44, 44);
+    await tester.pumpWidget(_surface(size));
+    final scope = tester.widget<GlassGlowScope>(find.byType(GlassGlowScope));
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(InteractiveGlass)),
+    );
+    await _hold(tester);
+    final pressed = scope.glow.value;
+
+    for (var i = 0; i < 12; i++) {
+      await gesture.moveBy(const Offset(10, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await _hold(tester);
+    final stretched = scope.glow.value;
+    expect(stretched.strength, greaterThan(pressed.strength + 0.1));
+    expect(stretched.strength, lessThanOrEqualTo(0.10 + 0.2 + 1e-9));
+    expect(stretched.radius, greaterThan(pressed.radius));
+
+    await gesture.up();
+    await _hold(tester, 120);
+    expect(scope.glow.value.isActive, isFalse, reason: 'the sheen lingered');
+  });
+
+  testWidgets('pulling past the edge keeps the glow on the glass', (
+    tester,
+  ) async {
+    const size = Size(44, 44);
+    await tester.pumpWidget(_surface(size));
+    final scope = tester.widget<GlassGlowScope>(find.byType(GlassGlowScope));
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(InteractiveGlass)),
+    );
+    for (var i = 0; i < 20; i++) {
+      await gesture.moveBy(const Offset(10, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await _hold(tester);
+    // The finger is 200 pt to the right; the surface gave only a few.
+    final glow = scope.glow.value;
+    final motion = _motionOf(tester);
+    final layer = tester.renderObject<RenderBox>(find.byType(GlassLayer));
+    final bounds = MatrixUtils.transformRect(
+      motion.getTransformTo(layer),
+      Offset.zero & motion.size,
+    );
+    expect(bounds.inflate(1e-6).contains(glow.centre), isTrue);
+    expect(glow.strength, greaterThan(0.2), reason: 'the sheen went clear');
+    await gesture.up();
+    await _hold(tester, 120);
+  });
+
+  testWidgets('a pull that moves before the first frame still lights up', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_surface(const Size(44, 44)));
+    final scope = tester.widget<GlassGlowScope>(find.byType(GlassGlowScope));
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(InteractiveGlass)),
+    );
+    // Down and a whole pull inside one frame: the press spring has not
+    // ticked yet, so every one of these moves publishes at press 0.
+    for (var i = 0; i < 8; i++) {
+      await gesture.moveBy(const Offset(0, 10));
+    }
+    await _hold(tester);
+    expect(scope.glow.value.strength, greaterThan(0.2), reason: 'no glow');
+    await gesture.up();
+    await _hold(tester, 120);
+  });
+
+  testWidgets('a still press takes on no sheen', (tester) async {
+    await tester.pumpWidget(_surface(const Size(44, 44)));
+    final scope = tester.widget<GlassGlowScope>(find.byType(GlassGlowScope));
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(InteractiveGlass)),
+    );
+    await _hold(tester);
+    expect(scope.glow.value.strength, closeTo(0.10, 0.005));
     await gesture.up();
     await _hold(tester, 120);
   });

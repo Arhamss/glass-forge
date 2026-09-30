@@ -124,58 +124,10 @@ Matrix4 glassSurfaceTransform({
     v11 = along * sin * sin + across * cos * cos;
   }
 
-  // A surface with no area is guarded rather than divided by. Dart doubles
-  // do not throw on division by zero — they produce `Infinity`, and the
-  // division below then evaluates `Infinity / Infinity`, which is NaN. A
-  // NaN transform is much worse than a wrong one: element-wise
-  // `Matrix4.==` compares NaN against itself and reports *not equal*, so
-  // `RenderGlassShape`'s "has this transform changed" check can never
-  // answer no again, and the shape re-registers its geometry and schedules
-  // a repaint every frame for as long as the condition lasts. It also
-  // survives into `ShapeGeometry.resolve`, whose producer then refuses the
-  // non-finite bounds and drops the matte for *every* shape sharing that
-  // material pass. A surface with no area has nothing to stretch across
-  // anyway, so the drag itself is zeroed, and the `travel` translation
-  // below goes inert with it.
-  final halfWidth = size.width / 2;
-  final halfHeight = size.height / 2;
-  // `!(x > 0)` rather than `x <= 0`, so a NaN extent is degenerate too.
-  final hasArea = !(!(halfWidth > 0) || !(halfHeight > 0));
-  // The drag rides the press spring in and out. Clamped, because the
-  // release spring undershoots zero, and a negative press would flip the
-  // stretch to point away from the drag for a frame or two.
-  final drag = hasArea && pressStretch.isActive
-      ? state.pressDrag * state.press.clamp(0.0, 1.0)
-      : Offset.zero;
-  final dragDistance = drag.distance;
-  // Past the slop, rubber-banded: `d / (1 + d / 100)` approaches 100 and
-  // never passes it, and halving it gives the ~50 pt ceiling. Diminishing
-  // returns are the point: the first few points of movement are felt, the
-  // hundredth is not.
-  final moved = dragDistance.isFinite && dragDistance > GlassPressStretch.slop
-      ? dragDistance - GlassPressStretch.slop
-      : 0.0;
-  final give = moved / (1 + moved / _resistance) / 2;
-  // How far that reaches, as a fraction of the surface's extent in the
-  // drag's own direction — 1 at most — and which way. The two are taken
-  // separately on purpose. The fraction is measured per axis so a small
-  // button and a large one give alike; the *direction* is the finger's
-  // own. Taking the direction off the per-axis fraction instead turns a
-  // diagonal drag across a wide card into a 45-degree stretch, and
-  // stretching a wide surface along a diagonal it does not have is a shear.
-  final toward = moved > 0 ? drag / dragDistance : Offset.zero;
-  final reachDistance = moved > 0
-      ? math.min(
-          Offset(
-            toward.dx * give / halfWidth,
-            toward.dy * give / halfHeight,
-          ).distance,
-          1,
-        )
-      : 0.0;
-  final travel = math.min(
-    moved * pressStretch.travel,
-    GlassPressStretch.maxTravel,
+  final (:toward, reach: reachDistance, :travel) = _pressReach(
+    size: size,
+    state: state,
+    pressStretch: pressStretch,
   );
 
   final double m00;
@@ -190,9 +142,18 @@ Matrix4 glassSurfaceTransform({
     m10 = v01;
     m11 = v11;
   } else {
-    final pressAlong = 1 + pressStretch.intensity * reachDistance;
+    // A negative reach is the rebound: shorter along, wider across. Floored
+    // so a large intensity cannot squash the surface flat or flip it.
+    final pressAlong = math.max(
+      1 + pressStretch.intensity * reachDistance,
+      _minRebound,
+    );
     final pressAcross =
-        1 / (1 + pressStretch.intensity * reachDistance * pressStretch.squash);
+        1 /
+        math.max(
+          1 + pressStretch.intensity * reachDistance * pressStretch.squash,
+          _minRebound,
+        );
     final cos = toward.dx;
     final sin = toward.dy;
     final a00 = pressAlong * cos * cos + pressAcross * sin * sin;
@@ -224,6 +185,99 @@ Matrix4 glassSurfaceTransform({
     )
     ..translateByDouble(-centreX, -centreY, 0, 1);
 }
+
+/// How far a press-stretch reaches, 0 to 1, for a surface of [size] in
+/// [state]: the fraction of its extent the finger's drag has pulled it,
+/// after the slop and the rubber band. Never negative: the rebound past
+/// rest on release deforms the surface but does not light it.
+///
+/// What the stretch in [glassSurfaceTransform] deforms by, and what
+/// `InteractiveGlass` lights its [GlassPressStretch.sheen] by, so the hue
+/// and the shape can never disagree about how far the surface has given.
+double glassPressReach({
+  required Size size,
+  required GlassMotionState state,
+  required GlassPressStretch pressStretch,
+}) => _pressReach(
+  size: size,
+  state: state,
+  pressStretch: pressStretch,
+).reach.abs();
+
+({Offset toward, double reach, double travel}) _pressReach({
+  required Size size,
+  required GlassMotionState state,
+  required GlassPressStretch pressStretch,
+}) {
+  // A surface with no area is guarded rather than divided by. Dart doubles
+  // do not throw on division by zero — they produce `Infinity`, and the
+  // division below then evaluates `Infinity / Infinity`, which is NaN. A
+  // NaN transform is much worse than a wrong one: element-wise
+  // `Matrix4.==` compares NaN against itself and reports *not equal*, so
+  // `RenderGlassShape`'s "has this transform changed" check can never
+  // answer no again, and the shape re-registers its geometry and schedules
+  // a repaint every frame for as long as the condition lasts. It also
+  // survives into `ShapeGeometry.resolve`, whose producer then refuses the
+  // non-finite bounds and drops the matte for *every* shape sharing that
+  // material pass. A surface with no area has nothing to stretch across
+  // anyway, so the drag itself is zeroed, and the `travel` translation
+  // below goes inert with it.
+  final halfWidth = size.width / 2;
+  final halfHeight = size.height / 2;
+  // `!(x > 0)` rather than `x <= 0`, so a NaN extent is degenerate too.
+  final hasArea = !(!(halfWidth > 0) || !(halfHeight > 0));
+  // The drag rides the press spring in and out, and through zero on the
+  // way out: the release spring undershoots, and the stretch follows it
+  // past rest into its opposite — squashed along the pull, nudged back
+  // past home — before it settles. That rebound is the bounce native
+  // glass gives on letting go. Only its size is taken from the press
+  // here; its sign is carried separately, so a negative press reverses
+  // the deformation rather than the drag's direction, which on an axis
+  // stretch would just stretch it again.
+  final press = state.press.clamp(-1.0, 1.0);
+  final rebound = press < 0 ? -pressStretch.rebound : 1.0;
+  final drag = hasArea && pressStretch.isActive
+      ? state.pressDrag * press.abs()
+      : Offset.zero;
+  final dragDistance = drag.distance;
+  // Past the slop, rubber-banded: `d / (1 + d / 100)` approaches 100 and
+  // never passes it, and halving it gives the ~50 pt ceiling. Diminishing
+  // returns are the point: the first few points of movement are felt, the
+  // hundredth is not.
+  final moved = dragDistance.isFinite && dragDistance > GlassPressStretch.slop
+      ? dragDistance - GlassPressStretch.slop
+      : 0.0;
+  final give = moved / (1 + moved / _resistance) / 2;
+  // How far that reaches, as a fraction of the surface's extent in the
+  // drag's own direction — 1 at most — and which way. The two are taken
+  // separately on purpose. The fraction is measured per axis so a small
+  // button and a large one give alike; the *direction* is the finger's
+  // own. Taking the direction off the per-axis fraction instead turns a
+  // diagonal drag across a wide card into a 45-degree stretch, and
+  // stretching a wide surface along a diagonal it does not have is a shear.
+  final toward = moved > 0 ? drag / dragDistance : Offset.zero;
+  final reachDistance = moved > 0
+      ? math.min<double>(
+          Offset(
+            toward.dx * give / halfWidth,
+            toward.dy * give / halfHeight,
+          ).distance,
+          1,
+        )
+      : 0.0;
+  final travel = math.min(
+    moved * pressStretch.travel,
+    GlassPressStretch.maxTravel,
+  );
+  return (
+    toward: toward,
+    reach: reachDistance.isFinite ? reachDistance * rebound : 0.0,
+    travel: travel * rebound,
+  );
+}
+
+/// The least a press-stretch's rebound shortens a surface to, as a ratio.
+const double _minRebound = 0.5;
 
 /// Where the press-stretch's rubber band saturates, in logical pixels,
 /// before it is halved. `liquid_glass_widgets`' `withResistance(0.01)`.

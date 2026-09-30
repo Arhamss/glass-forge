@@ -146,13 +146,13 @@ void main() {
           press: 1,
           pressDrag: drag,
         ),
-        const GlassPressStretch(intensity: 0, squash: 0),
+        const GlassPressStretch(intensity: 0),
       );
       return Offset(m.getTranslation().x, m.getTranslation().y);
     }
 
-    // 0.05 of the 57 pt past the 3 pt slop.
-    expect(travelled(const Offset(60, 0)).dx, closeTo(2.85, 1e-9));
+    // 0.15 of the 37 pt past the 3 pt slop.
+    expect(travelled(const Offset(40, 0)).dx, closeTo(5.55, 1e-9));
     expect(travelled(const Offset(60, 0)).dy, closeTo(0, 1e-9));
     // Never more than a few points, however far the finger goes.
     expect(
@@ -193,7 +193,7 @@ void main() {
     expect(twice, lessThan(2 * short));
   });
 
-  test('the default squash of 1 conserves area', () {
+  test('a squash of 1 conserves area', () {
     final m = transformFor(
       const GlassMotionState(
         translation: Offset.zero,
@@ -201,8 +201,8 @@ void main() {
         press: 1,
         pressDrag: Offset(60, 25),
       ),
-      // squash defaults to 1; a large intensity makes the check bite.
-      const GlassPressStretch(intensity: 0.5, travel: 0),
+      // A large intensity makes the check bite.
+      const GlassPressStretch(intensity: 0.5, squash: 1, travel: 0),
     );
     final determinant =
         m.entry(0, 0) * m.entry(1, 1) - m.entry(0, 1) * m.entry(1, 0);
