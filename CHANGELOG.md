@@ -1,163 +1,65 @@
-## Unreleased
+## 0.1.0
 
-### Breaking
+First release.
 
-- `GlassShapeClipper` is no longer exported. It was marked
-  `@visibleForTesting` but public, and every shape clip in the package now
-  goes through one internal clipper. Clip to a shape with `ClipPath` and
-  your own `CustomClipper` over `GlassShape`'s geometry instead.
-- `GlassSlider.semanticValue` is now `semanticValueFormatter`. It is a
-  `String Function(double)`, and the old name read as a string.
-  `GlassSlider` is new in this release, so this only affects code written
-  against this branch before release.
-- `GlassSurface` no longer builds a `Glass` when it is placed on glass
-  (under `GlassHostScope`). It paints its material's tint instead, as the
-  controls do. Before, it tripped the nested-glass assert.
-- A `GlassSurface` inside a `GlassPresence` now fades its content with the
-  glass, not only the glass.
-- `GlassTabBar`'s bar is painted, not glass: its `material` and
-  `minimumTintOpacity` are gone, replaced by `backgroundColor` (null is the
-  navigationBar role's tint at its legible step). Pass a tuned material as
-  `selectionMaterial` to drive the lens instead. `GlassTabBar` is new in
-  this release, so this only affects code written against this branch.
+### Rendering
 
-- `InteractiveGlass.pressScale` is now `double?` and defaults to null, which
-  grows the surface by the new `pressGrowth` (6 pt). Passing a ratio still
-  works as before and wins over `pressGrowth`; code that reads the field as
-  a `double` needs a null check.
-- `GlassMotionState.pressAnchor` is now `pressDrag` and
-  `GlassMotionController.setPressAnchor` is now `setPressDrag`. The value
-  is the finger's movement since pointer-down, no longer its offset from
-  the surface's centre.
-- `Glass.containsChild` is removed. It was accepted and never did
-  anything. What glass refracts is whatever paints behind its
-  `GlassLayer`; a child of `Glass` paints over the glass, never into what
-  it bends. Put content you want refracted behind the layer, as
-  `GlassScaffold` does with its body.
+- `GlassLayer` captures the backdrop once per material, and every `Glass`
+  under it registers into one shared signed-distance matte.
+- Two refraction models. `GlassMaterial.regular(brightness:)` and
+  `GlassMaterial.clear()` bend only inside a band at the rim, fitted against
+  iOS 27 captures. `GlassMaterial.dome()` refracts across the whole surface.
+  The band's displacement is what refracting through its surface's slope
+  gives: strongest at the rim, easing to zero with no seam. It reads the
+  backdrop bilinearly wherever it bends it; the flat interior keeps a single
+  tap.
+- Shapes: `GlassRoundedRectangle`, `GlassOval` and `GlassSuperellipse`.
+  `GlassBlendGroup` smooth-mins shapes into one another.
+- Any number of shapes per material. A pass's shapes are sorted into
+  clusters, groups of shapes whose mattes could meet plus any blend group,
+  and each cluster is a draw of its own, up to `kMaxShapes` (8) shapes.
+- A shape that is laid out but not drawn stays out of the matte, its
+  clusters and the diagnostics until it is: under an `Opacity` at zero, in
+  an `Offstage`, in a lazy list's cache region.
+- A pass whose material changes only in shading (tint, frost, highlight)
+  keeps its matte, and a `GlassTextField`'s focus is a uniform on its pass,
+  so neither rebakes anything.
 
-### Fixed
+### Presence and host awareness
 
-- The label or glyph on a moving glass surface moves with it. Under a
-  repaint boundary inside its `GlassLayer` (an `Opacity`, a list row), a
-  shape's placement marker split the picture, and whatever transform an
-  ancestor had applied to its canvas, such as an `InteractiveGlass`
-  stretch, was dropped for the content painted after it. The glass
-  stretched and the content stayed put.
-- A press whose finger moves before the press spring's first frame keeps
-  its touch glow. Every such move reached the glow at depth 0, which
-  forgot where the finger was.
-- `GlassScaffold`, `showGlassSheet` and `GlassDetentSheet` now give their
-  content a text style and icon colour of their own, iOS's 17-point body
-  in the theme's label colour, the way Material's `Scaffold` does. With no
-  `Material` above a glass page, its text used to draw in `WidgetsApp`'s
-  debug fallback: 48-point red monospace with a yellow double underline.
-  `GlassAppBar`'s title is 17-point semibold.
-- `GlassSegmentedControl` labels no longer render giant and cut off
-  outside a `Material`. They are 13 points, semibold when selected, and
-  keep the app's font family. `GlassButton` labels, the `GlassTextField`
-  placeholder and `GlassTabBar` labels likewise name their size and never
-  take an underline from the ambient style.
+- `GlassPresence` and `GlassPresenceScope` fade a `Glass` in and out,
+  driven by a controller, an `Animation<double>` or a route transition,
+  without rebaking its matte on every frame.
+- `GlassHostScope.isOnGlass(context)` tells a widget it is drawn on glass
+  rather than on content, so it can paint instead of stacking glass on
+  glass.
 
-### Backdrop sampling
+### Motion
 
-- `GlassBackdropSampler`, `GlassBackdropSource` and `GlassBackdropBuilder`
-  measure what is behind a surface, so adaptation no longer needs a
-  caller-supplied `backdrop`. The source is snapshotted at low resolution
-  (1/8 scale, at most 96 px on its long side), asynchronously, at most
-  every 200 ms and only after it repainted; each surface takes the mean
-  colour under its own rect, with a luminance band so it does not flicker
-  between schemes. `GlassSurface`, `GlassAppBar`, `GlassTabBar`,
-  `GlassDetentSheet` and every control use it when no `backdrop` is given.
-  An explicit `backdrop` still wins. Nothing is sampled where the tier
-  renders no glass, under Reduce Transparency, or on glass. A repaint
-  behind a repaint boundary inside the source goes unseen until
-  `markNeedsSample`, and a surface that moves while nothing repaints or
-  scrolls keeps its last reading.
-
-### Changed
-
-- A pulled glass surface gives visibly, like a native button: the
-  press-stretch defaults to 35 % along the pull (was 5 %) with no squash
-  across it (was 1), and follows the finger up to 10 pt (was 4). The
-  label or glyph on it stretches with the glass. It takes on
-  a white sheen as it stretches (`GlassPressStretch.sheen`), and the touch
-  glow stays on the surface however far the finger pulls. Letting go
-  bounces back softly through rest (`GlassPressStretch.rebound`).
-- `GlassSwitch` and `GlassSegmentedControl` are sized to iOS 27, measured
-  against the native `Toggle` and segmented `Picker` on the simulator. The
-  switch is a 63 × 28 track under a 37 × 24 knob (was 64 and 38 wide). The
-  segmented control draws a 32-point track under a 28-point pill inset 2
-  (was 44 and 38, inset 3), centred in a hit area that stays 44 tall.
-- The controls' own colours come from the theme: `GlassTokens.controls`,
-  a `GlassControlPalette` of light and dark `GlassControlColors` — `accent`
-  (the switch's on-track), `knob` (the knob, thumb and pill painted on
-  glass), and `fill` and `focus` (the slider's fill and the focus ring,
-  null for the label colour). The defaults are the old green and white, so
-  nothing changes until a theme sets them; `GlassSwitch.activeTrackColor`
-  still wins for one switch.
-- The chrome's painted colours come from the theme too:
-  `GlassTokens.chrome`, a `GlassChromeColors` with `scrim` (under
-  `showGlassSheet`, black at 32 % as before) and `handle` (both sheets'
-  grab handle, null for the sheet's label colour as before).
-- Fixed: the edge band drew a hard ring inset from every shape's edge,
-  which read as a bezel. The convex squircle the band is built on is the
-  glass's *height*; it was being used directly as the displacement, which
-  falls to zero with infinite steepness at the band's inner edge and folds
-  the image there. The displacement is now what refracting through that
-  surface's slope gives: strongest at the rim, easing to zero with no seam.
-  `edgeRefraction` keeps its meaning — the displacement at the edge.
-- Fixed: press-stretch on a non-square surface sheared it. The reach was
-  normalised per axis and that normalised vector used as the stretch
-  direction, so a finger at the corner of a wide card stretched it along a
-  45-degree diagonal. The direction is now the finger's own, and the reach
-  is capped.
-- `InteractiveGlass`'s touch response is retuned to Apple's Liquid Glass,
-  from `liquid_glass_widgets`' 120 fps measurements of iOS 26 and the
-  springs read out of UIKit:
-  - Press-stretch comes from how far the finger has **moved** since it went
-    down, not from where it rests. A tap or a still press, even at the very
-    edge, no longer deforms the glass. The first 3 pt of movement are
-    ignored and the rest is rubber-banded, so it saturates.
-  - `GlassPressStretch` defaults are now intensity 0.05, squash 1 (area
-    kept) and travel 0.05 of the drag, capped at 4 pt: at most 5 % of
-    elongation, where the old 0.5 / 0.3 / 0.15 reached 1.5×.
-  - A press **grows** the surface by 6 pt on its longest side
-    (`pressGrowth`), held to a ratio of 1.02 to 1.10, instead of shrinking
-    it to 0.96.
-  - The press runs on snappy 250 ms / bounce 0.25 and lets go on its own
-    spring, bouncy 280 ms / bounce 0.45 (`pressReleaseMotion`, new).
-    `GlassMotionDefaults.press` follows. `settleMotion` and the tab bar's
-    spring are unchanged.
-  - The touch glow is a soft lift, not a flash: 0.10 at the finger (0.05 in
-    dark mode) instead of 0.55, over a radius of one and a half times the
-    surface's longest side (48 to 640) instead of a fixed 320, so it covers
-    the pressed surface and only fringes its neighbours.
-  - Dragging a surface no longer stretches it into a needle: the stretch
-    saturates however far the finger carries it.
-  - `GlassJiggle` defaults to a 1.08 ceiling at a 2000 px/s half-speed
-    (was 1.18 at 1600), which quiets the slider thumb's stretch too.
-- Controls' settle springs land exactly on their target. They used to stop
-  wherever they were once within half a pixel, which left a slider thumb
-  visibly stretched after the jiggle ceiling came down.
-- The debug warning for glass shapes overlapping across backdrop passes
-  prints once per pair of passes instead of on every frame. An overlap that
-  lasted printed about sixty times a second and buried the rest of the log.
-- A debug warning when more shapes sit in one cluster than a single draw
-  can carry (`kMaxShapes`, 8). The limit is per cluster of nearby or
-  blended shapes now, not per material; see Rendering below.
-- `GlassDetentSheet.material` replaces the sheet role's material for an app
-  with a look of its own. Null keeps the role's, so nothing changes by
-  default; label colour, shadows and motion still come from the role.
-
-- `GlassDetentSheet.bottomGap` separates the floating sheet's bottom inset
-  from its side ones. A sheet that floats over other glass has to clear
-  that chrome's full height before their backdrop passes would overlap, and
-  driving every edge from one number charged twice that clearance in width.
-  Defaults to `gap`, so a sheet floating over nothing is unchanged.
-- Fixed: every layer baked its mattes a second time a few frames after it
-  mounted, when its producer's warm-up settled, although the mattes it held
-  were already the ones a ready producer bakes. The settling now only
-  re-asks a pass that got no matte.
+- `InteractiveGlass` handles press, drag, fling and spring-home. Squash and
+  stretch are read off the spring's own velocity (`GlassJiggle`, a 1.08
+  ceiling at a 2000 px/s half-speed).
+- Springs take a duration and a bounce, the way SwiftUI specifies them:
+  `GlassMotion.bouncy`, `.snappy`, `.smooth` and `.interactive`. A press
+  runs on snappy 250 ms / bounce 0.25 and lets go on its own spring,
+  `pressReleaseMotion`, bouncy 280 ms / bounce 0.45.
+- A press grows the surface by `pressGrowth`, 6 pt on its longest side,
+  held to a ratio of 1.02 to 1.10. `pressScale` fixes a ratio instead.
+- A pulled surface gives the way a native button does (`GlassPressStretch`).
+  The stretch comes from how far the finger has moved since it went down,
+  never from where it rests, so a tap does not deform anything. The first
+  3 pt are ignored and the rest is rubber-banded. At the defaults a surface
+  reaches about 1.5x along the pull with no squash across it, follows the
+  finger up to 10 pt, and the label or glyph on it stretches with the glass.
+  It takes on a white sheen as it stretches (`sheen`), and letting go
+  bounces it softly back through rest (`rebound`).
+- Touch glow (`GlassGlow`): a soft lift under the finger, 0.10 at full press
+  (0.05 in dark mode), over one and a half times the pressed surface's
+  longest side. It belongs to the pass, so neighbouring glass catches a
+  little of it, and it stays on the pressed surface however far the finger
+  pulls. `InteractiveGlass.glow` turns it off for one surface.
+- Under Reduce Motion every spring settles at once and nothing stretches;
+  the surface still answers the pointer.
 
 ### Controls
 
@@ -185,23 +87,28 @@ And all five have:
   touches. Disabling a control mid-drag ends the drag.
 - Right-to-left layouts, mirrored the way Flutter's own controls mirror.
 - A debug error naming the control when it is given an unbounded width.
+- Labels that name their own size, so they never fall back to
+  `WidgetsApp`'s debug text style outside a `Material`.
 
 The controls:
 
 - `GlassButton` and `GlassButton.icon`, with `toggled` for a button that
   reports an on/off state, `pressStretch`, `glow` and `semanticLabel`.
-- `GlassSwitch`: a painted track and a glass knob that drags, flicks and
-  settles to the side it ends up past. `activeTrackColor` defaults to the
-  theme's accent, an approximate system green.
+  Labels are iOS's 17-point button text.
+- `GlassSwitch`: a painted 63 x 28 track and a 37 x 24 glass knob, sized to
+  iOS 27's `Toggle`, that drags, flicks and settles to the side it ends up
+  past. `activeTrackColor` defaults to the theme's accent.
 - `GlassSlider`, with `min`, `max`, `divisions`, `onChangeStart`,
   `onChangeEnd` and `semanticValueFormatter`. It can be dragged from
   anywhere in its hit area, a tap sets it (in a scroll view too), and it
   reports only real changes. Arrow keys step it, onto the division grid
   when it has one.
 - `GlassSegmentedControl` and `GlassSegment`, a travelling pill you can
-  drag. The control is a named semantics group, each segment a selectable
-  button with its own `semanticLabel`. Left and right arrows move the
-  selection; up and down are left to the page.
+  drag: a 32-point track under a 28-point pill inset 2, sized to iOS 27,
+  centred in a hit area 44 tall. Labels are 13 points, semibold when
+  selected. The control is a named semantics group, each segment a
+  selectable button with its own `semanticLabel`. Left and right arrows
+  move the selection; up and down are left to the page.
 - `GlassTextField`, built on `EditableText`. Options: `controller`,
   `placeholder`, `leading`, `trailing`, `shape`, `enabled`, `keyboardType`,
   `textInputAction`, `obscureText`, `semanticLabel`, `onChanged` and
@@ -226,133 +133,65 @@ stop there. The text field grows instead.
   bar fades out over the first 40% of any route that covers the page, so
   the bar and the covering glass are never two backdrop filters over the
   same pixels. `material` is what a bare `Glass` in either layer inherits.
+- `GlassScaffold`, `showGlassSheet` and `GlassDetentSheet` give their
+  content a text style and icon colour of their own, iOS's 17-point body in
+  the theme's label colour, the way Material's `Scaffold` does.
 - `GlassTabBar` and `GlassTab`, a floating capsule whose selection is
-  always a clear glass lens, after the Kibu app's bar. Only the selection
-  is glass: the bar is painted, a translucent capsule in the role's tint at
-  its legible step (about 54% in dark mode, 35% in light, or
-  `backgroundColor`) with a hairline rim (white in dark mode, black in
-  light) and the role's shadow, and no blur, so the lens is never glass
-  over glass. The fill is light so the content behind shows through for
-  the lens to bend, and still keeps every label at 3:1 over any backdrop,
-  so unselected labels are no longer dimmed. The default lens is brighter
-  and bends further (highlight 2.8, edge refraction 26, a 14% white tint,
-  chromatic aberration 0.3), and a faint `selectionMaterial` is raised to
-  `minimumSelectionHighlight` (2), `minimumSelectionTintOpacity` (0.12)
-  and `minimumSelectionEdgeRefraction` (14), so a clear preset never hides
-  the selection. A bouncy spring moves the lens and it squashes along its
-  travel with its speed, to at most 116% of its height, so it stays inside
-  the bar and a `GlassScaffold`'s clip of it. A drag carries it under the
-  finger, clicks once per tab crossed, and commits the tab under the finger
-  on release; a cancelled drag sends it back. Reduce Motion moves it at once, still glass.
-  `selectionMaterial` replaces `GlassTabBar.defaultSelectionMaterial`.
-  `GlassTabBar.height` and `GlassTabBar.margin` are
-  public for laying out around it. `GlassTab.semanticLabel` names icon-only
-  tabs. Labels stop growing at 1.5x text size. In debug it reports a bar
-  too narrow for 44-point tabs. `maxWidth` caps the bar, centred, at
-  `GlassTabBar.defaultMaxWidth` (480 points) unless you pass another, so on
-  a tablet it stays a capsule rather than a strip across the screen.
-- `GlassAppBar`: `leading`, a title centred iOS style and marked as a
-  header, `actions`, the top safe area, and `material`.
+  always a clear glass lens. Only the selection is glass: the bar is
+  painted, a translucent capsule in the role's tint at its legible step
+  (about 54% in dark mode, 35% in light, or `backgroundColor`) with a
+  hairline rim and the role's shadow, and no blur, so the lens is never
+  glass over glass. The fill is light enough for the content behind to show
+  through for the lens to bend, and still keeps every label at 3:1 over any
+  backdrop. The default lens is bright and bends far (highlight 2.8, edge
+  refraction 26, a 14% white tint, chromatic aberration 0.3), and a faint
+  `selectionMaterial` is raised to `minimumSelectionHighlight` (2),
+  `minimumSelectionTintOpacity` (0.12) and `minimumSelectionEdgeRefraction`
+  (14), so a clear preset never hides the selection. A bouncy spring moves
+  the lens, and it squashes along its travel with its speed, to at most 116%
+  of its height. A drag carries it under the finger, clicks once per tab
+  crossed, and commits the tab under the finger on release; a cancelled
+  drag sends it back. Reduce Motion moves it at once, still glass.
+  `GlassTabBar.height` and `GlassTabBar.margin` are public for laying out
+  around it. `GlassTab.semanticLabel` names icon-only tabs. In debug it
+  reports a bar too narrow for 44-point tabs. `maxWidth` caps the bar,
+  centred, at `GlassTabBar.defaultMaxWidth` (480 points) unless you pass
+  another, so on a tablet it stays a capsule rather than a strip.
+- `GlassAppBar`: `leading`, a 17-point semibold title centred iOS style and
+  marked as a header, `actions`, the top safe area, and `material`.
 - `showGlassSheet` presents a modal glass sheet from the bottom edge. It
   takes `isDismissible`, `material`, `barrierLabel`, `useRootNavigator` and
   `routeSettings`, and completes with what it is popped with. The sheet
   rises over the keyboard, and Reduce Motion presents it instantly, even
   mid-presentation.
-- `GlassSurface` takes a `material` on every constructor. Chrome placed on
-  glass paints its tint instead of drawing glass.
-
-- `GlassDetentSheet` — a persistent bottom sheet dragged between fixed
-  heights, à la Apple Maps: floating with an inset, large-radius corner
-  below its top detent, flush with the display's own corners at it, with a
-  scroll handoff to the content it carries and no gap between detents to
-  step across. Detents are `GlassDetent.fraction`, `.height` or `.content`.
-  `GlassDetentSheetController` drives it from outside — including
+- `GlassDetentSheet`, a persistent bottom sheet dragged between fixed
+  heights, à la Apple Maps: floating with an inset and a large-radius
+  corner below its top detent, flush with the display's own corners at it,
+  with a scroll handoff to the content it carries. Detents are
+  `GlassDetent.fraction`, `.height` or `.content`. `material` replaces the
+  sheet role's material, and `bottomGap` sets the floating bottom inset
+  apart from the side ones, for a sheet that has to clear a bar beneath it.
+  `GlassDetentSheetController` drives it from outside, including
   `presenceUnder`, which hands a covered surface's `GlassPresence` off
-  before the sheet's own glass reaches it, over a ramp the caller states in
-  their own geometry: the sheet's floating `gap` has to clear the covered
-  bar in the first place, or the two are stacked before any drag begins —
-  and `GlassSheetScrollPhysics`
-  is what lets one drag cross from the sheet to its list and back without a
-  lifted finger.
+  before the sheet's own glass reaches it. `GlassSheetScrollPhysics` lets
+  one drag cross from the sheet to its list and back without a lifted
+  finger.
+- `GlassSurface` takes a `material` on every constructor. Placed on glass,
+  it paints its tint instead of drawing glass, and inside a `GlassPresence`
+  it fades its content with the glass.
 
-### Presence
+### Backdrop sampling
 
-- `GlassPresence` and `GlassPresenceScope` fade a `Glass` in and out —
-  driven by a controller, an `Animation<double>`, or a route transition —
-  without rebaking its matte on every frame.
-
-### Host awareness
-
-- `GlassHostScope` lets a control ask `GlassHostScope.isOnGlass(context)` so
-  it can adapt when it is drawn on top of glass instead of a plain
-  background.
-
-### Rendering
-
-- Any number of shapes per material. A pass's shapes are sorted into
-  clusters, groups of shapes whose mattes could meet plus any blend group,
-  and each cluster is a draw of its own. `kMaxShapes` (8) is now a limit
-  per cluster, not per material. A grid of separate tiles no longer loses
-  its ninth.
-- The edge band reads the backdrop bilinearly wherever it bends it.
-  Nearest-neighbour reads stepped the refraction by whole texels, so every
-  edge seen through the band was stair-stepped. The flat interior keeps its
-  single tap.
-- A shape that is laid out but not drawn stays out of the matte, its
-  clusters and the diagnostics until it is. This covers shapes under an
-  `Opacity` at zero, in an `Offstage` or in a lazy list's cache region. It
-  used to sit at the layer's origin as a phantom.
-- A pass whose material changes only in shading (tint, frost, highlight) is
-  carried over to its new material and keeps its matte. A focused
-  `GlassTextField` used to rebake seventeen times.
-- `GlassTextField`'s focus is now a uniform on its pass, driven the way
-  `GlassPresence` drives a fade. The focus animation re-sorts no pass.
-- A shape painted straight into its layer no longer walks up the tree on
-  every paint to look for a repaint boundary.
-- The cross-pass overlap warning reports every overlapping pair of passes
-  in the same paint, not only the first. An overlap that animates is
-  reported once. Nothing is exempt from it.
-
-### Motion
-
-- `InteractiveGlass.glow` turns the touch glow off for one surface, where a
-  glow would light glass it should not.
-- Anchored press-stretch: `InteractiveGlass` elongates a surface toward the
-  finger that is holding it, via the new `GlassPressStretch` and
-  `GlassMotionState.pressAnchor`.
-- Touch glow: `GlassGlow` drives a per-pass shader uniform from the pointer,
-  reaching neighbouring shapes so a touch's glow is not clipped to the
-  surface under the finger.
-- Fixed a surface with no area (zero width or height) transforming to NaN
-  instead of resolving to a safe default.
-
-### Debug tooling
-
-- A debug-only warning fires when shapes in different render passes overlap
-  on screen, surfacing the artifact behind
-  [flutter/flutter#187820](https://github.com/flutter/flutter/issues/187820)
-  before it reaches a release build.
-
-## 0.1.0
-
-First release.
-
-### Rendering
-
-- `GlassLayer` captures the backdrop once per material, and every `Glass`
-  under it registers into one shared signed-distance matte.
-- Two refraction models. `GlassMaterial.regular(brightness:)` and
-  `GlassMaterial.clear()` bend only inside a band at the rim, fitted against
-  iOS 27 captures. `GlassMaterial.dome()` refracts across the whole surface.
-- Shapes: `GlassRoundedRectangle`, `GlassOval` and `GlassSuperellipse`.
-  `GlassBlendGroup` smooth-mins shapes into one another.
-
-### Motion
-
-- `InteractiveGlass` handles press, drag, fling and spring-home. Squash and
-  stretch are read off the spring's own velocity.
-- Springs take a duration and a bounce, the way SwiftUI specifies them:
-  `GlassMotion.bouncy`, `.snappy`, `.smooth` and `.interactive`.
+- `GlassBackdropSampler`, `GlassBackdropSource` and `GlassBackdropBuilder`
+  measure what is behind a surface, so adaptation needs no caller-supplied
+  `backdrop`. The source is snapshotted at low resolution (1/8 scale, at
+  most 96 px on its long side), asynchronously, at most every 200 ms and
+  only after it repainted; each surface takes the mean colour under its own
+  rect, with a luminance band so it does not flicker between schemes.
+  `GlassSurface`, `GlassAppBar`, `GlassTabBar`, `GlassDetentSheet` and every
+  control use it when no `backdrop` is given. An explicit `backdrop` still
+  wins. Nothing is sampled where the tier renders no glass, under Reduce
+  Transparency, or on glass.
 
 ### Tiering and accessibility
 
@@ -367,7 +206,32 @@ First release.
 
 - Tokens for blur, radius, depth and tint, five `GlassSurface` roles, and
   `GlassTheme`.
+- The controls' colours come from the theme: `GlassTokens.controls`, a
+  `GlassControlPalette` of light and dark `GlassControlColors` — `accent`
+  (the switch's on-track), `knob` (the knob, thumb and pill painted on
+  glass), and `fill` and `focus` (the slider's fill and the focus ring,
+  null for the label colour). `GlassSwitch.activeTrackColor` still wins for
+  one switch.
+- The chrome's painted colours do too: `GlassTokens.chrome`, a
+  `GlassChromeColors` with `scrim` (under `showGlassSheet`, black at 32% by
+  default) and `handle` (both sheets' grab handle, null for the sheet's
+  label colour).
+
+### Debug tooling
+
+- A warning when shapes in different render passes overlap on screen,
+  surfacing the artifact behind
+  [flutter/flutter#187820](https://github.com/flutter/flutter/issues/187820)
+  before it reaches a release build. It reports every overlapping pair
+  once, not every frame.
+- A warning when more shapes sit in one cluster than a single draw can
+  carry (`kMaxShapes`).
 
 ### Known limits
 
+- `kMaxShapes` is 8 per cluster: shapes whose mattes could meet, and every
+  shape in one blend group. Past eight the extras are not drawn.
+- The backdrop sampler misses a repaint behind a repaint boundary inside the
+  source until `GlassBackdropSampler.markNeedsSample`, and a surface that
+  moves while nothing repaints or scrolls keeps its last reading.
 - Benchmark budgets are seed values, not measurements from real hardware.
