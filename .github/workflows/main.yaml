@@ -20,7 +20,7 @@ jobs:
       modified_files_only: false
 
   build:
-    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v1
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v2
     with:
       # Must satisfy pubspec.yaml's `flutter: ">=3.47.0"`. This was pinned at
       # 3.44.x, which cannot resolve that constraint, so the job failed at
